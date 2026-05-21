@@ -157,8 +157,10 @@ textarea { resize: vertical; min-height: 72px; }
 .map-control-btn { background: var(--card); border: 1px solid var(--border2); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); transition: all .15s; white-space: nowrap; }
 .map-control-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 .map-control-btn.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
-.map-legend { position: absolute; bottom: 30px; left: 10px; z-index: 800; background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); min-width: 150px; }
-.map-legend h4 { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.map-legend { position: absolute; bottom: 0; left: 0; right: 0; z-index: 800; background: rgba(13,26,13,.88); border-top: 1px solid var(--border2); padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; backdrop-filter: blur(4px); }
+.map-legend h4 { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; white-space: nowrap; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text2); white-space: nowrap; }
+.legend-swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
 .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
 .legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
 .map-sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
@@ -334,7 +336,8 @@ textarea { resize: vertical; min-height: 72px; }
   .search-input { max-width: 100% !important; }
   header { padding: 8px 12px; gap: 8px; }
   header > span { display: none; }
-  .header-tools { flex-wrap: wrap; gap: 5px; }
+  .header-tools { display: none; } /* moved to Clientes tab on mobile */
+  .mobile-tools-bar { display: flex !important; } /* show inside Clientes tab */
   #campana-global { font-size: 11px; padding: 3px 6px; min-width: 70px; }
   .treatment-card-header { flex-wrap: wrap; gap: 5px; }
   .trt-date { min-width: 0; }
@@ -401,14 +404,17 @@ textarea { resize: vertical; min-height: 72px; }
   .cultivo-row-name { min-width: 100%; }
 }
 
-/* ── Map on mobile ─────────────────────────────── */
+/* ── Map on mobile — FULL SCREEN ────────────────── */
 @media (max-width: 768px) {
   .map-panel-inner { flex-direction: column; }
-  .map-sidebar { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
-  .map-container { flex: 1; min-height: 260px; }
+  .map-sidebar { display: none; }
+  .map-container { flex: 1; min-height: 100%; }
   .map-controls { top: 6px; right: 6px; }
   .map-control-btn { font-size: 11px; padding: 5px 8px; }
-  .map-legend { bottom: 20px; left: 6px; font-size: 11px; padding: 8px 10px; }
+}
+@media (max-width: 600px) {
+  #tab-mapa { height: calc(100vh - 58px) !important; overflow: hidden !important; }
+  #tab-mapa.active { display: flex; flex-direction: column; height: calc(100vh - 58px) !important; }
 }
 
 /* Stat cards */
@@ -508,7 +514,7 @@ textarea { resize: vertical; min-height: 72px; }
 
 <!-- MOBILE BOTTOM NAV (visible on screens ≤600px) -->
 <nav id="mobile-nav">
-  <button class="mnav-btn active" onclick="switchTab('tratamientos')" id="mnav-tratamientos">
+  <button class="mnav-btn" onclick="switchTab('tratamientos')" id="mnav-tratamientos">
     <span class="mnav-icon">💊</span><span>Tratam.</span>
   </button>
   <button class="mnav-btn" onclick="switchTab('abonado')" id="mnav-abonado">
@@ -523,7 +529,7 @@ textarea { resize: vertical; min-height: 72px; }
   <button class="mnav-btn" onclick="switchTab('recintos')" id="mnav-recintos">
     <span class="mnav-icon">📋</span><span>Recintos</span>
   </button>
-  <button class="mnav-btn" onclick="switchTab('clientes')" id="mnav-clientes">
+  <button class="mnav-btn active" onclick="switchTab('clientes')" id="mnav-clientes">
     <span class="mnav-icon">👥</span><span>Clientes</span>
   </button>
   <button class="mnav-btn" onclick="switchTab('productos')" id="mnav-productos">
@@ -555,19 +561,19 @@ textarea { resize: vertical; min-height: 72px; }
 </header>
 
 <nav class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('tratamientos')">💊 Tratamientos <span class="badge" id="badge-trt">0</span></button>
+  <button class="tab-btn" onclick="switchTab('tratamientos')">💊 Tratamientos <span class="badge" id="badge-trt">0</span></button>
   <button class="tab-btn" onclick="switchTab('productos')">🌿 Productos <span class="badge" id="badge-prod">0</span></button>
   <button class="tab-btn" onclick="switchTab('abonos')">🧪 Abonos <span class="badge" id="badge-abo">0</span></button>
   <button class="tab-btn" onclick="switchTab('abonado')">🌱 Abonado <span class="badge" id="badge-abonado">0</span></button>
   <button class="tab-btn" onclick="switchTab('parcelas')">🗂️ Parcelas <span class="badge" id="badge-par">0</span></button>
   <button class="tab-btn" onclick="switchTab('mapa')">🗺️ Mapa</button>
   <button class="tab-btn" onclick="switchTab('recintos')">📋 Recintos <span class="badge" id="badge-rec">0</span></button>
-  <button class="tab-btn" onclick="switchTab('clientes')">👥 Clientes <span class="badge" id="badge-cli">0</span></button>
+  <button class="tab-btn active" onclick="switchTab('clientes')">👥 Clientes <span class="badge" id="badge-cli">0</span></button>
 </nav>
 
 <main>
   <!-- TRATAMIENTOS -->
-  <div class="tab-panel active" id="tab-tratamientos">
+  <div class="tab-panel" id="tab-tratamientos">
     <div class="content">
       <div class="section-header">
         <h2>Tratamientos fitosanitarios</h2>
@@ -686,8 +692,23 @@ textarea { resize: vertical; min-height: 72px; }
   </div>
 
   <!-- CLIENTES -->
-  <div class="tab-panel" id="tab-clientes">
+  <div class="tab-panel active" id="tab-clientes">
     <div class="content">
+      <!-- Mobile-only toolbar (hidden on desktop where header shows these) -->
+      <div class="mobile-tools-bar" style="display:none;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:10px 12px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border)">
+        <div style="width:100%;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Campaña activa</div>
+        <select id="campana-global-mobile" onchange="document.getElementById('campana-global').value=this.value;onCampanaChange()" style="flex:1;background:var(--accent-light);border:1px solid var(--accent);color:var(--accent);padding:6px 10px;border-radius:20px;font-size:12px;font-weight:600">
+          <option value="">Todas</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="promptNuevaCampanaGlobal()" style="font-size:12px">＋</button>
+        <div style="width:100%;height:1px;background:var(--border);margin:4px 0"></div>
+        <button class="btn btn-accent btn-sm" onclick="exportarDatos()" style="flex:1">💾 Exportar copia</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-json-input-mobile').click()" style="flex:1">📂 Importar copia</button>
+        <input type="file" id="import-json-input-mobile" accept=".json" style="display:none" onchange="importarDatos(this)">
+        <button class="btn btn-secondary btn-sm" onclick="openDriveSettings()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px">
+          <span id="gdrive-indicator-mobile">☁️</span> Google Drive
+        </button>
+      </div>
       <div class="section-header">
         <h2>Clientes</h2>
         <button class="btn btn-primary" onclick="openClienteModal()">＋ Nuevo cliente</button>
@@ -1584,6 +1605,7 @@ var gDrive = {
 function updateSyncStatus(status) {
   var btn = document.getElementById('gdrive-btn');
   var ind = document.getElementById('gdrive-indicator');
+  var indM = document.getElementById('gdrive-indicator-mobile');
   if(!btn || !ind) return;
   var map = {
     disconnected: { icon:'☁️', color:'var(--text3)',     label:'Google Drive', title:'Conectar Google Drive para sincronización' },
@@ -1598,6 +1620,7 @@ function updateSyncStatus(status) {
   btn.title       = s.title;
   btn.style.color = s.color;
   btn.querySelector('.gdrive-label').textContent = s.label;
+  if(indM) indM.textContent = s.icon;
 }
 
 function showSyncToast(msg) {
@@ -3743,13 +3766,19 @@ function getAllCampanas() {
 }
 
 function refreshCampanaSelector() {
-  var sel = document.getElementById('campana-global');
+  var sel  = document.getElementById('campana-global');
+  var selM = document.getElementById('campana-global-mobile');
   if(!sel) return;
   var campanas = getAllCampanas();
-  var html = '<option value="">Todas</option>';
-  campanas.forEach(function(c){ html += '<option value="' + c + '"' + (currentCampana===c?' selected':'') + '>Campaña ' + c + '</option>'; });
-  sel.innerHTML = html;
-  sel.value = currentCampana;
+  var opts = '<option value="">Todas</option>';
+  campanas.forEach(function(c){ opts += '<option value="' + c + '"' + (currentCampana===c?' selected':'') + '>Campaña ' + c + '</option>'; });
+  sel.innerHTML  = opts;
+  sel.value      = currentCampana;
+  if(selM) { selM.innerHTML = opts; selM.value = currentCampana; }
+  // Sync Drive indicator in mobile toolbar
+  var indM = document.getElementById('gdrive-indicator-mobile');
+  var indH = document.getElementById('gdrive-indicator');
+  if(indM && indH) indM.textContent = indH.textContent;
 }
 
 function onCampanaChange() {
@@ -5078,7 +5107,7 @@ window.addEventListener('DOMContentLoaded', function() {
   if(camps.length) currentCampana = camps[camps.length-1];
   refreshCampanaSelector();
   populateAllFilters();
-  renderTratamientos();
+  renderClientes(); // default view
 });
 
 function copyText(val) {
