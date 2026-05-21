@@ -34,6 +34,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 /* HEADER */
 header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 20px; display: flex; align-items: center; gap: 10px; min-height: 52px; flex-shrink: 0; flex-wrap: wrap; }
+.header-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; color: var(--white); letter-spacing: -0.3px; }
 .logo-icon { font-size: 22px; }
 .logo span { color: var(--primary); }
@@ -157,12 +158,10 @@ textarea { resize: vertical; min-height: 72px; }
 .map-control-btn { background: var(--card); border: 1px solid var(--border2); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); transition: all .15s; white-space: nowrap; }
 .map-control-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 .map-control-btn.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
-.map-legend { position: absolute; bottom: 0; left: 0; right: 0; z-index: 800; background: rgba(13,26,13,.88); border-top: 1px solid var(--border2); padding: 5px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; backdrop-filter: blur(4px); }
-.map-legend h4 { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; white-space: nowrap; }
-.legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text2); white-space: nowrap; }
-.legend-swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
-.legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
-.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
+.map-legend { position: absolute; bottom: 0; left: 0; right: 0; z-index: 800; background: rgba(10,20,10,.82); border-top: 1px solid rgba(255,255,255,.1); padding: 4px 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; backdrop-filter: blur(6px); max-height: 52px; overflow: hidden; }
+.map-legend h4 { font-size: 9px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-right: 2px; flex-shrink: 0; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text2); white-space: nowrap; line-height: 1; }
+.legend-swatch { width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(255,255,255,.12); flex-shrink: 0; }
 .map-sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .map-sidebar-header h3 { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
 .map-sidebar-header p { font-size: 12px; color: var(--text3); }
@@ -543,7 +542,7 @@ textarea { resize: vertical; min-height: 72px; }
 <header>
   <div class="logo"><span class="logo-icon">🌾</span> Agro<span>Track</span></div>
   <span style="color:var(--text3);font-size:12px;white-space:nowrap">Cuaderno Fitosanitario</span>
-  <div class="header-tools" style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+  <div class="header-tools">
     <span style="color:var(--text3);font-size:12px;white-space:nowrap">Campaña:</span>
     <select id="campana-global" onchange="onCampanaChange()" style="background:var(--accent-light);border:1px solid var(--accent);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;min-width:90px">
       <option value="">Todas</option>
@@ -648,6 +647,7 @@ textarea { resize: vertical; min-height: 72px; }
           <button class="map-control-btn" id="btn-layer-pnoa" onclick="toggleLayer('pnoa')">🛰️ PNOA</button>
           <button class="map-control-btn" id="btn-layer-sigpac" onclick="toggleLayer('sigpac')">📐 SIGPAC</button>
           <button class="map-control-btn" onclick="zoomToParcels()">⛶ Encuadrar</button>
+          <button class="map-control-btn" onclick="locateMe()" id="btn-locate" title="Mi ubicación">📍 Ubicación</button>
           <div style="border-top:1px solid var(--border2);margin:2px 0"></div>
           <button class="map-control-btn active" id="btn-view-recintos" onclick="setMapView('recintos')">📋 Recintos</button>
           <button class="map-control-btn" id="btn-view-parcelas" onclick="setMapView('parcelas')">🗂️ Parcelas</button>
@@ -1885,6 +1885,65 @@ function highlightParcel(id) {
 }
 function zoomToParcels() {
   if(layerParcels.getLayers().length > 0) map.fitBounds(layerParcels.getBounds(), {padding:[20,20]});
+}
+
+var _locateMarker = null;
+var _locateCircle = null;
+
+function locateMe() {
+  var btn = document.getElementById('btn-locate');
+  if(!navigator.geolocation) {
+    alert('Tu navegador no soporta geolocalización');
+    return;
+  }
+  if(btn) { btn.textContent = '⏳ Buscando…'; btn.classList.add('active'); }
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.latitude;
+      var lng = pos.coords.longitude;
+      var acc = pos.coords.accuracy; // metres
+
+      // Remove previous markers
+      if(_locateMarker) map.removeLayer(_locateMarker);
+      if(_locateCircle) map.removeLayer(_locateCircle);
+
+      // Accuracy circle
+      _locateCircle = L.circle([lat, lng], {
+        radius: acc,
+        color: '#4a8ce0',
+        fillColor: '#4a8ce0',
+        fillOpacity: 0.12,
+        weight: 1.5
+      }).addTo(map);
+
+      // Blue dot marker
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:#4a8ce0;border:3px solid #fff;box-shadow:0 0 8px rgba(74,140,224,.8)"></div>',
+        iconSize: [18,18],
+        iconAnchor: [9,9]
+      });
+      _locateMarker = L.marker([lat, lng], {icon: icon})
+        .addTo(map)
+        .bindPopup('<b>📍 Tu ubicación</b><br>Precisión: ±' + Math.round(acc) + ' m')
+        .openPopup();
+
+      // Zoom to location
+      map.flyTo([lat, lng], Math.max(map.getZoom(), 15), {duration: 1.2});
+
+      if(btn) { btn.textContent = '📍 Ubicación'; btn.classList.add('active'); }
+    },
+    function(err) {
+      var msgs = {
+        1: 'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.',
+        2: 'No se pudo determinar la posición.',
+        3: 'Tiempo de espera agotado.'
+      };
+      alert('⚠️ ' + (msgs[err.code] || err.message));
+      if(btn) { btn.textContent = '📍 Ubicación'; btn.classList.remove('active'); }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+  );
 }
 
 let activeLayer = 'osm';
@@ -3843,16 +3902,16 @@ function renderMap() {
     renderMapByRecintos(legendColors);
   }
 
-  // Legend
-  var leg = document.getElementById('map-legend');
+  // Legend — compact horizontal strip
+  var leg  = document.getElementById('map-legend');
   var keys = Object.keys(legendColors);
   if(keys.length) {
     var legHtml = '<h4>Cultivos</h4>';
     keys.forEach(function(k) {
-      legHtml += '<div class="legend-item"><div class="legend-swatch" style="background:' + legendColors[k] + '"></div>' + k + '</div>';
+      legHtml += '<span class="legend-item"><span class="legend-swatch" style="background:' + legendColors[k] + '"></span>' + k + '</span>';
     });
     leg.innerHTML = legHtml;
-    leg.style.display = 'block';
+    leg.style.display = 'flex';
   } else {
     leg.style.display = 'none';
   }
