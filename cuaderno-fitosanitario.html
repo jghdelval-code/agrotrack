@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgroTrack — Cuaderno Fitosanitario</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -655,6 +657,15 @@ textarea { resize: vertical; min-height: 72px; }
           <div style="border-top:1px solid var(--border2);margin:2px 0"></div>
           <button class="map-control-btn active" id="btn-view-recintos" onclick="setMapView('recintos')">📋 Recintos</button>
           <button class="map-control-btn" id="btn-view-parcelas" onclick="setMapView('parcelas')">🗂️ Parcelas</button>
+          <div style="border-top:1px solid var(--border2);margin:2px 0"></div>
+          <button class="map-control-btn" id="btn-draw-polygon" onclick="startDrawing()" title="Dibujar recinto en el mapa">✏️ Dibujar</button>
+        </div>
+        <!-- Draw panel — shown while drawing -->
+        <div id="draw-panel" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:900;background:rgba(10,20,10,.92);border:1px solid var(--primary);border-radius:10px;padding:10px 16px;backdrop-filter:blur(6px);display:none;align-items:center;gap:10px;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.6)">
+          <span style="font-size:18px">✏️</span>
+          <span style="color:var(--white);font-size:13px;font-weight:600" id="draw-status">Haz clic en el mapa para empezar a dibujar el recinto</span>
+          <button onclick="finishDrawing()" class="btn btn-primary btn-sm" id="btn-draw-finish" style="display:none">✓ Completar</button>
+          <button onclick="cancelDrawing()" class="btn btn-danger btn-sm">✕ Cancelar</button>
         </div>
         <div class="map-legend" id="map-legend"></div>
       </div>
@@ -1335,6 +1346,35 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-compra')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCompra()">💾 Guardar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ASIGNAR GEOMETRÍA DIBUJADA -->
+<div class="modal-overlay" id="modal-draw-assign">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>✏️ Guardar recinto dibujado</h3>
+      <button class="modal-close" onclick="cancelDrawing()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="padding:10px 12px;background:rgba(74,140,42,.1);border:1px solid var(--primary);border-radius:8px;margin-bottom:14px;font-size:13px">
+        <b style="color:var(--primary)">🗺️ Geometría dibujada</b><br>
+        <span id="draw-area-info" style="color:var(--text2)"></span>
+      </div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">¿A qué recinto quieres asignar esta geometría? Selecciona uno existente o crea uno nuevo:</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Asignar a recinto existente</label>
+        <select id="draw-assign-recinto" style="width:100%">
+          <option value="">— Selecciona un recinto —</option>
+        </select>
+      </div>
+      <div style="text-align:center;color:var(--text3);font-size:12px;margin-bottom:12px">— o —</div>
+      <button class="btn btn-secondary" style="width:100%" onclick="drawCreateNewRecinto()">＋ Crear nuevo recinto con esta geometría</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cancelDrawing()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDrawnGeometry()">💾 Guardar geometría</button>
     </div>
   </div>
 </div>
@@ -2635,16 +2675,22 @@ function deleteProducto(id) {
 // ============================================================
 function renderRecintos() {
   const search = document.getElementById('rec-search').value.toLowerCase();
-  const fCli = document.getElementById('rec-filter-cliente').value;
+  const fCli  = document.getElementById('rec-filter-cliente').value;
   const fCult = document.getElementById('rec-filter-cultivo').value;
-  // Also apply global campaign filter
   const fCamp = currentCampana;
   let list = DB.recintos.filter(r => {
+    // Always show incomplete/pending recintos regardless of filters
+    var isEmpty = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
+    if(isEmpty) return true;
     if(fCamp && r.campana !== fCamp) return false;
-    if(fCli && r.clienteId!==fCli) return false;
+    if(fCli  && r.clienteId !== fCli) return false;
     if(fCult && !(r.especieVariedad||'').toLowerCase().includes(fCult.toLowerCase())) return false;
-    if(search && !(r.nombreFinca||'').toLowerCase().includes(search) &&
-       !(`${r.numPoligono}-${r.numParcela}`).includes(search)) return false;
+    if(search &&
+       !(r.nombreFinca||'').toLowerCase().includes(search) &&
+       !(`${r.numPoligono||''}-${r.numParcela||''}`).includes(search) &&
+       !(r.especieVariedad||'').toLowerCase().includes(search) &&
+       !(r.clienteId ? (DB.clientes.find(c=>c.id===r.clienteId)?.nombre||'').toLowerCase().includes(search) : false)
+    ) return false;
     return true;
   });
 
@@ -2695,11 +2741,16 @@ function renderRecintos() {
   }
   tbody.innerHTML = list.map(r => {
     const cli = DB.clientes.find(c=>c.id===r.clienteId);
-    const sigpacRef = `${r.codProvincia}-${(r.termMunicipal||'').split(' ')[0]||'?'}-${r.numPoligono}-${r.numParcela}-${r.numRecinto}`;
-    return `<tr>
+    const sigpacRef = `${r.codProvincia||'?'}-${(r.termMunicipal||'').split(' ')[0]||'?'}-${r.numPoligono||'?'}-${r.numParcela||'?'}-${r.numRecinto||'?'}`;
+    const isEmpty = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
+    const rowStyle = isEmpty ? 'background:rgba(212,160,23,.08);' : '';
+    const warningBadge = isEmpty
+      ? '<span class="tag tag-yellow" style="font-size:10px;margin-left:6px" title="Recinto dibujado sin datos — pulsa ✏️ para completarlo">⚠️ Pendiente</span>'
+      : '';
+    return `<tr style="${rowStyle}">
       <td class="col-hide-mobile" style="color:var(--text3)">${r.numOrden||'—'}</td>
-      <td>${cli?`<b>${cli.nombre}</b>`:'<span style="color:var(--text3)">—</span>'}</td>
-      <td>${r.nombreFinca||'—'}</td>
+      <td>${cli?`<b>${cli.nombre}</b>`:'<span style="color:var(--accent)">Sin asignar</span>'}${warningBadge}</td>
+      <td>${r.nombreFinca||'<span style="color:var(--text3)">Sin nombre</span>'}</td>
       <td><code style="font-size:11px;color:var(--accent)">${sigpacRef}</code></td>
       <td>${getCropTag(r.especieVariedad)}</td>
       <td>${r.supSigpac||'—'} ha</td>
@@ -2707,7 +2758,7 @@ function renderRecintos() {
       <td class="col-hide-mobile"><span class="tag ${r.secanoRegadio==='Regadío'?'tag-blue':'tag-gray'}">${r.secanoRegadio||'—'}</span></td>
       <td class="col-hide-mobile">${r.wkt ? '<span class="tag tag-green">✓ WKT</span>' : '<span class="tag tag-gray">Sin WKT</span>'}</td>
       <td class="td-actions">
-        <button class="btn btn-secondary btn-sm" onclick="openRecintoModal('${r.id}')">✏️</button>
+        <button class="btn ${isEmpty?'btn-accent':'btn-secondary'} btn-sm" onclick="openRecintoModal('${r.id}')" title="${isEmpty?'⚠️ Completar datos del recinto':'Editar recinto'}">${isEmpty?'⚠️ Completar':'✏️'}</button>
         <button class="btn btn-secondary btn-sm" onclick="copyRecinto('${r.id}')" title="Copiar recinto para dividir cultivos">📋</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecinto('${r.id}')">🗑️</button>
       </td>
@@ -2837,188 +2888,187 @@ function renderClientes() {
 
   for(var ci = 0; ci < DB.clientes.length; ci++) {
     var c = DB.clientes[ci];
-    // Filter recintos by campaign if active
-    var recs = [];
-    for(var ri = 0; ri < DB.recintos.length; ri++) {
-      var rec = DB.recintos[ri];
-      if(rec.clienteId !== c.id) continue;
-      if(currentCampana && rec.campana !== currentCampana) continue;
-      recs.push(rec);
-    }
-    // Filter tratamientos by campaign if active
-    var nTrt = 0;
-    for(var ti = 0; ti < DB.tratamientos.length; ti++) {
-      var trt = DB.tratamientos[ti];
-      if(trt.clienteId !== c.id) continue;
-      if(currentCampana && trt.campana !== currentCampana) continue;
-      nTrt++;
-    }
-    // All campaigns for this client (for the chips — always show all)
-    var allRecs = DB.recintos.filter(function(r){ return r.clienteId===c.id; });
+
+    // All campaigns for this client
+    var allRecs = DB.recintos.filter(function(r){ return r.clienteId === c.id; });
     var campSet = {};
-    for(var ri2 = 0; ri2 < allRecs.length; ri2++) {
-      if(allRecs[ri2].campana) campSet[allRecs[ri2].campana] = 1;
-    }
-    var campanas = Object.keys(campSet).sort();
+    allRecs.forEach(function(r){ if(r.campana) campSet[r.campana] = 1; });
+    var allCampanas = Object.keys(campSet).sort();
 
-    // ── Superficies — supSIGPAC deduplicada por referencia única ──
-    var sigSeenCli = {};
-    var totSIG = 0, totCul = 0, haSecano = 0, haRegadio = 0;
-    for(var ri3 = 0; ri3 < recs.length; ri3++) {
-      var r = recs[ri3];
-      // Build unique SIGPAC key for deduplication
-      var sigKeyCli = [
-        String(r.codProvincia||'').trim(),
-        String(r.termMunicipal||'').split(' ')[0].trim(),
-        String(r.numPoligono||'').trim(),
-        String(r.numParcela||'').trim(),
-        String(r.numRecinto||'').trim()
-      ].join('-');
-      var sig = parseFloat(r.supSigpac) || 0;
-      if(!sigSeenCli[sigKeyCli] || sig > sigSeenCli[sigKeyCli]) sigSeenCli[sigKeyCli] = sig;
-      // supCultivada: always accumulate (each split has its own)
-      totCul += parseFloat(r.supCultivada) || 0;
-      var reg = (r.secanoRegadio||'').toLowerCase();
-      var ha  = parseFloat(r.supCultivada) || 0;
-      if(reg.indexOf('secano') >= 0)  haSecano  += ha;
-      if(reg.indexOf('regad')  >= 0)  haRegadio += ha;
-    }
-    // Sum unique SIGPAC areas only
-    Object.keys(sigSeenCli).forEach(function(k){ totSIG += sigSeenCli[k]; });
-    var pctSec = totCul > 0 ? (haSecano  / totCul * 100) : 0;
-    var pctReg = totCul > 0 ? (haRegadio / totCul * 100) : 0;
-    var haOtro = totCul - haSecano - haRegadio;
-    var pctOtro = totCul > 0 ? (haOtro / totCul * 100) : 0;
+    // Campaign filter logic
+    var showCampanas = currentCampana ? [currentCampana] : allCampanas;
 
-    // ── Cultivos ──
-    var cultivoMap = {};
-    var cultivoSecano = {};
-    var cultivoRegadio = {};
-    for(var ri4 = 0; ri4 < recs.length; ri4++) {
-      var r4 = recs[ri4];
-      if(!r4.especieVariedad) continue;
-      var cv = r4.especieVariedad.trim();
-      var ha4 = parseFloat(r4.supCultivada) || 0;
-      cultivoMap[cv] = (cultivoMap[cv] || 0) + ha4;
-      var reg4 = (r4.secanoRegadio||'').toLowerCase();
-      if(reg4.indexOf('secano') >= 0) cultivoSecano[cv]  = (cultivoSecano[cv]  || 0) + ha4;
-      if(reg4.indexOf('regad')  >= 0) cultivoRegadio[cv] = (cultivoRegadio[cv] || 0) + ha4;
+    // Helper: build per-campaign surface + cultivo stats
+    function buildCampStats(campana) {
+      var recs = allRecs.filter(function(r){ return !campana || r.campana === campana; });
+      var sigSeen = {}, totSIG = 0, totCul = 0, haSecano = 0, haRegadio = 0;
+      recs.forEach(function(r){
+        var key = [r.codProvincia||'',String(r.termMunicipal||'').split(' ')[0],r.numPoligono||'',r.numParcela||'',r.numRecinto||''].join('-');
+        var sig = parseFloat(r.supSigpac)||0;
+        if(!sigSeen[key] || sig > sigSeen[key]) sigSeen[key] = sig;
+        totCul += parseFloat(r.supCultivada)||0;
+        var reg = (r.secanoRegadio||'').toLowerCase();
+        var ha  = parseFloat(r.supCultivada)||0;
+        if(reg.includes('secano')) haSecano += ha;
+        if(reg.includes('regad'))  haRegadio += ha;
+      });
+      Object.keys(sigSeen).forEach(function(k){ totSIG += sigSeen[k]; });
+      var cultivoMap = {}, cultivoSecano = {}, cultivoRegadio = {};
+      recs.forEach(function(r){
+        if(!r.especieVariedad) return;
+        var cv = r.especieVariedad.trim();
+        var ha = parseFloat(r.supCultivada)||0;
+        cultivoMap[cv] = (cultivoMap[cv]||0) + ha;
+        var reg = (r.secanoRegadio||'').toLowerCase();
+        if(reg.includes('secano')) cultivoSecano[cv]  = (cultivoSecano[cv]||0)  + ha;
+        if(reg.includes('regad'))  cultivoRegadio[cv] = (cultivoRegadio[cv]||0) + ha;
+      });
+      var nSinCultivo = recs.filter(function(r){return !r.especieVariedad;}).length;
+      var nTrt = DB.tratamientos.filter(function(t){return t.clienteId===c.id && (!campana||t.campana===campana);}).length;
+      return { recs, totSIG, totCul, haSecano, haRegadio, cultivoMap, cultivoSecano, cultivoRegadio, nSinCultivo, nTrt };
     }
 
-    // Sort cultivos by ha desc
-    var cultivoList = Object.keys(cultivoMap).sort(function(a,b){ return cultivoMap[b]-cultivoMap[a]; });
-    var nSinCultivo = 0;
-    for(var ri5 = 0; ri5 < recs.length; ri5++) { if(!recs[ri5].especieVariedad) nSinCultivo++; }
-
-    // ── Build cultivo rows ──
-    var cultivoRows = '';
-    for(var cvi = 0; cvi < cultivoList.length; cvi++) {
-      var cv2  = cultivoList[cvi];
-      var ha2  = cultivoMap[cv2];
-      var pct2 = totCul > 0 ? (ha2 / totCul * 100) : 0;
-      var color = getCropColor(cv2);
-      var sec2 = cultivoSecano[cv2]  || 0;
-      var reg2 = cultivoRegadio[cv2] || 0;
-      var pctSec2 = ha2 > 0 ? (sec2 / ha2 * 100) : 0;
-      var pctReg2 = ha2 > 0 ? (reg2 / ha2 * 100) : 0;
-
-      cultivoRows += '<div class="cultivo-row">' +
-        '<span class="crop-dot" style="background:' + color + ';width:10px;height:10px;flex-shrink:0"></span>' +
-        '<span class="cultivo-row-name">' + cv2 + '</span>' +
-        '<div class="cultivo-row-bar"><div class="cultivo-row-bar-fill" style="width:' + pct2.toFixed(1) + '%;background:' + color + '"></div></div>' +
-        '<span class="cultivo-row-pct">' + pct2.toFixed(1) + '%</span>' +
-        '<span class="cultivo-row-ha">' + ha2.toFixed(2) + ' ha</span>' +
-        '<div class="cultivo-row-reg">';
-      if(sec2 > 0.005) cultivoRows += '<span class="reg-pill reg-pill-sec">🌾 ' + pctSec2.toFixed(0) + '% sec</span>';
-      if(reg2 > 0.005) cultivoRows += '<span class="reg-pill reg-pill-reg">💧 ' + pctReg2.toFixed(0) + '% reg</span>';
-      cultivoRows += '</div></div>';
-    }
-
-    if(!cultivoRows) {
-      cultivoRows = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin cultivos asignados</div>';
-    }
-    if(nSinCultivo > 0) {
-      cultivoRows += '<div class="cultivo-row">' +
-        '<span style="width:10px;height:10px;border:1px solid var(--border2);border-radius:50%;display:inline-block;flex-shrink:0"></span>' +
-        '<span class="cultivo-row-name" style="color:var(--text3)">Sin cultivo asignado</span>' +
-        '<div class="cultivo-row-bar"></div>' +
-        '<span class="cultivo-row-pct" style="color:var(--text3)">—</span>' +
-        '<span class="cultivo-row-ha" style="color:var(--text3)">' + nSinCultivo + ' rec.</span>' +
-        '<div class="cultivo-row-reg"></div>' +
-        '</div>';
-    }
-
-    // ── Regime block ──
-    var regimenHtml = '';
-    if(totCul > 0) {
-      regimenHtml += '<div class="reg-total-bar">' +
-        '<div class="reg-total-bar-sec" style="width:' + pctSec.toFixed(1) + '%"></div>' +
-        '<div class="reg-total-bar-reg" style="width:' + pctReg.toFixed(1) + '%"></div>' +
-        '</div>' +
-        '<div class="reg-total-legend">' +
-        '<div class="reg-total-item"><div class="reg-dot" style="background:#d4a017"></div>' +
-        '<div><div style="font-weight:700;color:var(--white)">' + pctSec.toFixed(1) + '%</div>' +
-        '<div style="color:var(--text3);font-size:11px">Secano (' + haSecano.toFixed(2) + ' ha)</div></div></div>' +
-        '<div class="reg-total-item"><div class="reg-dot" style="background:#5dade2"></div>' +
-        '<div><div style="font-weight:700;color:var(--white)">' + pctReg.toFixed(1) + '%</div>' +
-        '<div style="color:var(--text3);font-size:11px">Regadío (' + haRegadio.toFixed(2) + ' ha)</div></div></div>';
-      if(haOtro > 0.005) {
-        regimenHtml += '<div class="reg-total-item"><div class="reg-dot" style="background:var(--border2)"></div>' +
-          '<div><div style="font-weight:700;color:var(--white)">' + pctOtro.toFixed(1) + '%</div>' +
-          '<div style="color:var(--text3);font-size:11px">Sin clasificar (' + haOtro.toFixed(2) + ' ha)</div></div></div>';
+    function buildCultivoRows(stats) {
+      var cultivoList = Object.keys(stats.cultivoMap).sort(function(a,b){return stats.cultivoMap[b]-stats.cultivoMap[a];});
+      var html = '';
+      cultivoList.forEach(function(cv){
+        var ha    = stats.cultivoMap[cv];
+        var pct   = stats.totCul > 0 ? (ha / stats.totCul * 100) : 0;
+        var color = getCropColor(cv);
+        var sec2  = stats.cultivoSecano[cv]  || 0;
+        var reg2  = stats.cultivoRegadio[cv] || 0;
+        var pctSec2 = ha > 0 ? (sec2/ha*100) : 0;
+        var pctReg2 = ha > 0 ? (reg2/ha*100) : 0;
+        html += '<div class="cultivo-row">' +
+          '<span class="crop-dot" style="background:'+color+';width:10px;height:10px;flex-shrink:0"></span>' +
+          '<span class="cultivo-row-name">'+cv+'</span>' +
+          '<div class="cultivo-row-bar"><div class="cultivo-row-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+color+'"></div></div>' +
+          '<span class="cultivo-row-pct">'+pct.toFixed(1)+'%</span>' +
+          '<span class="cultivo-row-ha">'+ha.toFixed(2)+' ha</span>' +
+          '<div class="cultivo-row-reg">' +
+          (sec2>0.005?'<span class="reg-pill reg-pill-sec">🌾 '+pctSec2.toFixed(0)+'% sec</span>':'') +
+          (reg2>0.005?'<span class="reg-pill reg-pill-reg">💧 '+pctReg2.toFixed(0)+'% reg</span>':'') +
+          '</div></div>';
+      });
+      if(!html) html = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin cultivos asignados</div>';
+      if(stats.nSinCultivo > 0) {
+        html += '<div class="cultivo-row">' +
+          '<span style="width:10px;height:10px;border:1px solid var(--border2);border-radius:50%;display:inline-block;flex-shrink:0"></span>' +
+          '<span class="cultivo-row-name" style="color:var(--text3)">Sin cultivo</span>' +
+          '<div class="cultivo-row-bar"></div>' +
+          '<span class="cultivo-row-pct" style="color:var(--text3)">—</span>' +
+          '<span class="cultivo-row-ha" style="color:var(--text3)">'+stats.nSinCultivo+' rec.</span>' +
+          '<div class="cultivo-row-reg"></div></div>';
       }
-      regimenHtml += '</div>';
-    } else {
-      regimenHtml = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin datos de superficie</div>';
+      return html;
     }
 
-    // ── Chips ──
-    var chips = '<span class="tag tag-green">' + recs.length + ' recinto' + (recs.length!==1?'s':'') + '</span> ' +
-      '<span class="tag tag-blue">' + nTrt + ' trat.</span> ' +
-      '<span class="tag tag-yellow">' + totSIG.toFixed(2) + ' ha SIGPAC</span>';
-    for(var cpi = 0; cpi < campanas.length; cpi++) {
-      chips += ' <span class="tag tag-gray">C.' + campanas[cpi] + '</span>';
-    }
-
-    // ── Campaign + edit buttons ──
-    var actions = '';
-    if(recs.length) {
-      actions += '<button class="btn btn-accent btn-sm" onclick="openNuevaCampanaModal(\'' + c.id + '\')" title="Nueva campaña">🔄 Campaña</button> ';
-    }
-    actions += '<button class="btn btn-secondary btn-sm" onclick="openClienteModal(\'' + c.id + '\')">✏️ Editar</button> ';
-    actions += '<button class="btn btn-danger btn-sm" onclick="deleteCliente(\'' + c.id + '\')">🗑️</button>';
-
-    // ── Meta info line ──
-    var metaItems = '';
-    if(c.nif)      metaItems += '<span>🪪 ' + c.nif + '</span>';
-    if(c.telefono) metaItems += '<span>📞 ' + c.telefono + '</span>';
-    if(c.email)    metaItems += '<span>✉️ ' + c.email + '</span>';
-    if(c.municipio)metaItems += '<span>📍 ' + c.municipio + '</span>';
-
-    html += '<div class="cliente-card">' +
-      '<div class="cliente-card-header">' +
-      '<div>' +
-        '<div class="cliente-card-name">👤 ' + c.nombre + '</div>' +
-        (metaItems ? '<div class="cliente-card-meta">' + metaItems + '</div>' : '') +
-      '</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:8px">' + chips + '</div>' +
-      '<div class="cliente-card-actions">' + actions + '</div>' +
-      '</div>';
-
-    if(recs.length) {
-      html += '<div class="cliente-card-body">' +
-        '<div class="cliente-summary-block">' +
-        '<div class="cliente-summary-title">🌾 Cultivos — superficie y régimen hídrico</div>' +
-        cultivoRows +
-        '</div>' +
-        '<div class="cliente-summary-block">' +
-        '<div class="cliente-summary-title">💧 Total régimen hídrico</div>' +
-        regimenHtml +
-        '</div>' +
+    function buildRegimenBlock(stats) {
+      if(stats.totCul <= 0) return '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin datos de superficie</div>';
+      var pctSec  = stats.haSecano  / stats.totCul * 100;
+      var pctReg  = stats.haRegadio / stats.totCul * 100;
+      var haOtro  = stats.totCul - stats.haSecano - stats.haRegadio;
+      var pctOtro = haOtro / stats.totCul * 100;
+      return '<div class="reg-total-bar">' +
+        '<div class="reg-total-bar-sec" style="width:'+pctSec.toFixed(1)+'%"></div>' +
+        '<div class="reg-total-bar-reg" style="width:'+pctReg.toFixed(1)+'%"></div>' +
+        '</div><div class="reg-total-legend">' +
+        '<div class="reg-total-item"><div class="reg-dot" style="background:#d4a017"></div>' +
+        '<div><div style="font-weight:700;color:var(--white)">'+pctSec.toFixed(1)+'%</div>' +
+        '<div style="color:var(--text3);font-size:11px">Secano ('+stats.haSecano.toFixed(2)+' ha)</div></div></div>' +
+        '<div class="reg-total-item"><div class="reg-dot" style="background:#5dade2"></div>' +
+        '<div><div style="font-weight:700;color:var(--white)">'+pctReg.toFixed(1)+'%</div>' +
+        '<div style="color:var(--text3);font-size:11px">Regadío ('+stats.haRegadio.toFixed(2)+' ha)</div></div></div>' +
+        (haOtro>0.005?'<div class="reg-total-item"><div class="reg-dot" style="background:var(--border2)"></div>' +
+          '<div><div style="font-weight:700;color:var(--white)">'+pctOtro.toFixed(1)+'%</div>' +
+          '<div style="color:var(--text3);font-size:11px">Sin clasif. ('+haOtro.toFixed(2)+' ha)</div></div></div>':'') +
         '</div>';
     }
 
+    // ── Meta info ──
+    var metaItems = '';
+    if(c.nif)       metaItems += '<span>🪪 '+c.nif+'</span>';
+    if(c.telefono)  metaItems += '<span>📞 '+c.telefono+'</span>';
+    if(c.email)     metaItems += '<span>✉️ '+c.email+'</span>';
+    if(c.municipio) metaItems += '<span>📍 '+c.municipio+'</span>';
+
+    // ── Header chips ──
+    var totalRecAll = allRecs.length;
+    var campanaChips = allCampanas.map(function(camp){
+      return '<button onclick="document.getElementById(\'campana-global\').value=\''+camp+'\';onCampanaChange()" ' +
+        'style="background:none;border:1px solid var(--border2);color:var(--text2);padding:2px 8px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600" ' +
+        'title="Filtrar por campaña '+camp+'">📅 C.'+camp+'</button>';
+    }).join('');
+
+    var actions = '';
+    if(allRecs.length) actions += '<button class="btn btn-accent btn-sm" onclick="openNuevaCampanaModal(\''+c.id+'\')">🔄 Campaña</button> ';
+    actions += '<button class="btn btn-secondary btn-sm" onclick="openClienteModal(\''+c.id+'\')">✏️</button> ';
+    actions += '<button class="btn btn-danger btn-sm" onclick="deleteCliente(\''+c.id+'\')">🗑️</button>';
+
+    html += '<div class="cliente-card">';
+    html += '<div class="cliente-card-header">';
+    html += '<div><div class="cliente-card-name">👤 '+c.nombre+'</div>';
+    if(metaItems) html += '<div class="cliente-card-meta">'+metaItems+'</div>';
     html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-left:8px">' +
+      '<span class="tag tag-green">'+totalRecAll+' recinto'+(totalRecAll!==1?'s':'')+'</span>' +
+      campanaChips + '</div>';
+    html += '<div class="cliente-card-actions">'+actions+'</div>';
+    html += '</div>'; // end header
+
+    // ── Campaign sections ──
+    if(currentCampana) {
+      // Single campaign — flat view
+      var stats = buildCampStats(currentCampana);
+      if(stats.recs.length) {
+        html += '<div class="cliente-card-body">' +
+          '<div class="cliente-summary-block">' +
+          '<div class="cliente-summary-title">🌾 Cultivos — sup. cultivada</div>' +
+          buildCultivoRows(stats) +
+          '</div>' +
+          '<div class="cliente-summary-block">' +
+          '<div class="cliente-summary-title">💧 Régimen hídrico</div>' +
+          buildRegimenBlock(stats) +
+          '</div></div>';
+      } else {
+        html += '<div style="padding:14px 18px;color:var(--text3);font-size:13px">Sin recintos en campaña '+currentCampana+'</div>';
+      }
+    } else if(allCampanas.length === 0) {
+      // No campaigns — show without filter
+      var stats0 = buildCampStats(null);
+      if(stats0.recs.length) {
+        html += '<div class="cliente-card-body">' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos</div>'+buildCultivoRows(stats0)+'</div>' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">💧 Régimen hídrico</div>'+buildRegimenBlock(stats0)+'</div></div>';
+      }
+    } else {
+      // Multiple campaigns — one collapsible section per campaign
+      allCampanas.forEach(function(camp, idx) {
+        var stats = buildCampStats(camp);
+        if(!stats.recs.length) return;
+        var blockId = 'camp-block-'+c.id+'-'+camp;
+        var openByDefault = idx === allCampanas.length - 1; // most recent open
+        html += '<div style="border-top:1px solid var(--border)">';
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;background:rgba(74,140,42,.04)" onclick="toggleTrt(\''+blockId+'\')">' +
+          '<span style="font-size:16px;transition:transform .2s" id="ico-'+blockId+'">'+(openByDefault?'▾':'▸')+'</span>' +
+          '<span class="tag tag-yellow" style="font-size:13px">📅 Campaña '+camp+'</span>' +
+          '<span class="tag tag-green">'+stats.recs.length+' rec.</span>' +
+          '<span class="tag tag-blue" style="font-weight:700">'+stats.totCul.toFixed(2)+' ha cultivadas</span>' +
+          '<span class="tag tag-gray">'+stats.totSIG.toFixed(2)+' ha SIGPAC</span>' +
+          '<span class="tag tag-gray">'+stats.nTrt+' trat.</span>' +
+          '<button onclick="event.stopPropagation();document.getElementById(\'campana-global\').value=\''+camp+'\';onCampanaChange()" ' +
+          'class="btn btn-secondary btn-sm" style="margin-left:auto;font-size:11px">🗂️ Ver parcelas</button>' +
+          '</div>';
+        html += '<div id="'+blockId+'" style="display:'+(openByDefault?'block':'none')+';overflow:hidden">';
+        html += '<div class="cliente-card-body">' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos — sup. cultivada</div>'+buildCultivoRows(stats)+'</div>' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">💧 Régimen hídrico</div>'+buildRegimenBlock(stats)+'</div>' +
+          '</div>';
+        html += '</div></div>'; // end block + collapsible
+      });
+    }
+
+    html += '</div>'; // end cliente-card
   }
 
   cont.innerHTML = html;
@@ -4518,10 +4568,13 @@ function extractFormulacion(formulado) {
   return m ? m[1] : '';
 }
 
-// Extract materia activa from formulado: everything before the % or g/L
+// Extract materia activa from formulado: keep the FULL formulado text
+// (e.g. "GLIFOSATO 360 g/L [SL] P/V") as the materia activa field,
+// but remove the [FORMULACION] code since that goes to its own field.
 function extractMateriaActiva(formulado) {
   if(!formulado) return '';
-  return formulado.replace(/\s*\d+[,.]?\d*\s*%.*$/, '').replace(/\s*\d+[,.]?\d*\s*g\/.*$/, '').trim();
+  // Remove the [XX] formulacion bracket and the P/V P/P suffix — keep substance + concentration
+  return formulado.replace(/\s*\[[A-Z]{1,4}\]\s*/g, '').replace(/\s*P\/[VP]\s*$/i, '').trim();
 }
 
 // Extract cultivos from Condicionamiento text
@@ -4612,7 +4665,7 @@ function importarProductosMapa(input) {
           // Update with MAPA data
           existing.numRegistro       = entry.numRegistro || existing.numRegistro;
           existing.titular           = entry.titular     || existing.titular;
-          existing.materiaActiva     = existing.materiaActiva || materiaA;
+          existing.materiaActiva     = materiaA || existing.materiaActiva;  // always update from MAPA
           existing.formulacion       = existing.formulacion   || form;
           if(!existing.tipo || existing.tipo === 'Otro') existing.tipo = tipo;
           if(cultivos.length) existing.cultivosAutorizados = cultivos;
@@ -5697,6 +5750,195 @@ function deleteCompra(id) {
   if(!confirm('¿Eliminar esta compra? El stock se recalculará automáticamente.')) return;
   DB.compras = (DB.compras||[]).filter(function(c){return c.id!==id;});
   save(); renderCompras(); updateBadges();
+}
+
+// ============================================================
+// MAP DRAWING — draw a polygon and save it as WKT
+// ============================================================
+var _drawHandler   = null;   // Leaflet.Draw handler
+var _drawnLayer    = null;   // the drawn polygon layer
+var _drawnWKT      = null;   // WKT string of drawn polygon
+var _drawnAreaHa   = 0;      // calculated area in ha
+
+function startDrawing() {
+  if(!map) return;
+  var btn = document.getElementById('btn-draw-polygon');
+  if(_drawHandler) { cancelDrawing(); return; }
+
+  // Show draw panel
+  var panel = document.getElementById('draw-panel');
+  if(panel) { panel.style.display = 'flex'; }
+  if(btn)   { btn.classList.add('active'); btn.textContent = '✕ Cancelar'; }
+
+  // Remove previous drawn layer if any
+  if(_drawnLayer) { map.removeLayer(_drawnLayer); _drawnLayer = null; }
+
+  // Start Leaflet.Draw polygon handler
+  _drawHandler = new L.Draw.Polygon(map, {
+    shapeOptions: {
+      color:       '#4a8c2a',
+      fillColor:   '#4a8c2a',
+      fillOpacity: 0.25,
+      weight:      2.5,
+      dashArray:   '6 4'
+    },
+    showArea:      true,
+    allowIntersection: false,
+    showLength:    true,
+    repeatMode:    false
+  });
+  _drawHandler.enable();
+
+  // Update status as user adds points
+  var updateStatus = function(e) {
+    var n = e.layers ? e.layers.getLayers().length : 0;
+    var finBtn = document.getElementById('btn-draw-finish');
+    var statusEl = document.getElementById('draw-status');
+    if(statusEl) statusEl.textContent = 'Haz clic para añadir vértices. Cierra el polígono haciendo clic en el primer punto (🟢).';
+    if(finBtn) finBtn.style.display = '';
+  };
+
+  // Listen for draw:created
+  map.once('draw:created', function(e) {
+    _drawnLayer = e.layer;
+    _drawnLayer.setStyle({ color:'#4a8c2a', fillColor:'#4a8c2a', fillOpacity:0.3, weight:2.5 });
+    map.addLayer(_drawnLayer);
+    _drawHandler = null;
+
+    // Convert to WKT
+    var latlngs = _drawnLayer.getLatLngs()[0];
+    _drawnWKT = latLngsToWKT(latlngs);
+
+    // Calculate area using Leaflet's geodesic area
+    var area = L.GeometryUtil ? L.GeometryUtil.geodesicArea(latlngs) : 0;
+    _drawnAreaHa = area > 0 ? (area / 10000) : estimateAreaHa(latlngs);
+
+    // Hide draw panel, show assign modal
+    var panel = document.getElementById('draw-panel');
+    if(panel) panel.style.display = 'none';
+    var btn2 = document.getElementById('btn-draw-polygon');
+    if(btn2) { btn2.classList.remove('active'); btn2.textContent = '✏️ Dibujar'; }
+
+    openDrawAssignModal();
+  });
+
+  map.on('draw:drawvertex', function() {
+    var finBtn = document.getElementById('btn-draw-finish');
+    var statusEl = document.getElementById('draw-status');
+    if(finBtn) finBtn.style.display = '';
+    if(statusEl) statusEl.textContent = 'Añade más vértices o cierra haciendo clic en el primer punto (🟢).';
+  });
+}
+
+function finishDrawing() {
+  if(_drawHandler) _drawHandler._finishShape();
+}
+
+function cancelDrawing() {
+  if(_drawHandler) { _drawHandler.disable(); _drawHandler = null; }
+  if(_drawnLayer)  { map.removeLayer(_drawnLayer); _drawnLayer = null; }
+  _drawnWKT = null; _drawnAreaHa = 0;
+  var panel = document.getElementById('draw-panel');
+  if(panel) panel.style.display = 'none';
+  var btn = document.getElementById('btn-draw-polygon');
+  if(btn) { btn.classList.remove('active'); btn.textContent = '✏️ Dibujar'; }
+  closeModal('modal-draw-assign');
+  map.off('draw:drawvertex');
+}
+
+// Convert array of L.LatLng to WKT POLYGON string
+function latLngsToWKT(latlngs) {
+  var coords = latlngs.map(function(p){ return p.lng.toFixed(6)+' '+p.lat.toFixed(6); });
+  // Close the ring
+  coords.push(coords[0]);
+  return 'POLYGON((' + coords.join(',') + '))';
+}
+
+// Simple shoelace area estimate as fallback (degrees² → rough ha)
+function estimateAreaHa(latlngs) {
+  var n = latlngs.length;
+  var area = 0;
+  for(var i=0; i<n; i++) {
+    var j = (i+1) % n;
+    area += latlngs[i].lng * latlngs[j].lat;
+    area -= latlngs[j].lng * latlngs[i].lat;
+  }
+  area = Math.abs(area) / 2;
+  // 1 deg² ≈ 111320² m² at equator, vary by latitude
+  var latMid = latlngs.reduce(function(s,p){return s+p.lat;},0)/n;
+  var m2 = area * Math.pow(111320 * Math.cos(latMid * Math.PI/180), 2);
+  return m2 / 10000;
+}
+
+function openDrawAssignModal() {
+  // Populate recinto selector
+  var sel = document.getElementById('draw-assign-recinto');
+  sel.innerHTML = '<option value="">— Selecciona un recinto —</option>' +
+    DB.recintos.slice().sort(function(a,b){
+      return (a.nombreFinca||'').localeCompare(b.nombreFinca||'','es');
+    }).map(function(r) {
+      var cli = DB.clientes.find(function(c){return c.id===r.clienteId;});
+      var mun = String(r.termMunicipal||'').split(' ')[0];
+      var sigpac = r.codProvincia+'-'+mun+'-'+r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto;
+      var label = (r.nombreFinca||sigpac)+' ('+(cli?cli.nombre:'sin cliente')+' · '+(r.especieVariedad||'sin cultivo')+')';
+      return '<option value="'+r.id+'">'+label+'</option>';
+    }).join('');
+
+  // Show area info
+  var areaEl = document.getElementById('draw-area-info');
+  if(areaEl) areaEl.textContent = 'Área estimada: ' + _drawnAreaHa.toFixed(4) + ' ha · ' + _drawnWKT.slice(0,60)+'…';
+
+  openModal('modal-draw-assign');
+}
+
+function saveDrawnGeometry() {
+  var sel = document.getElementById('draw-assign-recinto');
+  var rid = sel ? sel.value : '';
+  if(!rid) { alert('Selecciona un recinto al que asignar esta geometría.'); return; }
+  var idx = DB.recintos.findIndex(function(r){return r.id===rid;});
+  if(idx < 0) return;
+  DB.recintos[idx].wkt = _drawnWKT;
+  // Update supSigpac if not set
+  if(!DB.recintos[idx].supSigpac || DB.recintos[idx].supSigpac === '0') {
+    DB.recintos[idx].supSigpac = _drawnAreaHa.toFixed(4);
+  }
+  save();
+  closeModal('modal-draw-assign');
+  _drawnWKT = null; _drawnAreaHa = 0;
+  // Keep the drawn layer visible — renderMap will replace it with the real polygon
+  renderMap();
+  renderRecintos();
+  renderParcelas();
+  showSyncToast('✅ Geometría guardada en el recinto');
+}
+
+function drawCreateNewRecinto() {
+  closeModal('modal-draw-assign');
+  // Save a stub recinto right away so it's immediately visible in the list
+  var stubId = uid();
+  var stub = {
+    id:          stubId,
+    wkt:         _drawnWKT || '',
+    supSigpac:   _drawnAreaHa > 0 ? _drawnAreaHa.toFixed(4) : '',
+    supCultivada:'',
+    clienteId:   '',
+    nombreFinca: '',
+    numOrden:    '',
+    codProvincia:'', termMunicipal:'', codAgregado:'', zona:'',
+    numPoligono: '', numParcela: '', numRecinto: '',
+    usoSigpac:'', especieVariedad:'', ecoregimen:'',
+    secanoRegadio:'', cultivoPrincipal:'', fechaInicio:'', fechaFin:'',
+    cobertura:'', gip:'', nitratos:'Sí', obs:'Recinto dibujado en el mapa — pendiente de completar',
+    propietario:'', campana: currentCampana||'', pac:'', _pendingData: true
+  };
+  DB.recintos.push(stub);
+  save();
+  _drawnWKT = null; _drawnAreaHa = 0;
+  renderRecintos();
+  renderMap();
+  // Switch to recintos tab and open the modal to complete data
+  switchTab('recintos');
+  setTimeout(function(){ openRecintoModal(stubId); }, 200);
 }
 
 window.addEventListener('DOMContentLoaded', function() {
