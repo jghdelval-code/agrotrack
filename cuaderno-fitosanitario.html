@@ -313,6 +313,22 @@ textarea { resize: vertical; min-height: 72px; }
 .reg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 @media (max-width: 680px) { .cliente-card-body { grid-template-columns: 1fr; } .cliente-summary-block + .cliente-summary-block { border-left: none; border-top: 1px solid var(--border); } }
 
+/* Product search combobox */
+.prod-combo-wrap { position: relative; flex: 1; }
+.prod-combo-input { width: 100%; font-size: 14px !important; }
+.prod-combo-list {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 8px; max-height: 260px; overflow-y: auto;
+  z-index: 9999; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  -webkit-overflow-scrolling: touch;
+}
+.prod-combo-group { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; padding: 6px 12px 3px; border-top: 1px solid var(--border); }
+.prod-combo-group:first-child { border-top: none; }
+.prod-combo-item { padding: 9px 12px; font-size: 13px; color: var(--text); cursor: pointer; line-height: 1.3; border-bottom: 1px solid var(--border); }
+.prod-combo-item:last-child { border-bottom: none; }
+.prod-combo-item:hover, .prod-combo-item.selected { background: var(--primary-light); color: var(--white); }
+
 /* LEAFLET POPUP DARK THEME */
 .leaflet-popup-content-wrapper { background: #0f1f0f !important; color: #d8ecd8 !important; border: 1px solid #2a422a !important; border-radius: 10px !important; box-shadow: 0 4px 24px rgba(0,0,0,.8) !important; padding: 0 !important; }
 .leaflet-popup-content { margin: 0 !important; padding: 14px 16px !important; color: #d8ecd8 !important; }
@@ -2434,46 +2450,112 @@ function addProductRow(data=null) {
 
   if(!opts) opts = '<option>Sin productos</option>';
 
-  // Mobile-friendly: product name on full row, then fields below
+  // Flat array for searchable combobox
+  var allProds = [];
+  if(authorized.length && cultivosDeParcela.size > 0) {
+    authorized.forEach(function(p){ allProds.push({id:p.id, label:p.nombre+(p.tipo?' ('+p.tipo+')':''), group:'auth'}); });
+    others.forEach(function(p){ allProds.push({id:p.id, label:p.nombre+(p.tipo?' ('+p.tipo+')':''), group:'other'}); });
+  } else {
+    DB.productos.forEach(function(p){ allProds.push({id:p.id, label:p.nombre+(p.tipo?' ('+p.tipo+')':''), group:'other'}); });
+  }
+
+  var selectedId    = (data&&data.productoId)||(allProds.length?allProds[0].id:'');
+  var foundProd     = allProds.find(function(p){return p.id===selectedId;});
+  var selectedLabel = foundProd ? foundProd.label : '';
+  var cbId = 'cb-'+Date.now()+'-'+Math.random().toString(36).slice(2,5);
+
   row.innerHTML =
-    '<div class="prod-row-inner">' +
-    // Row 1: product selector full width + remove button
-    '<div class="prod-row-top">' +
-    '<select class="prod-row-sel" onchange="calcProdRowPVP(this)">'+opts+'</select>' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()" style="flex-shrink:0">✕</button>' +
-    '</div>' +
-    // Row 2: numeric fields
-    '<div class="prod-row-fields">' +
-    '<div class="prod-row-field">' +
-    '<label class="prod-row-label">Dosis</label>' +
-    '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data?.dosis||'')+'" oninput="calcProdRowPVP(this)" style="width:100%">' +
-    '</div>' +
-    '<div class="prod-row-field">' +
-    '<label class="prod-row-label">Unidad</label>' +
-    '<select class="prod-row-unidad" style="width:100%">' +
+    '<div class="prod-row-inner">'+
+    '<div class="prod-row-top">'+
+    '<div class="prod-combo-wrap" style="flex:1;min-width:0;position:relative">'+
+    '<input type="text" class="prod-row-sel prod-combo-input" id="'+cbId+'-input"'+
+    ' placeholder="\uD83D\uDD0D Buscar producto..."'+
+    ' value="'+selectedLabel.replace(/"/g,'&quot;')+'"'+
+    ' autocomplete="off" autocorrect="off" spellcheck="false"'+
+    ' data-prod-id="'+selectedId+'"'+
+    ' oninput="filterProdCombo(this)"'+
+    ' onfocus="openProdCombo(this)"'+
+    ' onblur="closeProdComboDelay(this)">'+
+    '<div class="prod-combo-list" id="'+cbId+'-list" style="display:none"></div>'+
+    '</div>'+
+    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()" style="flex-shrink:0">✕</button>'+
+    '</div>'+
+    '<div class="prod-row-fields">'+
+    '<div class="prod-row-field"><label class="prod-row-label">Dosis</label>'+
+    '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis||'')+'" oninput="calcProdRowPVP(this)" style="width:100%"></div>'+
+    '<div class="prod-row-field"><label class="prod-row-label">Unidad</label>'+
+    '<select class="prod-row-unidad" style="width:100%">'+
     ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
       return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
-    }).join('') +
-    '</select>' +
-    '</div>' +
-    '<div class="prod-row-field">' +
-    '<label class="prod-row-label">Margen %</label>' +
-    '<input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data?.margen||'')+'" oninput="calcProdRowPVP(this)" style="width:100%">' +
-    '</div>' +
-    '<div class="prod-row-field prod-row-pvp-wrap">' +
-    '<label class="prod-row-label">PVP/ha</label>' +
-    '<span class="prod-row-pvp">'+(data?.pvpHa?data.pvpHa.toFixed(2)+' €/ha':'—')+'</span>' +
-    '</div>' +
-    '</div>' +
-    // Row 3: justification
-    '<input type="text" placeholder="Justificación / plaga objetivo" class="prod-row-just" value="'+(data?.justificacion||'')+'" style="width:100%;margin-top:5px">' +
+    }).join('')+
+    '</select></div>'+
+    '<div class="prod-row-field"><label class="prod-row-label">Margen %</label>'+
+    '<input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen||'')+'" oninput="calcProdRowPVP(this)" style="width:100%"></div>'+
+    '<div class="prod-row-field prod-row-pvp-wrap"><label class="prod-row-label">PVP/ha</label>'+
+    '<span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+' €/ha':'—')+'</span></div>'+
+    '</div>'+
+    '<input type="text" placeholder="Justificación / plaga objetivo" class="prod-row-just" value="'+(data&&data.justificacion||'')+'" style="width:100%;margin-top:5px">'+
     '</div>';
 
+  row._allProds = allProds;
   row.style.gridTemplateColumns = '1fr';
   row.style.padding = '10px 12px';
-
   document.getElementById('trt-products-rows').appendChild(row);
 }
+
+function openProdCombo(input) { filterProdCombo(input); }
+
+function filterProdCombo(input) {
+  var row      = input.closest('.product-row');
+  var allProds = row._allProds || [];
+  var listEl   = input.parentNode.querySelector('.prod-combo-list');
+  if(!listEl) return;
+  var q = (input.value||'').trim().toLowerCase();
+  var filtered = q ? allProds.filter(function(p){ return p.label.toLowerCase().includes(q); }) : allProds;
+  filtered = filtered.slice(0, 80);
+  if(!filtered.length) {
+    listEl.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>';
+    listEl.style.display = 'block'; return;
+  }
+  var html = '', lastGroup = '';
+  filtered.forEach(function(p) {
+    if(p.group !== lastGroup) {
+      html += '<div class="prod-combo-group">'+(p.group==='auth'?'✅ Autorizados para este cultivo':'— Otros productos')+'</div>';
+      lastGroup = p.group;
+    }
+    var isSelected = p.id === input.dataset.prodId;
+    var safe = p.label.replace(/"/g,'&quot;');
+    var lbl = q ? p.label.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<b style="color:var(--primary)">$1</b>') : p.label;
+    html += '<div class="prod-combo-item'+(isSelected?' selected':'')+'" data-id="'+p.id+'" data-label="'+safe+'" onmousedown="selectProdComboItem(this)">'+lbl+'</div>';
+  });
+  listEl.innerHTML = html;
+  listEl.style.display = 'block';
+}
+
+function selectProdComboItem(item) {
+  var listEl = item.closest('.prod-combo-list');
+  var input  = item.closest('.prod-combo-wrap').querySelector('.prod-combo-input');
+  input.value = item.dataset.label;
+  input.dataset.prodId = item.dataset.id;
+  listEl.style.display = 'none';
+  calcProdRowPVP(input);
+}
+
+function closeProdComboDelay(input) {
+  setTimeout(function() {
+    var wrap = input.parentNode;
+    var listEl = wrap ? wrap.querySelector('.prod-combo-list') : null;
+    if(listEl) listEl.style.display = 'none';
+    var row = input.closest('.product-row');
+    var allProds = row ? (row._allProds||[]) : [];
+    var q = (input.value||'').trim().toLowerCase();
+    if(q && allProds.length) {
+      var match = allProds.find(function(p){ return p.label.toLowerCase().includes(q); });
+      if(match) { input.value = match.label; input.dataset.prodId = match.id; calcProdRowPVP(input); }
+    }
+  }, 200);
+}
+
 
 function calcProdRowPVP(input) {
   var row     = input.closest('.product-row');
@@ -2501,8 +2583,10 @@ function saveTratamiento() {
 
   const productos = [];
   document.querySelectorAll('#trt-products-rows .product-row').forEach(row => {
-    const pid   = row.querySelector('.prod-row-sel')?.value;
-    const dosis = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
+    // Support both old select and new combobox
+    const selEl  = row.querySelector('.prod-row-sel');
+    const pid    = selEl ? (selEl.dataset.prodId || selEl.value) : '';
+    const dosis  = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
     const unidad = row.querySelector('.prod-row-unidad')?.value;
     const just   = row.querySelector('.prod-row-just')?.value||'';
     const margen = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
