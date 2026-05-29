@@ -136,7 +136,22 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* TREATMENT PRODUCTS */
 .products-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.product-row { display: grid; grid-template-columns: 2fr 90px 100px 1fr auto; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); align-items: center; background: var(--surface); }
+.product-row { display: grid; grid-template-columns: 1fr; gap: 0; padding: 10px 12px; border-bottom: 1px solid var(--border); align-items: start; background: var(--surface); }
+.prod-row-inner { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.prod-row-top { display: flex; gap: 8px; align-items: center; }
+.prod-row-top .prod-row-sel { flex: 1; min-width: 0; }
+.prod-row-fields { display: grid; grid-template-columns: 80px 100px 70px 1fr; gap: 6px; align-items: end; }
+.prod-row-field { display: flex; flex-direction: column; gap: 3px; }
+.prod-row-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
+.prod-row-pvp-wrap { display: flex; flex-direction: column; gap: 3px; }
+.prod-row-pvp { font-size: 13px; color: var(--text3); font-weight: 600; padding: 6px 4px; }
+.prod-row-pvp:not(:empty):not([data-empty]) { color: #7acc4a; }
+@media (max-width: 600px) {
+  .prod-row-fields { grid-template-columns: 1fr 1fr; }
+  .prod-row-pvp-wrap { grid-column: span 2; flex-direction: row; align-items: center; gap: 8px; }
+  .prod-row-pvp-wrap .prod-row-label { white-space: nowrap; }
+  .prod-row-pvp { font-size: 15px; }
+}
 .product-row:last-child { border-bottom: none; }
 .product-row-header { background: var(--card); font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
 .product-row input, .product-row select { padding: 5px 8px; font-size: 12px; }
@@ -359,8 +374,7 @@ textarea { resize: vertical; min-height: 72px; }
   .form-grid.cols-3 { grid-template-columns: 1fr 1fr; }
   .form-group.span-2, .form-group.span-3 { grid-column: span 1; }
   .form-section-title { grid-column: 1 / -1; }
-  .product-row { grid-template-columns: 1fr 1fr; gap: 6px; }
-  .product-row .remove-prod-btn { grid-column: 2; justify-self: end; }
+  /* product rows now use card layout — no override needed */
   .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { border-radius: 16px 16px 0 0; max-height: 92vh; overflow-y: auto; max-width: 100% !important; }
   .modal-body { padding: 16px; }
@@ -2420,34 +2434,56 @@ function addProductRow(data=null) {
 
   if(!opts) opts = '<option>Sin productos</option>';
 
+  // Mobile-friendly: product name on full row, then fields below
   row.innerHTML =
-    '<select class="prod-row-sel">'+opts+'</select>' +
-    '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data?.dosis||'')+'" oninput="calcProdRowPVP(this)">' +
-    '<select class="prod-row-unidad">' +
-      ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
-        return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
-      }).join('') +
+    '<div class="prod-row-inner">' +
+    // Row 1: product selector full width + remove button
+    '<div class="prod-row-top">' +
+    '<select class="prod-row-sel" onchange="calcProdRowPVP(this)">'+opts+'</select>' +
+    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()" style="flex-shrink:0">✕</button>' +
+    '</div>' +
+    // Row 2: numeric fields
+    '<div class="prod-row-fields">' +
+    '<div class="prod-row-field">' +
+    '<label class="prod-row-label">Dosis</label>' +
+    '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data?.dosis||'')+'" oninput="calcProdRowPVP(this)" style="width:100%">' +
+    '</div>' +
+    '<div class="prod-row-field">' +
+    '<label class="prod-row-label">Unidad</label>' +
+    '<select class="prod-row-unidad" style="width:100%">' +
+    ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
+      return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
+    }).join('') +
     '</select>' +
-    '<input type="number" step="0.1" min="0" max="500" placeholder="% margen" class="prod-row-margen" title="Margen de beneficio %" value="'+(data?.margen||'')+'" oninput="calcProdRowPVP(this)">' +
-    '<span class="prod-row-pvp" style="font-size:11px;color:#7acc4a;font-weight:600;white-space:nowrap;min-width:60px;text-align:right" title="PVP calculado €/ha">'+(data?.pvpHa?data.pvpHa.toFixed(2)+' €/ha':'—')+'</span>' +
-    '<input type="text" placeholder="Justificación / plaga objetivo" class="prod-row-just" value="'+(data?.justificacion||'')+'">' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
+    '</div>' +
+    '<div class="prod-row-field">' +
+    '<label class="prod-row-label">Margen %</label>' +
+    '<input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data?.margen||'')+'" oninput="calcProdRowPVP(this)" style="width:100%">' +
+    '</div>' +
+    '<div class="prod-row-field prod-row-pvp-wrap">' +
+    '<label class="prod-row-label">PVP/ha</label>' +
+    '<span class="prod-row-pvp">'+(data?.pvpHa?data.pvpHa.toFixed(2)+' €/ha':'—')+'</span>' +
+    '</div>' +
+    '</div>' +
+    // Row 3: justification
+    '<input type="text" placeholder="Justificación / plaga objetivo" class="prod-row-just" value="'+(data?.justificacion||'')+'" style="width:100%;margin-top:5px">' +
+    '</div>';
 
-  // Set product row grid columns
-  row.style.gridTemplateColumns = '2fr 70px 90px 80px 70px 1fr auto';
+  row.style.gridTemplateColumns = '1fr';
+  row.style.padding = '10px 12px';
 
   document.getElementById('trt-products-rows').appendChild(row);
 }
 
 function calcProdRowPVP(input) {
-  var row       = input.closest('.product-row');
-  var sel       = row.querySelector('.prod-row-sel');
-  var dosis     = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
-  var margen    = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
-  var pvpSpan   = row.querySelector('.prod-row-pvp');
+  var row     = input.closest('.product-row');
+  var sel     = row.querySelector('.prod-row-sel');
+  var dosis   = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
+  var margen  = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
+  var pvpSpan = row.querySelector('.prod-row-pvp');
   if(!pvpSpan) return;
   var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
-  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; return; }
+  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; pvpSpan.style.color='var(--text3)'; return; }
   var costeHa = prod.coste * dosis;
   var pvpHa   = costeHa * (1 + margen/100);
   pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
@@ -6243,13 +6279,26 @@ function generateTratamientoPDF() {
   setFont(12,'bold','#1a3d1a');
   doc.text('PRODUCTOS FITOSANITARIOS', margin, y); y += 7;
 
-  // Dynamic columns
+  // Dynamic columns — carefully spaced to avoid overlap
+  // A4 usable width: 210 - 2*15 = 180mm
+  // With price:    Producto(35) | MatAct(38) | Dosis(20) | Total(22) | PVP/ha(20) | Total€(22) = 157 + gaps
+  // Without price: Producto(40) | MatAct(45) | Plazo(22) | Dosis(22) | Total(28)  = 157
   var cols = includePrice
     ? ['Producto','Materia activa','Dosis/ha','Total','PVP/ha','Total €']
     : ['Producto','Materia activa','Plazo seg.','Dosis/ha','Total'];
   var colX = includePrice
-    ? [margin+2, 52, 105, 125, 151, 175]
-    : [margin+2, 60, 110, 133, 161];
+    ? [margin+2, margin+42, margin+86, margin+110, margin+136, margin+158]
+    : [margin+2, margin+46, margin+100, margin+125, margin+152];
+  // Column widths for truncation (chars → pixels roughly 2mm per char at size 9)
+  var colW = includePrice
+    ? [38, 42, 22, 22, 22, 22]
+    : [43, 52, 24, 24, 24];
+
+  // Helper: truncate text to fit column width (approximate: size 9 ≈ 1.9mm per char)
+  function fitCol(text, colWidthMm) {
+    var maxChars = Math.floor(colWidthMm / 1.9);
+    return text.length > maxChars ? text.slice(0, maxChars-1)+'…' : text;
+  }
 
   rect(margin, y, W-2*margin, 7, '#2d5a1a');
   setFont(9,'bold','#ffffff');
@@ -6263,32 +6312,34 @@ function generateTratamientoPDF() {
     if(altRow) rect(margin, y, W-2*margin, 7, '#f9fbf9');
     altRow = !altRow;
     var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var nombre = (prod?prod.nombre:'—').slice(0,28);
-    var materia = (prod?prod.materiaActiva||'—':'—').slice(0,30);
-    var plazo = prod?prod.plazo||'—':'—';
-    var total = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+    var nombre  = fitCol(prod?prod.nombre:'—', colW[0]);
+    var materia = fitCol(prod?prod.materiaActiva||'—':'—', colW[1]);
+    var plazo   = fitCol(prod?prod.plazo||'—':'—', colW[2]);
+    var dosisStr= p.dosis+' '+(p.unidad||'L/ha');
+    var total   = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
     setFont(9,'normal','#111');
-    doc.text(nombre, colX[0], y+5);
+    doc.text(nombre,  colX[0], y+5);
     doc.text(materia, colX[1], y+5);
     if(includePrice) {
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[2], y+5);
-      doc.text(total, colX[3], y+5);
+      doc.text(fitCol(dosisStr, colW[2]), colX[2], y+5);
+      doc.text(fitCol(total, colW[3]),    colX[3], y+5);
       if(prod && prod.coste && p.dosis) {
         var costeHa = prod.coste * p.dosis;
         var pvpHa   = costeHa * (1 + (p.margen||0)/100);
         var pvpTot  = pvpHa * totalHa;
         totalPVPTot += pvpTot;
         setFont(9,'bold','#1a6b1a');
-        doc.text(pvpHa.toFixed(2)+' €', colX[4], y+5);
-        doc.text(pvpTot.toFixed(2)+' €', colX[5], y+5);
+        doc.text(pvpHa.toFixed(2)+' \u20AC', colX[4], y+5);
+        doc.text(pvpTot.toFixed(2)+' \u20AC', colX[5], y+5);
       } else {
+        setFont(9,'normal','#111');
         doc.text('—', colX[4], y+5);
         doc.text('—', colX[5], y+5);
       }
     } else {
-      doc.text(plazo, colX[2], y+5);
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[3], y+5);
-      doc.text(total, colX[4], y+5);
+      doc.text(fitCol(plazo, colW[2]),   colX[2], y+5);
+      doc.text(fitCol(dosisStr, colW[3]),colX[3], y+5);
+      doc.text(fitCol(total, colW[4]),   colX[4], y+5);
     }
     y += 7;
   });
