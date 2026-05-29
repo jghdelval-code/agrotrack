@@ -965,18 +965,17 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Plazo seguridad</label>
           <input type="text" id="prod-plazo" placeholder="ej: 21 días / NP">
         </div>
-        <div class="form-group">
-          <label>Coste (€/L o €/kg)</label>
-          <input type="number" step="0.01" min="0" id="prod-coste" placeholder="ej: 12.50">
-        </div>
-        <div class="form-group">
-          <label>Unidad de coste</label>
-          <select id="prod-unidad-coste">
-            <option value="L">€/L</option>
-            <option value="kg">€/kg</option>
-            <option value="ud">€/ud</option>
-            <option value="saco">€/saco</option>
-          </select>
+        <div class="form-group span-2">
+          <label>Formatos y precios</label>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:7px">Añade los diferentes envases/presentaciones con su precio (ej: Envase 1L → 14.50 €/L)</div>
+          <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
+            <div style="display:grid;grid-template-columns:1fr 80px 90px 90px auto;gap:0;background:var(--card);padding:5px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">
+              <span>Nombre del formato</span><span>Cantidad</span><span>Unidad</span><span>Precio unit.</span><span></span>
+            </div>
+            <div id="prod-formatos-rows"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addFormatoRow()" style="margin-top:6px">＋ Añadir formato</button>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">El precio unitario es €/litro, €/kg, etc. según la unidad elegida.</div>
         </div>
         <div class="form-group span-2">
           <label>Cultivos autorizados</label>
@@ -2284,7 +2283,7 @@ function renderTratamientos() {
             <tbody>
               ${prods.map(p => {
                 const prod = DB.productos.find(pr=>pr.id===p.productoId);
-                const totalProd = (p.dosis * totalHa).toFixed(2);
+                const totalProd = (p.dosis * totalHa).toFixed(3);
                 let costeCells = '';
                 if(hasCost && prod && prod.coste && p.dosis) {
                   const costeHa = prod.coste * p.dosis;
@@ -2538,7 +2537,47 @@ function selectProdComboItem(item) {
   input.value = item.dataset.label;
   input.dataset.prodId = item.dataset.id;
   listEl.style.display = 'none';
+  // Show format selector if product has multiple formats
+  var row = input.closest('.product-row');
+  updateFormatoSelector(row, item.dataset.id);
   calcProdRowPVP(input);
+}
+
+function updateFormatoSelector(row, prodId) {
+  var prod = (DB.productos||[]).find(function(p){return p.id===prodId;});
+  var fmts = (prod&&prod.formatos&&prod.formatos.length) ? prod.formatos
+    : (prod&&prod.coste ? [{nombre:'Estándar',cantidad:1,unidad:prod.unidadCoste||'L',precio:prod.coste}] : []);
+  // Remove existing format selector
+  var existing = row.querySelector('.prod-formato-wrap');
+  if(existing) existing.remove();
+  if(fmts.length < 2) return; // no selector needed for single or no format
+  var wrap = document.createElement('div');
+  wrap.className = 'prod-formato-wrap';
+  wrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:5px;padding:5px 0;border-top:1px solid var(--border)';
+  var opts = fmts.map(function(f,i){
+    return '<option value="'+i+'">'+f.nombre+' — '+f.precio+'€/'+f.unidad+'</option>';
+  }).join('');
+  wrap.innerHTML =
+    '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>'+
+    '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="onFormatoChange(this)">'+opts+'</select>'+
+    '<span class="prod-row-formato-price" style="font-size:12px;color:#7acc4a;font-weight:600;white-space:nowrap"></span>';
+  var fieldsDiv = row.querySelector('.prod-row-fields');
+  if(fieldsDiv) fieldsDiv.parentNode.insertBefore(wrap, fieldsDiv);
+  // Store formats on element
+  wrap._formatos = fmts;
+  onFormatoChange(wrap.querySelector('.prod-row-formato'));
+}
+
+function onFormatoChange(sel) {
+  var wrap    = sel.closest('.prod-formato-wrap');
+  var fmts    = wrap._formatos || [];
+  var fmt     = fmts[parseInt(sel.value)||0];
+  var priceEl = wrap.querySelector('.prod-row-formato-price');
+  if(priceEl && fmt) priceEl.textContent = fmt.precio + ' €/' + fmt.unidad;
+  // Recalc PVP
+  var row = wrap.closest('.product-row');
+  var input = row ? row.querySelector('.prod-combo-input') : null;
+  if(input) calcProdRowPVP(input);
 }
 
 function closeProdComboDelay(input) {
@@ -2559,14 +2598,27 @@ function closeProdComboDelay(input) {
 
 function calcProdRowPVP(input) {
   var row     = input.closest('.product-row');
-  var sel     = row.querySelector('.prod-row-sel');
   var dosis   = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
   var margen  = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
   var pvpSpan = row.querySelector('.prod-row-pvp');
   if(!pvpSpan) return;
-  var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
-  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; pvpSpan.style.color='var(--text3)'; return; }
-  var costeHa = prod.coste * dosis;
+  var prodId = input.dataset ? input.dataset.prodId : (input.value||'');
+  var prod   = (DB.productos||[]).find(function(p){return p.id===prodId;});
+  if(!prod || !dosis) { pvpSpan.textContent = '—'; pvpSpan.style.color='var(--text3)'; return; }
+  // Get price from selected format if available
+  var precio = 0;
+  var fmtSel = row.querySelector('.prod-row-formato');
+  var fmtWrap = row.querySelector('.prod-formato-wrap');
+  if(fmtSel && fmtWrap && fmtWrap._formatos) {
+    var fmt = fmtWrap._formatos[parseInt(fmtSel.value)||0];
+    if(fmt) precio = fmt.precio||0;
+  } else {
+    // Fallback: first format or legacy coste
+    var fmts = prod.formatos && prod.formatos.length ? prod.formatos : (prod.coste?[{precio:prod.coste}]:[]);
+    precio = fmts.length ? (fmts[0].precio||0) : 0;
+  }
+  if(!precio) { pvpSpan.textContent = '—'; pvpSpan.style.color='var(--text3)'; return; }
+  var costeHa = precio * dosis;
   var pvpHa   = costeHa * (1 + margen/100);
   pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
   pvpSpan.style.color = '#7acc4a';
@@ -2714,15 +2766,31 @@ function renderProductos() {
     var dcBlock = '';
     if(p.productoReferencia || (p.denominacionesComunes && p.denominacionesComunes.length)) {
       var dcs = p.denominacionesComunes || [];
-      var shownDCs = dcs.slice(0, 6);
-      var moreDCs  = dcs.length - shownDCs.length;
-      var dcPills  = shownDCs.map(function(d){
-        return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text2)" title="'+d.empresa+'">'+d.nombre+'</span>';
+      var dcPills = dcs.map(function(d){
+        var exists = (DB.productos||[]).find(function(x){ return x.nombre.toUpperCase()===d.nombre.toUpperCase() && x.id!==p.id; });
+        var existsBadge = exists ? '<span style="font-size:9px;color:#7acc4a;margin-left:3px">✓</span>' : '';
+        var btnStyle = 'font-size:9px;padding:1px 5px;background:none;border:1px solid var(--border2);color:var(--text3);border-radius:4px;cursor:pointer;margin-left:4px;flex-shrink:0';
+        var btnLabel = exists ? '✓ Ya creado' : '＋ Crear';
+        var btnDisabled = exists ? 'disabled style="'+btnStyle+';opacity:.5"' : 'style="'+btnStyle+'"';
+        return '<div style="display:flex;align-items:center;gap:3px;margin:2px 0">'+
+          '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text2)" title="'+d.empresa+'">'+d.nombre+'</span>'+
+          existsBadge+
+          '<button '+btnDisabled+' onclick="crearProductoDesdeDenominacion(\''+p.id+'\',\''+d.nombre.replace(/'/g,"\\'")+'\',' +'\''+( d.empresa||'').replace(/'/g,"\\'")+'\')">'+btnLabel+'</button>'+
+          '</div>';
       }).join('');
-      if(moreDCs > 0) dcPills += '<span style="font-size:10px;color:var(--text3);padding:2px 5px">+'+moreDCs+' más</span>';
+      var moreDCs = dcs.length > 8 ? '<span style="font-size:10px;color:var(--text3);padding:2px 5px">...y '+(dcs.length-8)+' más</span>' : '';
+      if(dcs.length > 8) dcPills = dcs.slice(0,8).map(function(d){
+        var exists = (DB.productos||[]).find(function(x){return x.nombre.toUpperCase()===d.nombre.toUpperCase()&&x.id!==p.id;});
+        var btnStyle = 'font-size:9px;padding:1px 5px;background:none;border:1px solid var(--border2);color:var(--text3);border-radius:4px;cursor:pointer;margin-left:4px';
+        return '<div style="display:flex;align-items:center;gap:3px;margin:2px 0">'+
+          '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text2)">'+d.nombre+'</span>'+
+          (exists?'<span style="font-size:9px;color:#7acc4a">✓</span>':'<button style="'+btnStyle+'" onclick="crearProductoDesdeDenominacion(\''+p.id+'\',\''+d.nombre.replace(/'/g,"\\'")+'\',' +'\''+( d.empresa||'').replace(/'/g,"\\'")+'\')">＋ Crear</button>')+
+          '</div>';
+      }).join('')+moreDCs;
+
       dcBlock = '<div style="margin-top:6px;padding:7px 9px;background:rgba(74,140,42,.06);border-left:3px solid var(--primary);border-radius:0 5px 5px 0">' +
-        (p.productoReferencia ? '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">📋 Producto de referencia: <span style="color:var(--white)">'+p.productoReferencia+'</span></div>' : '') +
-        (dcs.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center"><span style="font-size:11px;color:var(--text3)">🏷️ Denominaciones:</span>'+dcPills+'</div>' : '') +
+        (p.productoReferencia ? '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">📋 Producto de referencia: <span style="color:var(--white)">'+p.productoReferencia+'</span></div>' : '') +
+        (dcs.length ? '<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:5px">🏷️ Denominaciones comunes — pulsa ＋ Crear para añadir al catálogo con precio propio:</div>'+dcPills : '') +
         '</div>';
     }
 
@@ -2738,6 +2806,18 @@ function renderProductos() {
       '<span>📏 Dosis: '+(p.dosis||'—')+'</span>' +
       '<span>⏱️ Plazo: '+(p.plazo||'—')+'</span>' +
       '</div>' +
+      // Formatos / prices
+      (function(){
+        var fmts = p.formatos||[];
+        if(!fmts.length && p.coste) fmts=[{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}];
+        if(!fmts.length) return '';
+        return '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">' +
+          '<span style="font-size:11px;color:var(--text3);align-self:center">💶 Formatos:</span>' +
+          fmts.map(function(f){
+            return '<span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(74,140,42,.12);border:1px solid var(--border2);color:var(--white)">' +
+              '<b>'+(f.nombre||f.cantidad+' '+f.unidad)+'</b> — ' + (f.precio||'?') + ' €/'+f.unidad + '</span>';
+          }).join('') + '</div>';
+      })() +
       (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📋 '+p.usos+'</div>' : '') +
       cultivosPills +
       dcBlock +
@@ -2785,8 +2865,12 @@ function openProductoModal(id=null) {
   document.getElementById('prod-formulacion').value = p?.formulacion||'';
   document.getElementById('prod-dosis').value = p?.dosis||'';
   document.getElementById('prod-plazo').value = p?.plazo||'';
-  document.getElementById('prod-coste').value = p?.coste||'';
-  document.getElementById('prod-unidad-coste').value = p?.unidadCoste||'L';
+  // Legacy single cost → migrate to formatos if needed
+  var formatos = p?.formatos || [];
+  if(!formatos.length && p?.coste) {
+    formatos = [{nombre:'Formato estándar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}];
+  }
+  renderFormatoRows(formatos);
   document.getElementById('prod-usos').value = p?.usos||'';
   document.getElementById('prod-obs').value = p?.obs||'';
   document.getElementById('prod-cultivo-input').value = '';
@@ -2833,10 +2917,82 @@ function removeCultivoTag(el) {
   renderCultivoTags(remaining);
 }
 
+function renderFormatoRows(formatos) {
+  var cont = document.getElementById('prod-formatos-rows');
+  if(!cont) return;
+  cont.innerHTML = '';
+  (formatos||[]).forEach(function(f){ addFormatoRow(f); });
+  if(!formatos||!formatos.length) addFormatoRow();
+}
+
+function addFormatoRow(data) {
+  var cont = document.getElementById('prod-formatos-rows');
+  if(!cont) return;
+  var row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 90px 90px auto;gap:6px;padding:6px 10px;border-top:1px solid var(--border);align-items:center';
+  var unidades = ['L','kg','ud','saco','t','mL','g'].map(function(u){
+    return '<option value="'+u+'"'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
+  }).join('');
+  row.innerHTML =
+    '<input type="text" placeholder="ej: Envase 1L / Garrafa 5L" class="fmt-nombre" value="'+(data&&data.nombre||'').replace(/"/g,'&quot;')+'" style="font-size:13px">' +
+    '<input type="number" step="0.001" min="0" placeholder="1" class="fmt-cantidad" value="'+(data&&data.cantidad||1)+'" style="font-size:13px">' +
+    '<select class="fmt-unidad" style="font-size:13px">'+unidades+'</select>' +
+    '<input type="number" step="0.01" min="0" placeholder="€/ud" class="fmt-precio" value="'+(data&&data.precio||'').toString().replace(/"/g,'')+'" style="font-size:13px" title="Precio por unidad de la cantidad (ej: €/L)">' +
+    '<button onclick="this.closest(\'div\').remove()" class="remove-prod-btn" title="Eliminar formato">\u2715</button>';
+  cont.appendChild(row);
+}
+
+function getFormatosValues() {
+  var rows = document.querySelectorAll('#prod-formatos-rows > div');
+  var out = [];
+  rows.forEach(function(row){
+    var nombre   = row.querySelector('.fmt-nombre')?.value.trim();
+    var cantidad = parseFloat(row.querySelector('.fmt-cantidad')?.value)||1;
+    var unidad   = row.querySelector('.fmt-unidad')?.value||'L';
+    var precio   = parseFloat(row.querySelector('.fmt-precio')?.value)||0;
+    if(nombre||precio) out.push({nombre:nombre||('Formato '+out.length+1), cantidad, unidad, precio});
+  });
+  return out;
+}
+
+// Create an independent product copy from a denomination
+function crearProductoDesdeDenominacion(refProductId, dcNombre, dcEmpresa) {
+  var ref = (DB.productos||[]).find(function(p){return p.id===refProductId;});
+  if(!ref) { alert('Producto de referencia no encontrado'); return; }
+  // Check if already exists
+  var exists = (DB.productos||[]).find(function(p){
+    return p.nombre.toUpperCase() === dcNombre.toUpperCase();
+  });
+  if(exists) {
+    if(!confirm('Ya existe un producto con el nombre "'+dcNombre+'". ¿Abrir para editarlo?')) return;
+    openProductoModal(exists.id);
+    return;
+  }
+  // Create a copy with the denomination name
+  var newProd = JSON.parse(JSON.stringify(ref));
+  newProd.id              = uid();
+  newProd.nombre          = dcNombre;
+  newProd.titular         = dcEmpresa || newProd.titular;
+  newProd.productoReferencia = ref.nombre;
+  // Reset price — user will set their own
+  newProd.formatos        = [];
+  newProd.coste           = 0;
+  newProd._vigente        = ref._vigente;
+  newProd._cancelado      = false;
+  newProd.obs             = 'Denominación común de: '+ref.nombre+(dcEmpresa?' ('+dcEmpresa+')':'');
+  DB.productos.push(newProd);
+  save();
+  updateBadges();
+  renderProductos();
+  // Open modal so user can set formats/price
+  setTimeout(function(){ openProductoModal(newProd.id); }, 200);
+  showSyncToast && showSyncToast('✅ Producto creado: '+dcNombre);
+}
+
 function getCultivoTagsValues() {
   var container = document.getElementById('prod-cultivos-tags');
   if(!container) return [];
-  return [...container.querySelectorAll('span[data-cv]')].map(s=>s.dataset.cv);
+  return [...container.querySelectorAll('span[data-cv]')].map(function(s){return s.dataset.cv;});
 }
 
 function saveProducto() {
@@ -2850,8 +3006,10 @@ function saveProducto() {
     formulacion:document.getElementById('prod-formulacion').value,
     dosis:document.getElementById('prod-dosis').value.trim(),
     plazo:document.getElementById('prod-plazo').value.trim(),
-    coste:parseFloat(document.getElementById('prod-coste').value)||0,
-    unidadCoste:document.getElementById('prod-unidad-coste').value,
+    formatos: getFormatosValues(),
+    // Keep legacy coste = first format's precio/cantidad for backward compat
+    coste: (function(){ var fmts=getFormatosValues(); return fmts.length?(fmts[0].precio||0):0; })(),
+    unidadCoste: (function(){ var fmts=getFormatosValues(); return fmts.length?(fmts[0].unidad||'L'):'L'; })(),
     usos:document.getElementById('prod-usos').value.trim(),
     obs:document.getElementById('prod-obs').value.trim(),
     cultivosAutorizados: getCultivoTagsValues()
@@ -6400,7 +6558,7 @@ function generateTratamientoPDF() {
     var materia = fitCol(prod?prod.materiaActiva||'—':'—', colW[1]);
     var plazo   = fitCol(prod?prod.plazo||'—':'—', colW[2]);
     var dosisStr= p.dosis+' '+(p.unidad||'L/ha');
-    var total   = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+    var total   = (p.dosis * totalHa).toFixed(3)+' '+(p.unidad||'L/ha').replace('/ha','');
     setFont(9,'normal','#111');
     doc.text(nombre,  colX[0], y+5);
     doc.text(materia, colX[1], y+5);
