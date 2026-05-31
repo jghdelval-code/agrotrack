@@ -147,6 +147,11 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* TREATMENT RECINTOS */
 .recintos-picker { border: 1px solid var(--border); border-radius: var(--radius); max-height: 200px; overflow-y: auto; }
+/* Cultivo filter chips in treatment modal */
+.cultivo-chip { padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid var(--border2);background:var(--surface);color:var(--text2);transition:all .15s;white-space:nowrap; }
+.cultivo-chip:hover { border-color:var(--primary);color:var(--white); }
+.cultivo-chip.active { border-color:var(--chip-color,var(--primary));background:var(--chip-color,var(--primary));color:#fff; }
+.cultivo-chip[data-cv=""].active { background:var(--surface);border-color:var(--primary);color:var(--primary); }
 .recinto-check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
 .recinto-check:last-child { border-bottom: none; }
 .recinto-check:hover { background: var(--primary-light); }
@@ -621,7 +626,8 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
           <button class="btn btn-accent btn-sm" onclick="document.getElementById('prod-mapa-import').click()" title="Actualizar desde fichero del Ministerio">📥 Actualizar MAPA</button>
           <input type="file" id="prod-mapa-import" accept=".xlsx,.xls" style="display:none" onchange="importarProductosMapa(this)">
-          <button class="btn btn-secondary btn-sm" onclick="applyDenominacionesComunes()" title="Comparar con lista de denominaciones comunes del MAPA">🔗 Denominaciones</button>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dc-mapa-import').click()" title="Importar archivo de denominaciones comunes del MAPA">🔗 Denominaciones</button>
+          <input type="file" id="dc-mapa-import" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importarDenominacionesMapa(this)">
           <button class="btn btn-secondary btn-sm" onclick="applyMAPACultivosToAllProducts()" title="Asignar cultivos autorizados desde los datos del MAPA (28/05/2026)">🌱 Aplicar cultivos</button>
           <button class="btn btn-primary" onclick="openProductoModal()">＋ Nuevo producto</button>
         </div>
@@ -848,10 +854,21 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
         </div>
       </div>
+      <!-- Cultivo filter — shown after selecting a client -->
+      <div id="trt-cultivo-filter" style="display:none;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Filtrar parcelas por cultivo</div>
+        <div id="trt-cultivo-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
       <div class="form-group" style="margin-bottom:14px">
-        <label>Recintos tratados *</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label style="margin:0">Recintos tratados *</label>
+          <div style="display:flex;gap:6px">
+            <span id="trt-recintos-info" style="font-size:11px;color:var(--text3)"></span>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="toggleAllTrtRecintos(true)">☑ Todo</button>
+          </div>
+        </div>
         <div class="recintos-picker" id="recintos-picker">
-          <div class="empty-state" style="padding:20px;font-size:12px;color:var(--text3)">Selecciona un cliente primero</div>
+          <div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>
         </div>
       </div>
       <div style="margin-bottom:14px">
@@ -935,18 +952,16 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Plazo seguridad</label>
           <input type="text" id="prod-plazo" placeholder="ej: 21 días / NP">
         </div>
-        <div class="form-group">
-          <label>Coste (€/L o €/kg)</label>
-          <input type="number" step="0.01" min="0" id="prod-coste" placeholder="ej: 12.50">
-        </div>
-        <div class="form-group">
-          <label>Unidad de coste</label>
-          <select id="prod-unidad-coste">
-            <option value="L">€/L</option>
-            <option value="kg">€/kg</option>
-            <option value="ud">€/ud</option>
-            <option value="saco">€/saco</option>
-          </select>
+        <div class="form-group span-2">
+          <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— añade uno por cada tamaño de envase disponible</span></label>
+          <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
+            <div style="display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:0;background:var(--card);padding:5px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">
+              <span>Nombre / descripción</span><span>Cantidad</span><span>Unidad</span><span>€ / unidad</span><span></span>
+            </div>
+            <div id="prod-formatos-rows"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addFormatoRow()" style="margin-top:6px;font-size:12px">＋ Añadir formato</button>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">El precio es por unidad de la cantidad (ej: €/L, €/kg). Los cálculos de PVP usarán el formato que elijas al tratar.</div>
         </div>
         <div class="form-group span-2">
           <label>Cultivos autorizados</label>
@@ -2182,111 +2197,196 @@ function toggleLayer(layer) {
 // ============================================================
 // TRATAMIENTOS
 // ============================================================
-function renderTratamientos() {
-  const fCli  = document.getElementById('trt-filter-cliente').value;
-  // Use local select if set, otherwise fall back to global campaign
-  const fCamp = document.getElementById('trt-filter-campana').value || currentCampana;
-  let list = [...DB.tratamientos].sort((a,b) => b.fecha.localeCompare(a.fecha));
-  if(fCli)  list = list.filter(t=>t.clienteId===fCli);
-  if(fCamp) list = list.filter(t=>t.campana===fCamp);
+// ── Build a single treatment card HTML ──────────────────
+function buildTrtCardHtml(t) {
+  var cli      = DB.clientes.find(function(c){return c.id===t.clienteId;});
+  var prods    = t.productos||[];
+  var recs     = (t.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+  var totalHa  = recs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
 
-  const cont = document.getElementById('tratamientos-list');
+  var totalCosteHa=0, totalPVPHa=0, hasCost=false;
+  prods.forEach(function(p){
+    var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
+    var precio = getPrecioProducto(prod, p.formatoIdx||0);
+    if(prod && precio && p.dosis) {
+      var costeHa = precio * p.dosis;
+      var pvpHa   = costeHa * (1+(p.margen||0)/100);
+      totalCosteHa += costeHa; totalPVPHa += pvpHa; hasCost = true;
+    }
+  });
+  var totalPVPTot = totalPVPHa * totalHa;
+
+  var costeBadge = hasCost
+    ? '<span class="tag tag-green" style="font-size:11px">💶 '+totalPVPTot.toFixed(2)+' €</span>'
+    : '';
+
+  var recTags = recs.map(function(r){
+    return '<span class="tag tag-green">'+(r.nombreFinca||('P'+r.numPoligono+'-Pa'+r.numParcela))+
+      ' ('+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2)+' ha)</span>';
+  }).join(' ');
+
+  var tableHead = '<th>Producto</th><th>Materia activa</th><th>Tipo</th><th>Dosis/ha</th><th>Total ('+totalHa.toFixed(2)+' ha)</th>'+
+    (hasCost?'<th>Coste/ha</th><th>PVP/ha</th><th>Total PVP</th>':'')+'<th>Justificación</th>';
+
+  var tableBody = prods.map(function(p){
+    var prod      = DB.productos.find(function(pr){return pr.id===p.productoId;});
+    var totalProd = (p.dosis * totalHa).toFixed(3);
+    var costeCells = '';
+    if(hasCost) {
+      var precio  = getPrecioProducto(prod, p.formatoIdx||0);
+      if(prod && precio && p.dosis) {
+        var cH   = precio * p.dosis;
+        var pHa  = cH * (1+(p.margen||0)/100);
+        var pTot = pHa * totalHa;
+        costeCells = '<td style="color:var(--text3)">'+cH.toFixed(2)+' €</td>'+
+          '<td style="color:#7acc4a;font-weight:700">'+pHa.toFixed(2)+' €</td>'+
+          '<td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+' €</td>';
+      } else { costeCells = '<td>—</td><td>—</td><td>—</td>'; }
+    }
+    return '<tr>'+
+      '<td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td>'+
+      '<td style="color:var(--text2)">'+(prod?prod.materiaActiva||'—':'—')+'</td>'+
+      '<td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'—')+'</td>'+
+      '<td><b>'+p.dosis+' '+(p.unidad||'L/ha')+'</b></td>'+
+      '<td><b>'+totalProd+' '+(p.unidad||'L/ha').replace('/ha','')+'</b></td>'+
+      costeCells+
+      '<td style="color:var(--text2)">'+(p.justificacion||'—')+'</td></tr>';
+  }).join('');
+
+  var tableFoot = hasCost ? '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td>'+
+    '<td style="color:var(--text3);font-weight:700">'+totalCosteHa.toFixed(2)+' €/ha</td>'+
+    '<td style="color:#7acc4a;font-weight:700">'+totalPVPHa.toFixed(2)+' €/ha</td>'+
+    '<td style="color:#7acc4a;font-weight:700;font-size:14px">'+totalPVPTot.toFixed(2)+' €</td>'+
+    '<td></td></tr></tfoot>' : '';
+
+  return '<div class="treatment-card">'+
+    '<div class="treatment-card-header" onclick="toggleTrt(\'body-'+t.id+'\')">'+
+    '<span class="trt-date">📅 '+formatDate(t.fecha)+'</span>'+
+    '<span class="trt-products-count">🌿 '+prods.length+' prod.</span>'+
+    '<span class="trt-products-count">📋 '+recs.length+' rec. · '+totalHa.toFixed(2)+' ha</span>'+
+    costeBadge+
+    '<div class="trt-actions">'+
+    '<button class="btn btn-secondary btn-sm" title="PDF" onclick="event.stopPropagation();openTratamientoPDF(\''+t.id+'\')">📄</button>'+
+    '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTratamientoModal(\''+t.id+'\')">✏️</button>'+
+    '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTratamiento(\''+t.id+'\')">🗑️</button>'+
+    '</div></div>'+
+    '<div class="treatment-card-body" id="body-'+t.id+'">'+
+    '<div class="trt-detail-grid">'+
+    '<div class="trt-detail-item"><div class="k">Recintos / Parcelas</div><div class="v">'+recTags+'</div></div>'+
+    '<div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">'+(t.maquinaria||'—')+'</div></div>'+
+    '<div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">'+(t.aplicador||'—')+'</div></div>'+
+    '<div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">'+(t.obs||'—')+'</div></div>'+
+    '</div>'+
+    '<div class="trt-products-table"><table><thead><tr>'+tableHead+'</tr></thead><tbody>'+tableBody+'</tbody>'+tableFoot+'</table></div>'+
+    '</div></div>';
+}
+
+function renderTratamientos() {
+  var fCli  = document.getElementById('trt-filter-cliente').value;
+  var fCamp = document.getElementById('trt-filter-campana').value || currentCampana;
+  var list  = DB.tratamientos.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
+  if(fCli)  list = list.filter(function(t){return t.clienteId===fCli;});
+  if(fCamp) list = list.filter(function(t){return t.campana===fCamp;});
+
+  var cont = document.getElementById('tratamientos-list');
   if(!list.length) {
-    cont.innerHTML = `<div class="empty-state"><div class="icon">💊</div><div>No hay tratamientos registrados</div><div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openTratamientoModal()">+ Crear primer tratamiento</button></div></div>`;
+    cont.innerHTML = '<div class="empty-state"><div class="icon">💊</div><div>No hay tratamientos registrados</div>'+
+      '<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openTratamientoModal()">+ Crear primer tratamiento</button></div></div>';
     return;
   }
 
-  cont.innerHTML = list.map(t => {
-    const cli   = DB.clientes.find(c=>c.id===t.clienteId);
-    const prods = t.productos||[];
-    const recs  = (t.recintoIds||[]).map(id=>DB.recintos.find(r=>r.id===id)).filter(Boolean);
-    const nProd = prods.length;
-    const nRec  = recs.length;
-    const totalHa = recs.reduce((s,r)=>s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0),0);
+  // Build campaign → clienteId → [treatments] map
+  var campOrder = []; // maintains insertion order (already sorted by date desc)
+  var byCamp    = {};
+  list.forEach(function(t){
+    var camp = t.campana||'—';
+    if(!byCamp[camp]) { byCamp[camp]=[]; campOrder.push(camp); }
+    byCamp[camp].push(t);
+  });
+  // Deduplicate and sort campaigns descending
+  var seen = {};
+  campOrder = campOrder.filter(function(c){ return seen[c] ? false : (seen[c]=true); });
+  campOrder.sort(function(a,b){ return b.localeCompare(a); });
 
-    // Cost calculations
-    let totalCosteHa = 0, totalPVPHa = 0, hasCost = false;
-    prods.forEach(p => {
-      const prod = DB.productos.find(pr=>pr.id===p.productoId);
-      if(prod && prod.coste && p.dosis) {
-        const costeHa = prod.coste * p.dosis;
-        const margen  = p.margen||0;
-        const pvpHa   = costeHa * (1 + margen/100);
-        totalCosteHa += costeHa;
-        totalPVPHa   += pvpHa;
-        hasCost = true;
-      }
+  var html = '';
+  campOrder.forEach(function(camp, campIdx) {
+    var campTrts = byCamp[camp];
+    var campHa   = campTrts.reduce(function(s,t){
+      return s+(t.recintoIds||[]).reduce(function(s2,rid){
+        var r=DB.recintos.find(function(rc){return rc.id===rid;});
+        return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);
+      },0);
+    },0);
+    var campId = 'camp-trt-blk-'+camp.replace(/[^a-zA-Z0-9]/g,'_');
+    var isOpen = campIdx === 0; // most recent campaign open by default
+
+    // Campaign header
+    html += '<div style="margin-bottom:14px">'+
+      '<div onclick="toggleTrt(\''+campId+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;'+
+      'background:var(--surface);border:1px solid var(--border2);border-radius:8px;cursor:pointer;margin-bottom:6px;user-select:none">'+
+      '<span style="font-size:16px">📅</span>'+
+      '<span style="font-size:15px;font-weight:800;color:var(--white)">Campaña '+camp+'</span>'+
+      '<span class="tag tag-yellow">'+campTrts.length+' tratamiento'+(campTrts.length!==1?'s':'')+'</span>'+
+      '<span class="tag tag-green">'+campHa.toFixed(2)+' ha</span>'+
+      '<span style="margin-left:auto;font-size:14px;color:var(--text3)" id="ico-'+campId+'">'+(isOpen?'▾':'▸')+'</span>'+
+      '</div>'+
+      '<div id="'+campId+'" style="display:'+(isOpen?'block':'none')+'">';
+
+    // Group by client within this campaign
+    var cliOrder = [], byCliInCamp = {};
+    campTrts.forEach(function(t){
+      var cid = t.clienteId||'_sin_';
+      if(!byCliInCamp[cid]) { byCliInCamp[cid]=[]; cliOrder.push(cid); }
+      byCliInCamp[cid].push(t);
     });
-    const totalCosteTot = totalCosteHa * totalHa;
-    const totalPVPTot   = totalPVPHa   * totalHa;
+    var seenCli = {};
+    cliOrder = cliOrder.filter(function(c){return seenCli[c]?false:(seenCli[c]=true);});
 
-    const costeBadge = hasCost
-      ? `<span class="tag tag-green" style="font-size:11px">💶 PVP: ${totalPVPTot.toFixed(2)} €</span>`
-      : '';
+    cliOrder.forEach(function(cliId, cliIdx){
+      var cliTrts = byCliInCamp[cliId];
+      var cli     = DB.clientes.find(function(c){return c.id===cliId;});
+      var cliHa   = cliTrts.reduce(function(s,t){
+        return s+(t.recintoIds||[]).reduce(function(s2,rid){
+          var r=DB.recintos.find(function(rc){return rc.id===rid;});
+          return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);
+        },0);
+      },0);
+      var cliGrpId = 'cligrp-'+camp.replace(/[^a-zA-Z0-9]/g,'_')+'-'+(cliId||'sin');
+      var cliOpen  = true; // client groups always open
 
-    return `
-    <div class="treatment-card">
-      <div class="treatment-card-header" onclick="toggleTrt('body-${t.id}')">
-        <span class="trt-date">📅 ${formatDate(t.fecha)}</span>
-        <span class="trt-client">${cli?cli.nombre:'—'}</span>
-        <span class="trt-products-count">🌿 ${nProd} prod.</span>
-        <span class="trt-products-count">📋 ${nRec} rec. · ${totalHa.toFixed(2)} ha</span>
-        ${t.campana?`<span class="tag tag-yellow">C.${t.campana}</span>`:''}
-        ${costeBadge}
-        <div class="trt-actions">
-          <button class="btn btn-secondary btn-sm" title="Descargar PDF" onclick="event.stopPropagation();openTratamientoPDF('${t.id}')">📄</button>
-          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTratamientoModal('${t.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTratamiento('${t.id}')">🗑️</button>
-        </div>
-      </div>
-      <div class="treatment-card-body" id="body-${t.id}">
-        <div class="trt-detail-grid">
-          <div class="trt-detail-item"><div class="k">Recintos / Parcelas</div>
-            <div class="v">${recs.map(r=>`<span class="tag tag-green">${r.nombreFinca||`P${r.numPoligono}-Pa${r.numParcela}`} (${(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2)} ha)</span>`).join(' ')}</div>
-          </div>
-          <div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">${t.maquinaria||'—'}</div></div>
-          <div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">${t.aplicador||'—'}</div></div>
-          <div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">${t.obs||'—'}</div></div>
-        </div>
-        <div class="trt-products-table">
-          <table>
-            <thead><tr><th>Producto</th><th>Materia activa</th><th>Tipo</th><th>Dosis/ha</th><th>Total (${totalHa.toFixed(2)} ha)</th>${hasCost?'<th>Coste/ha</th><th>PVP/ha</th><th>Total PVP</th>':''}<th>Justificación</th></tr></thead>
-            <tbody>
-              ${prods.map(p => {
-                const prod = DB.productos.find(pr=>pr.id===p.productoId);
-                const totalProd = (p.dosis * totalHa).toFixed(2);
-                let costeCells = '';
-                if(hasCost && prod && prod.coste && p.dosis) {
-                  const costeHa = prod.coste * p.dosis;
-                  const pvpHa   = costeHa * (1 + (p.margen||0)/100);
-                  const pvpTot  = pvpHa * totalHa;
-                  costeCells = `<td style="color:var(--text3)">${costeHa.toFixed(2)} €</td><td style="color:#7acc4a;font-weight:700">${pvpHa.toFixed(2)} €</td><td style="color:#7acc4a;font-weight:700">${pvpTot.toFixed(2)} €</td>`;
-                } else if(hasCost) {
-                  costeCells = '<td>—</td><td>—</td><td>—</td>';
-                }
-                return `<tr>
-                  <td>${prod?`<b>${prod.nombre}</b>`:'Producto eliminado'}</td>
-                  <td style="color:var(--text2)">${prod?prod.materiaActiva||'—':'—'}</td>
-                  <td>${prod?`<span class="tag ${tipoBadge(prod.tipo)}">${prod.tipo}</span>`:'—'}</td>
-                  <td><b>${p.dosis} ${p.unidad||'L/ha'}</b></td>
-                  <td><b>${totalProd} ${(p.unidad||'L/ha').replace('/ha','')}</b></td>
-                  ${costeCells}
-                  <td style="color:var(--text2)">${p.justificacion||'—'}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-            ${hasCost?`<tfoot><tr>
-              <td colspan="${prods.length?'5':'5'}" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td>
-              <td style="color:var(--text3);font-weight:700">${totalCosteHa.toFixed(2)} €/ha</td>
-              <td style="color:#7acc4a;font-weight:700">${totalPVPHa.toFixed(2)} €/ha</td>
-              <td style="color:#7acc4a;font-weight:700;font-size:14px">${totalPVPTot.toFixed(2)} €</td>
-              <td></td>
-            </tr></tfoot>`:''}
-          </table>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+      html += '<div style="margin-bottom:8px">'+
+        '<div onclick="toggleTrt(\''+cliGrpId+'\')" style="display:flex;align-items:center;gap:8px;padding:7px 14px;'+
+        'background:rgba(74,140,42,.06);border-left:4px solid var(--primary);border-radius:0 6px 6px 0;cursor:pointer;margin-bottom:4px;user-select:none">'+
+        '<span style="font-size:14px">👤</span>'+
+        '<span style="font-weight:700;color:var(--white);font-size:13px">'+(cli?cli.nombre:'Sin cliente asignado')+'</span>'+
+        '<span class="tag tag-blue">'+cliTrts.length+' trat.</span>'+
+        '<span class="tag tag-green">'+cliHa.toFixed(2)+' ha</span>'+
+        '</div>'+
+        '<div id="'+cliGrpId+'" style="display:block">'+
+        cliTrts.map(buildTrtCardHtml).join('')+
+        '</div></div>';
+    });
+
+    html += '</div></div>'; // close campId div + wrapper
+  });
+
+  cont.innerHTML = html;
+
+  // Fix toggleTrt for campaign blocks to also toggle arrow icon
+  campOrder.forEach(function(camp){
+    var campId = 'camp-trt-blk-'+camp.replace(/[^a-zA-Z0-9]/g,'_');
+    var header = cont.querySelector('[onclick="toggleTrt(\''+campId+'\')"]');
+    if(header) {
+      header.onclick = function(){
+        var el  = document.getElementById(campId);
+        var ico = document.getElementById('ico-'+campId);
+        if(!el) return;
+        var open = el.style.display!=='none';
+        el.style.display  = open ? 'none' : 'block';
+        if(ico) ico.textContent = open ? '▸' : '▾';
+      };
+    }
+  });
 }
 
 function toggleTrt(id) {
@@ -2332,27 +2432,145 @@ function openTratamientoModal(id=null) {
   openModal('modal-tratamiento');
 }
 
-function loadRecintosPicker(selectedIds=[]) {
-  const clienteId = document.getElementById('trt-cliente').value;
-  const picker = document.getElementById('recintos-picker');
-  const recintos = DB.recintos.filter(r=>r.clienteId===clienteId);
+function loadRecintosPicker(selectedIds, cultivoFilter) {
+  selectedIds   = selectedIds   || [];
+  cultivoFilter = cultivoFilter != null ? cultivoFilter : '';
+  var clienteId = document.getElementById('trt-cliente').value;
+  var picker    = document.getElementById('recintos-picker');
+  var filterDiv = document.getElementById('trt-cultivo-filter');
+  var chipsDiv  = document.getElementById('trt-cultivo-chips');
+  var infoEl    = document.getElementById('trt-recintos-info');
+
   if(!clienteId) {
     picker.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';
+    if(filterDiv) filterDiv.style.display = 'none';
     return;
   }
-  if(!recintos.length) {
+
+  var campana  = (document.getElementById('trt-campana') || {}).value || currentCampana || '';
+  var allRecs  = DB.recintos.filter(function(r){
+    if(r.clienteId !== clienteId) return false;
+    if(campana && r.campana && r.campana !== campana) return false;
+    return true;
+  });
+  // If campaign filter gives nothing, show all for this client
+  if(!allRecs.length) {
+    allRecs = DB.recintos.filter(function(r){ return r.clienteId === clienteId; });
+  }
+
+  if(!allRecs.length) {
     picker.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Este cliente no tiene recintos</div>';
+    if(filterDiv) filterDiv.style.display = 'none';
     return;
   }
-  picker.innerHTML = recintos.map(r => {
-    const checked = selectedIds.includes(r.id) ? 'checked' : '';
-    const color = getCropColor(r.especieVariedad);
-    return `<label class="recinto-check">
-      <input type="checkbox" value="${r.id}" ${checked} onchange="refreshProductRows()">
-      <span class="crop-dot" style="background:${color}"></span>
-      <label>${r.nombreFinca||`Pol.${r.numPoligono} Par.${r.numParcela}-${r.numRecinto}`} · ${r.especieVariedad||'Sin cultivo'} · ${r.supCultivada} ha</label>
-    </label>`;
-  }).join('');
+
+  // Build cultivo list
+  var cultivoMap = {};
+  allRecs.forEach(function(r){
+    var cv = (r.especieVariedad||'').trim();
+    if(cv) cultivoMap[cv] = (cultivoMap[cv]||0) + 1;
+  });
+  var cultivoList = Object.keys(cultivoMap).sort();
+
+  // Show/hide filter strip
+  if(filterDiv) {
+    if(cultivoList.length > 1) {
+      filterDiv.style.display = 'block';
+      // Build chips
+      var chips = '<button type="button" class="cultivo-chip'+(cultivoFilter===''?' active':'')+
+        '" data-cv="" onclick="loadRecintosPicker(getCheckedRecintoIds(),\'\')">'+
+        'Todos ('+allRecs.length+')</button>';
+      cultivoList.forEach(function(cv){
+        var n     = cultivoMap[cv];
+        var color = getCropColor(cv);
+        chips += '<button type="button" class="cultivo-chip'+(cultivoFilter===cv?' active':'')+
+          '" data-cv="'+cv.replace(/"/g,'&quot;')+'" style="--chip-color:'+color+'"'+
+          ' onclick="loadRecintosPicker(getCheckedRecintoIds(),\''+cv.replace(/'/g,"\\'")+'\')">' +
+          cv+' <span style="opacity:.7">('+n+')</span></button>';
+      });
+      if(chipsDiv) chipsDiv.innerHTML = chips;
+    } else {
+      filterDiv.style.display = 'none';
+    }
+  }
+
+  // Filter recintos by selected cultivo
+  var filteredRecs = cultivoFilter
+    ? allRecs.filter(function(r){ return (r.especieVariedad||'').trim() === cultivoFilter; })
+    : allRecs;
+
+  // Update info line
+  if(infoEl) {
+    var ha = filteredRecs.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
+    infoEl.textContent = filteredRecs.length+' recinto'+(filteredRecs.length!==1?'s':'')+' · '+ha.toFixed(2)+' ha';
+  }
+
+  // Group by finca
+  var fincas = {}, fincaOrder = [];
+  filteredRecs.forEach(function(r){
+    var key = (r.nombreFinca||('Pol.'+r.numPoligono+' Par.'+r.numParcela)).trim() || 'Sin nombre';
+    if(!fincas[key]) { fincas[key]=[]; fincaOrder.push(key); }
+    fincas[key].push(r);
+  });
+
+  var html = '';
+  fincaOrder.forEach(function(finca){
+    var group   = fincas[finca];
+    var haF     = group.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
+    var allIds  = group.map(function(r){return r.id;});
+    var allChk  = allIds.every(function(id){return selectedIds.indexOf(id)>=0;});
+
+    // Finca header with select-all checkbox
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;'+
+      'background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1">'+
+      '<input type="checkbox" '+(allChk?'checked':'')+
+        ' data-finca-ids="'+allIds.join(',')+'"'+
+        ' onchange="toggleFincaRecintos(this)"'+
+        ' style="width:14px;height:14px;accent-color:var(--primary)">'+
+      '<span style="font-weight:700;font-size:12px;color:var(--white)">🏡 '+finca+'</span>'+
+      '<span style="font-size:11px;color:var(--text3)">'+haF.toFixed(2)+' ha · '+group.length+' rec.</span>'+
+      '</div>';
+
+    group.forEach(function(r){
+      var checked = selectedIds.indexOf(r.id)>=0 ? 'checked' : '';
+      var color   = getCropColor(r.especieVariedad);
+      var sigpac  = (r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+      var ha      = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
+      html += '<label class="recinto-check" style="padding-left:28px">'+
+        '<input type="checkbox" value="'+r.id+'" '+checked+' onchange="refreshProductRows()">'+
+        '<span class="crop-dot" style="background:'+color+'"></span>'+
+        '<span style="flex:1;font-size:12px">'+(r.nombreFinca||sigpac)+'</span>'+
+        '<span style="font-size:11px;color:var(--text2)">'+((r.especieVariedad||'Sin cultivo').split('/')[0].trim())+'</span>'+
+        '<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>'+
+        '</label>';
+    });
+  });
+
+  picker.innerHTML = html ||
+    '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin parcelas para este cultivo</div>';
+}
+
+function getCheckedRecintoIds() {
+  var checks = document.querySelectorAll('#recintos-picker input[type=checkbox][value]');
+  var ids = [];
+  checks.forEach(function(c){ if(c.checked) ids.push(c.value); });
+  return ids;
+}
+
+function toggleFincaRecintos(masterCb) {
+  var ids = (masterCb.dataset.fincaIds||'').split(',').filter(Boolean);
+  ids.forEach(function(id){
+    var cb = document.querySelector('#recintos-picker input[type=checkbox][value="'+id+'"]');
+    if(cb) cb.checked = masterCb.checked;
+  });
+  refreshProductRows();
+}
+
+function toggleAllTrtRecintos(val) {
+  document.querySelectorAll('#recintos-picker input[type=checkbox]').forEach(function(cb){
+    cb.checked = val;
+  });
+  refreshProductRows();
 }
 
 function refreshProductRows() {
@@ -2421,7 +2639,7 @@ function addProductRow(data=null) {
   if(!opts) opts = '<option>Sin productos</option>';
 
   row.innerHTML =
-    '<select class="prod-row-sel">'+opts+'</select>' +
+    '<select class="prod-row-sel" onchange="onProdRowSelChange(this)">'+opts+'</select>' +
     '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data?.dosis||'')+'" oninput="calcProdRowPVP(this)">' +
     '<select class="prod-row-unidad">' +
       ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
@@ -2440,18 +2658,52 @@ function addProductRow(data=null) {
 }
 
 function calcProdRowPVP(input) {
-  var row       = input.closest('.product-row');
-  var sel       = row.querySelector('.prod-row-sel');
-  var dosis     = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
-  var margen    = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
-  var pvpSpan   = row.querySelector('.prod-row-pvp');
+  var row     = input.closest('.product-row');
+  if(!row) return;
+  var sel     = row.querySelector('.prod-row-sel');
+  var dosis   = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+  var margen  = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
+  var pvpSpan = row.querySelector('.prod-row-pvp');
   if(!pvpSpan) return;
   var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
-  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; return; }
-  var costeHa = prod.coste * dosis;
+  if(!prod || !dosis) { pvpSpan.textContent = '—'; pvpSpan.style.color = 'var(--text3)'; return; }
+
+  // Get formato index from selector if present
+  var fmtSel = row.querySelector('.prod-row-formato');
+  var fmtIdx = fmtSel ? parseInt(fmtSel.value)||0 : 0;
+  var precio  = getPrecioProducto(prod, fmtIdx);
+
+  if(!precio) { pvpSpan.textContent = '—'; pvpSpan.style.color = 'var(--text3)'; return; }
+  var costeHa = precio * dosis;
   var pvpHa   = costeHa * (1 + margen/100);
   pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
   pvpSpan.style.color = '#7acc4a';
+}
+
+// When a product is selected in treatment row, update formato selector if product has multiple formats
+function onProdRowSelChange(sel) {
+  var row  = sel.closest('.product-row');
+  if(!row) return;
+  var prod = (DB.productos||[]).find(function(p){return p.id===sel.value;});
+  var fmts = (prod && prod.formatos && prod.formatos.length) ? prod.formatos : [];
+
+  // Remove existing formato wrap if any
+  var existing = row.querySelector('.prod-row-formato-wrap');
+  if(existing) existing.remove();
+
+  if(fmts.length > 1) {
+    // Add formato selector below the product name
+    var wrap = document.createElement('div');
+    wrap.className = 'prod-row-formato-wrap';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;grid-column:1/-1';
+    var opts = fmts.map(function(f,i){
+      return '<option value="'+i+'">'+f.nombre+' — '+f.precio+' €/'+f.unidad+'</option>';
+    }).join('');
+    wrap.innerHTML = '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>' +
+      '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="calcProdRowPVP(this)">' + opts + '</select>';
+    row.appendChild(wrap);
+  }
+  calcProdRowPVP(sel);
 }
 
 function saveTratamiento() {
@@ -2618,6 +2870,18 @@ function renderProductos() {
       '<span>📏 Dosis: '+(p.dosis||'—')+'</span>' +
       '<span>⏱️ Plazo: '+(p.plazo||'—')+'</span>' +
       '</div>' +
+      // Formats / prices block
+      (function(){
+        var fmts = (p.formatos && p.formatos.length) ? p.formatos
+          : (p.coste ? [{nombre:'Estándar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}] : []);
+        if(!fmts.length) return '';
+        var pills = fmts.map(function(f){
+          return '<span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(74,140,42,.12);border:1px solid var(--border2);color:var(--white)">' +
+            '<b>'+(f.nombre||f.cantidad+' '+f.unidad)+'</b> — '+f.precio+' €/'+f.unidad+'</span>';
+        }).join('');
+        return '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">' +
+          '<span style="font-size:11px;color:var(--text3);align-self:center">💶</span>' + pills + '</div>';
+      })() +
       (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📋 '+p.usos+'</div>' : '') +
       cultivosPills +
       dcBlock +
@@ -2657,21 +2921,27 @@ function openProductoModal(id=null) {
   editingId.producto = id;
   document.getElementById('modal-prod-title').textContent = id ? 'Editar producto' : 'Nuevo producto';
   const p = id ? DB.productos.find(pr=>pr.id===id) : null;
-  document.getElementById('prod-nombre').value = p?.nombre||'';
-  document.getElementById('prod-registro').value = p?.numRegistro||'';
-  document.getElementById('prod-tipo').value = p?.tipo||'Herbicida';
-  document.getElementById('prod-materia').value = p?.materiaActiva||'';
-  document.getElementById('prod-titular').value = p?.titular||'';
-  document.getElementById('prod-formulacion').value = p?.formulacion||'';
-  document.getElementById('prod-dosis').value = p?.dosis||'';
-  document.getElementById('prod-plazo').value = p?.plazo||'';
-  document.getElementById('prod-coste').value = p?.coste||'';
-  document.getElementById('prod-unidad-coste').value = p?.unidadCoste||'L';
-  document.getElementById('prod-usos').value = p?.usos||'';
-  document.getElementById('prod-obs').value = p?.obs||'';
+  document.getElementById('prod-nombre').value = p ? p.nombre||'' : '';
+  document.getElementById('prod-registro').value = p ? p.numRegistro||'' : '';
+  document.getElementById('prod-tipo').value = p ? p.tipo||'Herbicida' : 'Herbicida';
+  document.getElementById('prod-materia').value = p ? p.materiaActiva||'' : '';
+  document.getElementById('prod-titular').value = p ? p.titular||'' : '';
+  document.getElementById('prod-formulacion').value = p ? p.formulacion||'' : '';
+  document.getElementById('prod-dosis').value = p ? p.dosis||'' : '';
+  document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
+  document.getElementById('prod-usos').value = p ? p.usos||'' : '';
+  document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
+
+  // Load formats — migrate legacy single coste if no formatos array
+  var formatos = (p && p.formatos && p.formatos.length) ? p.formatos : [];
+  if(!formatos.length && p && p.coste) {
+    formatos = [{nombre:'Formato estándar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}];
+  }
+  renderFormatoRows(formatos);
+
   // Render cultivos tags
-  renderCultivoTags(p?.cultivosAutorizados||[]);
+  renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
   openModal('modal-producto');
 }
 
@@ -2719,28 +2989,90 @@ function getCultivoTagsValues() {
   return [...container.querySelectorAll('span[data-cv]')].map(s=>s.dataset.cv);
 }
 
+// Get the price per unit for a product, considering a specific format index
+function getPrecioProducto(prod, formatoIdx) {
+  if(!prod) return 0;
+  var fmts = (prod.formatos && prod.formatos.length) ? prod.formatos : [];
+  if(fmts.length) {
+    var fmt = fmts[formatoIdx != null ? formatoIdx : 0];
+    return fmt ? (fmt.precio||0) : 0;
+  }
+  return prod.coste||0; // fallback to legacy field
+}
+
+// ── Formatos / prices helpers ─────────────────────────────
+function renderFormatoRows(formatos) {
+  var cont = document.getElementById('prod-formatos-rows');
+  if(!cont) return;
+  cont.innerHTML = '';
+  if(formatos && formatos.length) {
+    formatos.forEach(function(f){ addFormatoRow(f); });
+  } else {
+    addFormatoRow(); // start with one empty row
+  }
+}
+
+function addFormatoRow(data) {
+  var cont = document.getElementById('prod-formatos-rows');
+  if(!cont) return;
+  var row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:6px;padding:6px 10px;border-top:1px solid var(--border);align-items:center';
+  var units = ['L','kg','ud','saco','t','mL','g'];
+  var uOpts = units.map(function(u){
+    return '<option value="'+u+'"'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
+  }).join('');
+  row.innerHTML =
+    '<input type="text" class="fmt-nombre" placeholder="ej: Envase 1 L" value="'+(data&&data.nombre?data.nombre.replace(/"/g,'&quot;'):'')+'" style="font-size:13px">' +
+    '<input type="number" step="0.001" min="0" class="fmt-cantidad" placeholder="1" value="'+(data&&data.cantidad?data.cantidad:'')+'" style="font-size:13px">' +
+    '<select class="fmt-unidad" style="font-size:13px">'+uOpts+'</select>' +
+    '<input type="number" step="0.01" min="0" class="fmt-precio" placeholder="0.00" value="'+(data&&data.precio?data.precio:'')+'" style="font-size:13px">' +
+    '<button type="button" onclick="this.closest(\'div\').remove()" class="btn btn-danger btn-sm" style="padding:4px 8px">✕</button>';
+  cont.appendChild(row);
+}
+
+function getFormatosValues() {
+  var rows = document.querySelectorAll('#prod-formatos-rows > div');
+  var out = [];
+  rows.forEach(function(row) {
+    var nombre   = (row.querySelector('.fmt-nombre')||{}).value;
+    var cantidad = parseFloat((row.querySelector('.fmt-cantidad')||{}).value)||1;
+    var unidad   = (row.querySelector('.fmt-unidad')||{}).value||'L';
+    var precio   = parseFloat((row.querySelector('.fmt-precio')||{}).value)||0;
+    if(nombre || precio) {
+      out.push({nombre: nombre||('Formato '+out.length+1), cantidad: cantidad, unidad: unidad, precio: precio});
+    }
+  });
+  return out;
+}
+
 function saveProducto() {
-  const nombre = document.getElementById('prod-nombre').value.trim();
+  var nombre = document.getElementById('prod-nombre').value.trim();
   if(!nombre) { alert('Introduce el nombre del producto'); return; }
-  const data = {
-    nombre, numRegistro:document.getElementById('prod-registro').value.trim(),
-    tipo:document.getElementById('prod-tipo').value,
-    materiaActiva:document.getElementById('prod-materia').value.trim(),
-    titular:document.getElementById('prod-titular').value.trim(),
-    formulacion:document.getElementById('prod-formulacion').value,
-    dosis:document.getElementById('prod-dosis').value.trim(),
-    plazo:document.getElementById('prod-plazo').value.trim(),
-    coste:parseFloat(document.getElementById('prod-coste').value)||0,
-    unidadCoste:document.getElementById('prod-unidad-coste').value,
-    usos:document.getElementById('prod-usos').value.trim(),
-    obs:document.getElementById('prod-obs').value.trim(),
+  var formatos = getFormatosValues();
+  // Keep legacy coste = first format's precio for backward compatibility
+  var legacyCoste    = formatos.length ? (formatos[0].precio||0) : 0;
+  var legacyUnidad   = formatos.length ? (formatos[0].unidad||'L') : 'L';
+  var data = {
+    nombre,
+    numRegistro: document.getElementById('prod-registro').value.trim(),
+    tipo:        document.getElementById('prod-tipo').value,
+    materiaActiva: document.getElementById('prod-materia').value.trim(),
+    titular:     document.getElementById('prod-titular').value.trim(),
+    formulacion: document.getElementById('prod-formulacion').value,
+    dosis:       document.getElementById('prod-dosis').value.trim(),
+    plazo:       document.getElementById('prod-plazo').value.trim(),
+    formatos:    formatos,
+    coste:       legacyCoste,
+    unidadCoste: legacyUnidad,
+    usos:        document.getElementById('prod-usos').value.trim(),
+    obs:         document.getElementById('prod-obs').value.trim(),
     cultivosAutorizados: getCultivoTagsValues()
   };
   if(editingId.producto) {
-    const i = DB.productos.findIndex(p=>p.id===editingId.producto);
-    if(i>=0) DB.productos[i] = {...DB.productos[i],...data};
+    var i = DB.productos.findIndex(function(p){return p.id===editingId.producto;});
+    if(i>=0) DB.productos[i] = Object.assign({}, DB.productos[i], data);
   } else {
-    const newProd = {id:uid(),...data};
+    var newProd = Object.assign({id:uid()}, data);
     DB.productos.push(newProd);
     if(typeof window._productoSaveHook === 'function') { window._productoSaveHook(newProd.id); window._productoSaveHook = null; }
   }
@@ -3079,6 +3411,22 @@ function renderClientes() {
 
     // ── Header chips ──
     var totalRecAll = allRecs.length;
+
+    // Surface for the active campaign (or all if no filter)
+    var recsForSurface = currentCampana
+      ? allRecs.filter(function(r){ return r.campana === currentCampana; })
+      : allRecs;
+    // Deduplicate SIGPAC keys for totSIG, sum supCultivada for totCul
+    var sigSeen = {}, totSIG = 0, totCul = 0;
+    recsForSurface.forEach(function(r){
+      var key = [r.codProvincia||'',String(r.termMunicipal||'').split(' ')[0],
+                 r.numPoligono||'',r.numParcela||'',r.numRecinto||''].join('-');
+      var sig = parseFloat(r.supSigpac)||0;
+      if(!sigSeen[key] || sig > sigSeen[key]) sigSeen[key] = sig;
+      totCul += parseFloat(r.supCultivada)||0;
+    });
+    Object.keys(sigSeen).forEach(function(k){ totSIG += sigSeen[k]; });
+
     var campanaChips = allCampanas.map(function(camp){
       return '<button onclick="document.getElementById(\'campana-global\').value=\''+camp+'\';onCampanaChange()" ' +
         'style="background:none;border:1px solid var(--border2);color:var(--text2);padding:2px 8px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600" ' +
@@ -3097,6 +3445,8 @@ function renderClientes() {
     html += '</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-left:8px">' +
       '<span class="tag tag-green">'+totalRecAll+' recinto'+(totalRecAll!==1?'s':'')+'</span>' +
+      (totCul > 0 ? '<span class="tag tag-blue" style="font-weight:700">'+totCul.toFixed(2)+' ha cultivadas</span>' : '') +
+      (totSIG > 0 && totSIG !== totCul ? '<span class="tag tag-gray">'+totSIG.toFixed(2)+' ha SIGPAC</span>' : '') +
       campanaChips + '</div>';
     html += '<div class="cliente-card-actions">'+actions+'</div>';
     html += '</div>'; // end header
@@ -4840,28 +5190,159 @@ DC_MAPA.forEach(function(d){
   if(kNum !== k) DC_INDEX[kNum] = d;
 });
 
-function applyDenominacionesComunes() {
-  var matched = 0, noMatch = 0;
-  DB.productos.forEach(function(p) {
-    var raw = (p.numRegistro||'').trim().toUpperCase();
-    // Normalise: "ES-00169", "ES00169", "169" all should work
-    var keys = [raw, raw.replace(/^ES-?/,''), 'ES-'+raw.replace(/^ES-?/,'')];
-    var found = null;
-    keys.forEach(function(k){ if(!found && DC_INDEX[k]) found = DC_INDEX[k]; });
-    if(found) {
-      p.productoReferencia     = found.productoRef;
-      p.denominacionesComunes  = found.dcs;
-      matched++;
-    } else {
-      noMatch++;
-    }
-  });
-  save();
-  renderProductos();
-  alert('✅ Comparación completada:\n\n🔗 Con denominaciones encontradas: '+matched+'\n⚠️ Sin coincidencia: '+noMatch);
+function importarDenominacionesMapa(input) {
+  var file = input.files && input.files[0];
+  if(!file) return;
+  input.value = '';
+
+  var ext = file.name.split('.').pop().toLowerCase();
+
+  if(ext === 'xlsx' || ext === 'xls') {
+    // Parse Excel format (same structure as MAPA product files)
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var data  = new Uint8Array(e.target.result);
+        var wb    = XLSX.read(data, {type:'array'});
+        var ws    = wb.Sheets[wb.SheetNames[0]];
+        var rows  = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+        // Find header row
+        var headerRow = -1;
+        for(var i=0; i<Math.min(rows.length, 35); i++) {
+          var r = rows[i].map(function(c){return String(c||'').trim().toUpperCase();});
+          if(r.indexOf('NUMREGISTRO')>=0 || r.indexOf('NOMBRE')>=0) { headerRow=i; break; }
+        }
+        if(headerRow < 0) { alert('No se encontró la cabecera en el archivo. Asegúrate de que sea el archivo de denominaciones comunes del MAPA.'); return; }
+
+        var headers = rows[headerRow].map(function(c){return String(c||'').trim().toUpperCase();});
+        var iNumReg  = headers.indexOf('NUMREGISTRO');
+        var iRef     = headers.indexOf('PRODUCTOREF'); // may not exist
+        var iNombre  = headers.indexOf('NOMBRE');
+        var iEmpresa = headers.indexOf('EMPRESA') >= 0 ? headers.indexOf('EMPRESA') : headers.indexOf('TITULAR');
+        var iRefAlt  = headers.indexOf('PRODUCTOREF') >= 0 ? headers.indexOf('PRODUCTOREF') : -1;
+
+        // Build new DC_MAPA structure: [{numReg, productoRef, dcs:[{nombre, empresa}]}]
+        var byReg = {};
+        for(var j=headerRow+1; j<rows.length; j++) {
+          var row  = rows[j];
+          var nr   = String(row[iNumReg]||'').trim();
+          var dc   = String(row[iNombre]||'').trim();
+          var emp  = iEmpresa >= 0 ? String(row[iEmpresa]||'').trim() : '';
+          var ref  = iRefAlt >= 0 ? String(row[iRefAlt]||'').trim() : '';
+          if(!nr || !dc) continue;
+          if(!byReg[nr]) byReg[nr] = {numReg:nr, productoRef:ref, dcs:[]};
+          byReg[nr].dcs.push({nombre:dc, empresa:emp});
+          if(ref && !byReg[nr].productoRef) byReg[nr].productoRef = ref;
+        }
+
+        var newDC = Object.values ? Object.values(byReg) : Object.keys(byReg).map(function(k){return byReg[k];});
+        var total = newDC.length;
+
+        if(!total) { alert('No se encontraron denominaciones comunes en el archivo.'); return; }
+
+        // Update embedded DC_MAPA in memory and re-apply
+        window._DC_MAPA_OVERRIDE = newDC;
+        var res = _applyDenominacionesComunesFromData(newDC);
+        alert('✅ Denominaciones comunes actualizadas desde el archivo.\n\n' +
+          '📦 Productos de referencia actualizados: ' + res.updated + '\n' +
+          '🆕 Nuevos productos creados: ' + res.created + '\n' +
+          (res.skipped ? '⏭️ Ya existían: ' + res.skipped + '\n' : '') +
+          '\nLos nuevos productos tienen los datos del producto de referencia.\nAñade el precio en cada uno (Productos → ✏️ Editar).');
+      } catch(err) {
+        alert('Error al procesar el archivo: ' + err.message);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else {
+    alert('Formato no compatible. Por favor sube el archivo Excel (.xlsx) de denominaciones comunes descargado del MAPA (Registro de Productos Fitosanitarios → Denominaciones Comunes).');
+  }
 }
 
+function _applyDenominacionesComunesFromData(dcData) {
+  // Build lookup: numReg (normalised) → {productoRef, dcs}
+  var lookup = {};
+  dcData.forEach(function(d) {
+    var key = String(d.numReg||'').trim().toUpperCase().replace(/\s/g,'');
+    if(key) lookup[key] = d;
+    var keyNum = key.replace('ES-','').replace(/^0+/,'') || '0';
+    if(keyNum !== key) lookup[keyNum] = d;
+  });
 
+  var updated = 0, created = 0, skipped = 0;
+
+  DB.productos.forEach(function(refProd) {
+    // Find denominaciones for this reference product
+    var keys = [];
+    if(refProd.numRegistro) {
+      var k = String(refProd.numRegistro).trim().toUpperCase().replace(/\s/g,'');
+      keys.push(k);
+      keys.push(k.replace('ES-','').replace(/^0+/,'') || '0');
+    }
+    var found = null;
+    for(var i=0; i<keys.length; i++) {
+      if(lookup[keys[i]]) { found = lookup[keys[i]]; break; }
+    }
+    if(!found) return;
+
+    // Update the reference product's denominacionesComunes list
+    refProd.denominacionesComunes = found.dcs;
+    if(found.productoRef && !refProd.productoReferencia) refProd.productoReferencia = found.productoRef;
+    updated++;
+
+    // For each denomination, create a new product if it doesn't already exist
+    (found.dcs||[]).forEach(function(dc) {
+      var dcNombre = (dc.nombre||'').trim();
+      if(!dcNombre) return;
+
+      // Check if a product with this name already exists
+      var exists = DB.productos.find(function(p) {
+        return p.nombre.trim().toUpperCase() === dcNombre.toUpperCase();
+      });
+      if(exists) { skipped++; return; }
+
+      // Create a copy of the reference product with the denomination name
+      var newProd = {
+        id:                  uid(),
+        nombre:              dcNombre,
+        numRegistro:         refProd.numRegistro || '',
+        tipo:                refProd.tipo         || 'Fitosanitario',
+        materiaActiva:       refProd.materiaActiva|| '',
+        titular:             dc.empresa           || refProd.titular || '',
+        formulacion:         refProd.formulacion  || '',
+        dosis:               refProd.dosis        || '',
+        plazo:               refProd.plazo        || '',
+        formatos:            [],          // empty — user sets their own price
+        coste:               0,
+        unidadCoste:         refProd.unidadCoste  || 'L',
+        usos:                refProd.usos         || '',
+        obs:                 'Denominación común de: ' + refProd.nombre +
+                             (dc.empresa ? ' (' + dc.empresa + ')' : ''),
+        cultivosAutorizados: (refProd.cultivosAutorizados||[]).slice(),
+        productoReferencia:  refProd.nombre,
+        denominacionesComunes: [],
+        _cancelado:          false
+      };
+      DB.productos.push(newProd);
+      created++;
+    });
+  });
+
+  save();
+  renderProductos();
+  return {updated: updated, created: created, skipped: skipped};
+}
+
+function applyDenominacionesComunes() {
+  var dcData = window._DC_MAPA_OVERRIDE || DC_MAPA;
+  var res = _applyDenominacionesComunesFromData(dcData);
+  alert('✅ Denominaciones comunes aplicadas.\n\n' +
+    '📦 Productos de referencia actualizados: ' + res.updated + '\n' +
+    '🆕 Nuevos productos creados: ' + res.created + '\n' +
+    (res.skipped ? '⏭️ Ya existían: ' + res.skipped : ''));
+}
 // ============================================================
 // CULTIVOS AUTORIZADOS — datos extraídos de fichas MAPA por cultivo
 // Fuente: Registro Fitosanitarios MAPA — 28/05/2026
