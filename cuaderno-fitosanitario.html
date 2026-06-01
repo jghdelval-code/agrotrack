@@ -136,10 +136,30 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* TREATMENT PRODUCTS */
 .products-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.product-row { display: grid; grid-template-columns: 2fr 90px 100px 1fr auto; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); align-items: center; background: var(--surface); }
-.product-row:last-child { border-bottom: none; }
-.product-row-header { background: var(--card); font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
-.product-row input, .product-row select { padding: 5px 8px; font-size: 12px; }
+/* ── Product rows in treatment modal ─────────────────── */
+.product-row { background:var(--surface); border-bottom:1px solid var(--border); }
+.product-row:last-child { border-bottom:none; }
+.prod-row-inner { display:flex; flex-direction:column; gap:6px; padding:10px 12px; }
+.prod-row-top { display:flex; gap:8px; align-items:center; }
+.prod-row-fields { display:grid; grid-template-columns:1fr 90px 70px 80px; gap:6px; align-items:end; }
+.prod-row-field { display:flex; flex-direction:column; gap:3px; }
+.prod-row-label { font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.3px; }
+.prod-row-pvp-wrap { align-items:center; justify-content:center; }
+.prod-row-pvp { font-size:12px; color:#7acc4a; font-weight:700; }
+/* Combobox */
+.prod-combo-wrap { position:relative; flex:1; min-width:0; }
+.prod-combo-input { width:100%; padding:8px 10px; font-size:14px; border:1px solid var(--border2); border-radius:var(--radius); background:var(--card); color:var(--white); box-sizing:border-box; }
+.prod-combo-input:focus { border-color:var(--primary); outline:none; }
+.prod-combo-list { position:absolute; top:calc(100% + 2px); left:0; right:0; background:var(--card); border:1px solid var(--primary); border-radius:var(--radius); max-height:220px; overflow-y:auto; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+.prod-combo-group { padding:4px 10px; font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.4px; background:var(--surface); position:sticky; top:0; }
+.prod-combo-item { padding:8px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border); color:var(--white); }
+.prod-combo-item:last-child { border-bottom:none; }
+.prod-combo-item:hover, .prod-combo-item.selected { background:rgba(74,140,42,.15); }
+/* Mobile: stack to 2 columns */
+@media(max-width:500px) {
+  .prod-row-fields { grid-template-columns:1fr 1fr; }
+  .prod-combo-input { font-size:16px; } /* prevent iOS zoom */
+}
 .add-product-btn { width: 100%; padding: 9px; border: 1px dashed var(--border2); background: none; color: var(--primary); cursor: pointer; border-radius: var(--radius); margin-top: 8px; font-size: 13px; font-weight: 600; transition: all .15s; }
 .add-product-btn:hover { background: var(--primary-light); border-style: solid; }
 .remove-prod-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; padding: 2px 4px; }
@@ -364,8 +384,6 @@ textarea { resize: vertical; min-height: 72px; }
   .form-grid.cols-3 { grid-template-columns: 1fr 1fr; }
   .form-group.span-2, .form-group.span-3 { grid-column: span 1; }
   .form-section-title { grid-column: 1 / -1; }
-  .product-row { grid-template-columns: 1fr 1fr; gap: 6px; }
-  .product-row .remove-prod-btn { grid-column: 2; justify-self: end; }
   .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { border-radius: 16px 16px 0 0; max-height: 92vh; overflow-y: auto; max-width: 100% !important; }
   .modal-body { padding: 16px; }
@@ -2596,87 +2614,173 @@ function addProductRow(data=null) {
   const row = document.createElement('div');
   row.className = 'product-row';
 
-  // Get crops from selected recintos for this treatment
-  var selectedRecintoIds = [...document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')].map(c=>c.value);
-  var cultivosDeParcela = new Set();
-  selectedRecintoIds.forEach(function(rid) {
-    var r = DB.recintos.find(function(rc){return rc.id===rid;});
-    if(r && r.especieVariedad) {
-      cultivosDeParcela.add(r.especieVariedad.toUpperCase());
-    }
+  // Build flat product list for the combobox
+  var selectedRecintoIds = (document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')||[]);
+  var cultivosSet = {};
+  Array.prototype.forEach.call(selectedRecintoIds, function(c){
+    var r = DB.recintos.find(function(rc){return rc.id===c.value;});
+    if(r && r.especieVariedad) cultivosSet[r.especieVariedad.toUpperCase()] = 1;
   });
+  var cultivoKeys = Object.keys(cultivosSet);
 
-  // Build grouped options: authorized first, then rest
   var authorized = [], others = [];
   DB.productos.forEach(function(p) {
     var isAuth = false;
-    if(cultivosDeParcela.size > 0 && p.cultivosAutorizados && p.cultivosAutorizados.length) {
+    if(cultivoKeys.length && p.cultivosAutorizados && p.cultivosAutorizados.length) {
       isAuth = p.cultivosAutorizados.some(function(cv){
-        return [...cultivosDeParcela].some(function(cp){ return cp.includes(cv.toUpperCase()) || cv.toUpperCase().includes(cp.split('/')[0].trim()); });
+        return cultivoKeys.some(function(cp){
+          return cp.indexOf(cv.toUpperCase())>=0 || cv.toUpperCase().indexOf(cp.split('/')[0].trim())>=0;
+        });
       });
     }
     if(isAuth) authorized.push(p); else others.push(p);
   });
 
-  var opts = '';
-  if(authorized.length && cultivosDeParcela.size > 0) {
-    opts += '<optgroup label="✅ Autorizados para los cultivos de la parcela">';
-    opts += authorized.map(function(p){
-      return '<option value="'+p.id+'"'+(data&&data.productoId===p.id?' selected':'')+'>'+p.nombre+(p.tipo?' ('+p.tipo+')':'')+'</option>';
-    }).join('');
-    opts += '</optgroup>';
-    opts += '<optgroup label="— Otros productos —">';
-    opts += others.map(function(p){
-      return '<option value="'+p.id+'"'+(data&&data.productoId===p.id?' selected':'')+'>'+p.nombre+'</option>';
-    }).join('');
-    opts += '</optgroup>';
-  } else {
-    opts = DB.productos.map(function(p){
-      return '<option value="'+p.id+'"'+(data&&data.productoId===p.id?' selected':'')+'>'+p.nombre+'</option>';
-    }).join('');
-  }
+  var allProds = [];
+  authorized.forEach(function(p){ allProds.push({id:p.id, nombre:p.nombre, tipo:p.tipo||'', group:'auth'}); });
+  others.forEach(function(p){ allProds.push({id:p.id, nombre:p.nombre, tipo:p.tipo||'', group:'other'}); });
 
-  if(!opts) opts = '<option>Sin productos</option>';
+  var selId    = (data && data.productoId) || '';
+  var selProd  = selId ? allProds.find(function(p){return p.id===selId;}) : null;
+  var selLabel = selProd ? selProd.nombre + (selProd.tipo?' ('+selProd.tipo+')':'') : '';
+  var cbId     = 'prodcb-'+Date.now()+'-'+Math.random().toString(36).slice(2,5);
 
+  // Build card-style layout for good mobile UX
   row.innerHTML =
-    '<select class="prod-row-sel" onchange="onProdRowSelChange(this)">'+opts+'</select>' +
-    '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data?.dosis||'')+'" oninput="calcProdRowPVP(this)">' +
-    '<select class="prod-row-unidad">' +
-      ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
-        return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
-      }).join('') +
-    '</select>' +
-    '<input type="number" step="0.1" min="0" max="500" placeholder="% margen" class="prod-row-margen" title="Margen de beneficio %" value="'+(data?.margen||'')+'" oninput="calcProdRowPVP(this)">' +
-    '<span class="prod-row-pvp" style="font-size:11px;color:#7acc4a;font-weight:600;white-space:nowrap;min-width:60px;text-align:right" title="PVP calculado €/ha">'+(data?.pvpHa?data.pvpHa.toFixed(2)+' €/ha':'—')+'</span>' +
-    '<input type="text" placeholder="Justificación / plaga objetivo" class="prod-row-just" value="'+(data?.justificacion||'')+'">' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
+    '<div class="prod-row-inner">' +
+      // Line 1: searchable input + remove
+      '<div class="prod-row-top">' +
+        '<div class="prod-combo-wrap">' +
+          '<input type="text" class="prod-combo-input" id="'+cbId+'" autocomplete="off" autocorrect="off"' +
+          ' spellcheck="false" placeholder="🔍 Buscar producto..."' +
+          ' value="'+selLabel.replace(/"/g,'&quot;')+'"' +
+          ' data-prod-id="'+selId+'"' +
+          ' oninput="prodComboFilter(this)"' +
+          ' onfocus="prodComboOpen(this)"' +
+          ' onblur="prodComboBlur(this)">' +
+          '<div class="prod-combo-list" style="display:none"></div>' +
+        '</div>' +
+        '<button type="button" class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">\u2715</button>' +
+      '</div>' +
+      // Line 2: numeric fields
+      '<div class="prod-row-fields">' +
+        '<div class="prod-row-field"><label class="prod-row-label">Dosis</label>' +
+          '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis!=null?data.dosis:'')+'" oninput="calcProdRowPVP(this)"></div>' +
+        '<div class="prod-row-field"><label class="prod-row-label">Unidad</label>' +
+          '<select class="prod-row-unidad">' +
+          ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
+            return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
+          }).join('') +
+          '</select></div>' +
+        '<div class="prod-row-field"><label class="prod-row-label">Margen %</label>' +
+          '<input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>' +
+        '<div class="prod-row-field prod-row-pvp-wrap"><label class="prod-row-label">PVP/ha</label>' +
+          '<span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+' \u20ac/ha':'\u2014')+'</span></div>' +
+      '</div>' +
+      // Line 3: justification
+      '<input type="text" placeholder="Justificaci\u00f3n / plaga objetivo" class="prod-row-just" value="'+(data&&data.justificacion?data.justificacion.replace(/"/g,'&quot;'):'')+'" style="width:100%;margin-top:5px">' +
+    '</div>';
 
-  // Set product row grid columns
-  row.style.gridTemplateColumns = '2fr 70px 90px 80px 70px 1fr auto';
-
+  row._prodList = allProds;
+  row.style.gridTemplateColumns = '1fr';
+  row.style.padding = '10px 12px';
   document.getElementById('trt-products-rows').appendChild(row);
+}
+
+// ── Combobox functions ──────────────────────────────────
+function prodComboOpen(inp) { prodComboFilter(inp); }
+
+function prodComboFilter(inp) {
+  var row   = inp.closest('.product-row');
+  var list  = row ? row._prodList : [];
+  var drop  = inp.parentNode ? inp.parentNode.querySelector('.prod-combo-list') : null;
+  if(!drop) return;
+  var q = (inp.value||'').trim().toLowerCase();
+  var filtered = q
+    ? list.filter(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.tipo||'').toLowerCase().indexOf(q) >= 0; })
+    : list;
+  filtered = filtered.slice(0,80);
+  if(!filtered.length) {
+    drop.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>';
+    drop.style.display = 'block'; return;
+  }
+  var html = '', lastGroup = '';
+  filtered.forEach(function(p) {
+    if(p.group !== lastGroup) {
+      html += '<div class="prod-combo-group">'+(p.group==='auth' ? '\u2705 Autorizados para el cultivo' : '\u2014 Otros productos')+'</div>';
+      lastGroup = p.group;
+    }
+    var label  = p.nombre + (p.tipo ? ' <span style="font-size:10px;color:var(--text3)">'+p.tipo+'</span>' : '');
+    var marked = q ? label.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<b style="color:var(--primary)">$1</b>') : label;
+    var sel    = p.id === inp.dataset.prodId ? ' selected' : '';
+    html += '<div class="prod-combo-item'+sel+'" data-id="'+p.id+'" data-label="'+p.nombre.replace(/"/g,'&quot;')+(p.tipo?' ('+p.tipo+')':'').replace(/"/g,'&quot;')+'" onmousedown="prodComboSelect(this)">'+marked+'</div>';
+  });
+  drop.innerHTML = html;
+  drop.style.display = 'block';
+}
+
+function prodComboSelect(item) {
+  var drop = item.closest('.prod-combo-list');
+  var wrap = drop ? drop.parentNode : null;
+  var inp  = wrap ? wrap.querySelector('.prod-combo-input') : null;
+  if(!inp) return;
+  inp.value = item.dataset.label;
+  inp.dataset.prodId = item.dataset.id;
+  drop.style.display = 'none';
+  // Show format selector if product has multiple formats
+  var row  = inp.closest('.product-row');
+  var prod = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
+  if(prod) {
+    var fmts = (prod.formatos&&prod.formatos.length) ? prod.formatos : (prod.coste?[{nombre:'Est\u00e1ndar',cantidad:1,unidad:prod.unidadCoste||'L',precio:prod.coste}]:[]);
+    var existing = row ? row.querySelector('.prod-row-formato-wrap') : null;
+    if(existing) existing.remove();
+    if(fmts.length > 1 && row) {
+      var wrap2 = document.createElement('div');
+      wrap2.className = 'prod-row-formato-wrap';
+      wrap2.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px';
+      var fopts = fmts.map(function(f,i){ return '<option value="'+i+'">'+f.nombre+' \u2014 '+f.precio+' \u20ac/'+f.unidad+'</option>'; }).join('');
+      wrap2.innerHTML = '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>'+
+        '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="calcProdRowPVP(this)">'+fopts+'</select>';
+      wrap2._formatos = fmts;
+      var fieldsDiv = row.querySelector('.prod-row-fields');
+      if(fieldsDiv) fieldsDiv.parentNode.insertBefore(wrap2, fieldsDiv);
+    }
+  }
+  calcProdRowPVP(inp);
+}
+
+function prodComboBlur(inp) {
+  setTimeout(function(){
+    var drop = inp.parentNode ? inp.parentNode.querySelector('.prod-combo-list') : null;
+    if(drop) drop.style.display = 'none';
+    // Auto-select first match if text changed
+    var row  = inp.closest('.product-row');
+    var list = row ? (row._prodList||[]) : [];
+    var q    = (inp.value||'').trim().toLowerCase();
+    if(q) {
+      var match = list.find(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0; });
+      if(match) { inp.value = match.nombre+(match.tipo?' ('+match.tipo+')':''); inp.dataset.prodId = match.id; calcProdRowPVP(inp); }
+    }
+  }, 200);
 }
 
 function calcProdRowPVP(input) {
   var row     = input.closest('.product-row');
   if(!row) return;
-  var sel     = row.querySelector('.prod-row-sel');
-  var dosis   = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
-  var margen  = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
-  var pvpSpan = row.querySelector('.prod-row-pvp');
+  var comboInp = row.querySelector('.prod-combo-input');
+  var dosis    = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+  var margen   = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
+  var pvpSpan  = row.querySelector('.prod-row-pvp');
   if(!pvpSpan) return;
-  var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
-  if(!prod || !dosis) { pvpSpan.textContent = '—'; pvpSpan.style.color = 'var(--text3)'; return; }
-
-  // Get formato index from selector if present
-  var fmtSel = row.querySelector('.prod-row-formato');
-  var fmtIdx = fmtSel ? parseInt(fmtSel.value)||0 : 0;
+  var prodId   = comboInp ? (comboInp.dataset.prodId||'') : ((row.querySelector('.prod-row-sel')||{}).value||'');
+  var prod     = prodId ? (DB.productos||[]).find(function(p){return p.id===prodId;}) : null;
+  if(!prod || !dosis) { pvpSpan.textContent = '\u2014'; pvpSpan.style.color='var(--text3)'; return; }
+  var fmtSel  = row.querySelector('.prod-row-formato');
+  var fmtIdx  = fmtSel ? parseInt(fmtSel.value)||0 : 0;
   var precio  = getPrecioProducto(prod, fmtIdx);
-
-  if(!precio) { pvpSpan.textContent = '—'; pvpSpan.style.color = 'var(--text3)'; return; }
-  var costeHa = precio * dosis;
-  var pvpHa   = costeHa * (1 + margen/100);
-  pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
+  if(!precio) { pvpSpan.textContent = '\u2014'; pvpSpan.style.color='var(--text3)'; return; }
+  var pvpHa   = precio * dosis * (1 + margen/100);
+  pvpSpan.textContent = pvpHa.toFixed(2) + ' \u20ac/ha';
   pvpSpan.style.color = '#7acc4a';
 }
 
@@ -2686,19 +2790,13 @@ function onProdRowSelChange(sel) {
   if(!row) return;
   var prod = (DB.productos||[]).find(function(p){return p.id===sel.value;});
   var fmts = (prod && prod.formatos && prod.formatos.length) ? prod.formatos : [];
-
-  // Remove existing formato wrap if any
   var existing = row.querySelector('.prod-row-formato-wrap');
   if(existing) existing.remove();
-
   if(fmts.length > 1) {
-    // Add formato selector below the product name
     var wrap = document.createElement('div');
     wrap.className = 'prod-row-formato-wrap';
     wrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;grid-column:1/-1';
-    var opts = fmts.map(function(f,i){
-      return '<option value="'+i+'">'+f.nombre+' — '+f.precio+' €/'+f.unidad+'</option>';
-    }).join('');
+    var opts = fmts.map(function(f,i){ return '<option value="'+i+'">'+f.nombre+' \u2014 '+f.precio+' \u20ac/'+f.unidad+'</option>'; }).join('');
     wrap.innerHTML = '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>' +
       '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="calcProdRowPVP(this)">' + opts + '</select>';
     row.appendChild(wrap);
@@ -2717,14 +2815,17 @@ function saveTratamiento() {
 
   const productos = [];
   document.querySelectorAll('#trt-products-rows .product-row').forEach(row => {
-    const pid   = row.querySelector('.prod-row-sel')?.value;
-    const dosis = parseFloat(row.querySelector('.prod-row-dosis')?.value)||0;
-    const unidad = row.querySelector('.prod-row-unidad')?.value;
-    const just   = row.querySelector('.prod-row-just')?.value||'';
-    const margen = parseFloat(row.querySelector('.prod-row-margen')?.value)||0;
-    const pvpText= row.querySelector('.prod-row-pvp')?.textContent||'';
+    const comboInp = row.querySelector('.prod-combo-input');
+    const pid   = comboInp ? (comboInp.dataset.prodId||'') : (row.querySelector('.prod-row-sel')||{value:''}).value;
+    const dosis = parseFloat((row.querySelector('.prod-row-dosis')||{value:0}).value)||0;
+    const unidad = (row.querySelector('.prod-row-unidad')||{value:'L/ha'}).value;
+    const just   = (row.querySelector('.prod-row-just')||{value:''}).value||'';
+    const margen = parseFloat((row.querySelector('.prod-row-margen')||{value:0}).value)||0;
+    const pvpText= (row.querySelector('.prod-row-pvp')||{textContent:''}).textContent||'';
     const pvpHa  = parseFloat(pvpText)||0;
-    if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa});
+    const fmtSel = row.querySelector('.prod-row-formato');
+    const formatoIdx = fmtSel ? parseInt(fmtSel.value)||0 : 0;
+    if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa, formatoIdx});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
 
