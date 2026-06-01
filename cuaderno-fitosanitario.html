@@ -3192,96 +3192,152 @@ function deleteProducto(id) {
 // RECINTOS
 // ============================================================
 function renderRecintos() {
-  const search = document.getElementById('rec-search').value.toLowerCase();
-  const fCli  = document.getElementById('rec-filter-cliente').value;
-  const fCult = document.getElementById('rec-filter-cultivo').value;
-  const fCamp = currentCampana;
-  let list = DB.recintos.filter(r => {
-    // Always show incomplete/pending recintos regardless of filters
+  var search = (document.getElementById('rec-search').value||'').toLowerCase();
+  var fCli   = document.getElementById('rec-filter-cliente').value;
+  var fCult  = document.getElementById('rec-filter-cultivo').value;
+  var fCamp  = currentCampana;
+  var list = DB.recintos.filter(function(r) {
     var isEmpty = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
     if(isEmpty) return true;
     if(fCamp && r.campana !== fCamp) return false;
     if(fCli  && r.clienteId !== fCli) return false;
-    if(fCult && !(r.especieVariedad||'').toLowerCase().includes(fCult.toLowerCase())) return false;
-    if(search &&
-       !(r.nombreFinca||'').toLowerCase().includes(search) &&
-       !(`${r.numPoligono||''}-${r.numParcela||''}`).includes(search) &&
-       !(r.especieVariedad||'').toLowerCase().includes(search) &&
-       !(r.clienteId ? (DB.clientes.find(c=>c.id===r.clienteId)?.nombre||'').toLowerCase().includes(search) : false)
-    ) return false;
+    if(fCult && (r.especieVariedad||'').toLowerCase().indexOf(fCult.toLowerCase()) < 0) return false;
+    if(search) {
+      var cli = DB.clientes.find(function(c){return c.id===r.clienteId;});
+      var cliNombre = cli ? cli.nombre.toLowerCase() : '';
+      if((r.nombreFinca||'').toLowerCase().indexOf(search) < 0 &&
+         ((r.numPoligono||'')+'-'+(r.numParcela||'')).indexOf(search) < 0 &&
+         (r.especieVariedad||'').toLowerCase().indexOf(search) < 0 &&
+         cliNombre.indexOf(search) < 0) return false;
+    }
     return true;
   });
 
-  // Stats — supSIGPAC deduplicada: si un recinto está dividido en varios cultivos,
-  // la superficie física (supSigpac) se cuenta UNA SOLA VEZ por referencia SIGPAC única.
-  // supCultivada sí se suma por cada fila (es la superficie asignada a cada cultivo).
-  var sigSeen = {};
-  var totalSIGPAC = 0;
-  var totalHa = 0;
+  // Stats
+  var sigSeen = {}, totalSIGPAC = 0, totalHa = 0;
   list.forEach(function(r) {
-    var key = [
-      String(r.codProvincia||'').trim(),
-      String(r.termMunicipal||'').split(' ')[0].trim(),
-      String(r.numPoligono||'').trim(),
-      String(r.numParcela||'').trim(),
-      String(r.numRecinto||'').trim()
-    ].join('-');
-    var sig = parseFloat(r.supSigpac) || 0;
+    var key = [String(r.codProvincia||'').trim(), String(r.termMunicipal||'').split(' ')[0].trim(),
+               String(r.numPoligono||'').trim(), String(r.numParcela||'').trim(), String(r.numRecinto||'').trim()].join('-');
+    var sig = parseFloat(r.supSigpac)||0;
     if(!sigSeen[key] || sig > sigSeen[key]) sigSeen[key] = sig;
-    totalHa += parseFloat(r.supCultivada) || 0;
+    totalHa += parseFloat(r.supCultivada)||0;
   });
   Object.keys(sigSeen).forEach(function(k){ totalSIGPAC += sigSeen[k]; });
-
-  // Count unique SIGPAC references (physical parcels, not rows)
   var uniqueSigpacCount = Object.keys(sigSeen).length;
-  var splitCount = list.length - uniqueSigpacCount;  // rows that are splits
-  const campBanner = currentCampana
-    ? '<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;font-size:13px;">' +
-      '<span style="font-size:16px">📅</span>' +
-      '<span style="color:var(--accent);font-weight:700">Campaña activa: ' + currentCampana + '</span>' +
-      '<span style="color:var(--text2)">— ' + list.length + ' recintos en esta campaña</span>' +
-      '<button onclick="document.getElementById(\'campana-global\').value=\'\';onCampanaChange()" ' +
-      'style="margin-left:auto;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600">Ver todas</button>' +
+  var splitCount = list.length - uniqueSigpacCount;
+
+  var campBanner = currentCampana
+    ? '<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;font-size:13px;">'+
+      '<span style="font-size:16px">📅</span>'+
+      '<span style="color:var(--accent);font-weight:700">Campaña activa: '+currentCampana+'</span>'+
+      '<span style="color:var(--text2)">— '+list.length+' recintos</span>'+
+      '<button onclick="document.getElementById(\'campana-global\').value=\'\';onCampanaChange()" '+
+      'style="margin-left:auto;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600">Ver todas</button>'+
       '</div>'
     : '';
+
   document.getElementById('recintos-stats').innerHTML =
     campBanner +
-    '<div class="stat-card"><div class="icon">📋</div><div class="val">' + list.length + '</div><div class="lbl">Filas' + (splitCount > 0 ? ' <span style="font-size:11px;color:var(--accent)">('+splitCount+' divis.)</span>' : '') + '</div></div>' +
-    '<div class="stat-card"><div class="icon">📐</div><div class="val">' + uniqueSigpacCount + '</div><div class="lbl">Recintos únicos</div></div>' +
-    '<div class="stat-card"><div class="icon">🌾</div><div class="val">' + totalSIGPAC.toFixed(2) + '</div><div class="lbl">ha SIGPAC</div></div>' +
-    '<div class="stat-card"><div class="icon">✅</div><div class="val">' + totalHa.toFixed(2) + '</div><div class="lbl">ha Cultivadas</div></div>' +
-    '<div class="stat-card"><div class="icon">📍</div><div class="val">' + list.filter(r=>r.wkt).length + '</div><div class="lbl">Con geometría</div></div>';
+    '<div class="stat-card"><div class="icon">📋</div><div class="val">'+list.length+'</div><div class="lbl">Filas'+(splitCount>0?' <span style="font-size:11px;color:var(--accent)">('+splitCount+' divis.)</span>':'')+' </div></div>'+
+    '<div class="stat-card"><div class="icon">📐</div><div class="val">'+uniqueSigpacCount+'</div><div class="lbl">Recintos únicos</div></div>'+
+    '<div class="stat-card"><div class="icon">🌾</div><div class="val">'+totalSIGPAC.toFixed(2)+'</div><div class="lbl">ha SIGPAC</div></div>'+
+    '<div class="stat-card"><div class="icon">✅</div><div class="val">'+totalHa.toFixed(2)+'</div><div class="lbl">ha Cultivadas</div></div>'+
+    '<div class="stat-card"><div class="icon">📍</div><div class="val">'+list.filter(function(r){return r.wkt;}).length+'</div><div class="lbl">Con geometría</div></div>';
 
-  const tbody = document.getElementById('recintos-tbody');
+  var tbody = document.getElementById('recintos-tbody');
   if(!list.length) {
     tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="icon">📋</div>Sin recintos</td></tr>';
     return;
   }
-  tbody.innerHTML = list.map(r => {
-    const cli = DB.clientes.find(c=>c.id===r.clienteId);
-    const sigpacRef = `${r.codProvincia||'?'}-${(r.termMunicipal||'').split(' ')[0]||'?'}-${r.numPoligono||'?'}-${r.numParcela||'?'}-${r.numRecinto||'?'}`;
-    const isEmpty = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
-    const rowStyle = isEmpty ? 'background:rgba(212,160,23,.08);' : '';
-    const warningBadge = isEmpty
-      ? '<span class="tag tag-yellow" style="font-size:10px;margin-left:6px" title="Recinto dibujado sin datos — pulsa ✏️ para completarlo">⚠️ Pendiente</span>'
-      : '';
-    return `<tr style="${rowStyle}">
-      <td class="col-hide-mobile" style="color:var(--text3)">${r.numOrden||'—'}</td>
-      <td>${cli?`<b>${cli.nombre}</b>`:'<span style="color:var(--accent)">Sin asignar</span>'}${warningBadge}</td>
-      <td>${r.nombreFinca||'<span style="color:var(--text3)">Sin nombre</span>'}</td>
-      <td><code style="font-size:11px;color:var(--accent)">${sigpacRef}</code></td>
-      <td>${getCropTag(r.especieVariedad)}</td>
-      <td>${r.supSigpac||'—'} ha</td>
-      <td class="col-hide-mobile">${r.supCultivada||'—'} ha</td>
-      <td class="col-hide-mobile"><span class="tag ${r.secanoRegadio==='Regadío'?'tag-blue':'tag-gray'}">${r.secanoRegadio||'—'}</span></td>
-      <td class="col-hide-mobile">${r.wkt ? '<span class="tag tag-green">✓ WKT</span>' : '<span class="tag tag-gray">Sin WKT</span>'}</td>
-      <td class="td-actions">
-        <button class="btn ${isEmpty?'btn-accent':'btn-secondary'} btn-sm" onclick="openRecintoModal('${r.id}')" title="${isEmpty?'⚠️ Completar datos del recinto':'Editar recinto'}">${isEmpty?'⚠️ Completar':'✏️'}</button>
-        <button class="btn btn-secondary btn-sm" onclick="copyRecinto('${r.id}')" title="Copiar recinto para dividir cultivos">📋</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteRecinto('${r.id}')">🗑️</button>
-      </td>
-    </tr>`;
-  }).join('');
+
+  // Group by clienteId
+  var cliOrder = [], byCli = {};
+  list.forEach(function(r) {
+    var cid = r.clienteId || '__sin__';
+    if(!byCli[cid]) { byCli[cid] = []; cliOrder.push(cid); }
+    byCli[cid].push(r);
+  });
+  // Deduplicate order
+  var seenC = {};
+  cliOrder = cliOrder.filter(function(c){ return seenC[c] ? false : (seenC[c]=true); });
+
+  var html = '';
+  cliOrder.forEach(function(cid) {
+    var group  = byCli[cid];
+    var cli    = DB.clientes.find(function(c){return c.id===cid;});
+    var cliNom = cli ? cli.nombre : 'Sin cliente';
+    // Group stats
+    var cliSigSeen = {}, cliSIG = 0, cliCul = 0;
+    group.forEach(function(r){
+      var key = [String(r.codProvincia||'').trim(), String(r.termMunicipal||'').split(' ')[0].trim(),
+                 String(r.numPoligono||'').trim(), String(r.numParcela||'').trim(), String(r.numRecinto||'').trim()].join('-');
+      var sig = parseFloat(r.supSigpac)||0;
+      if(!cliSigSeen[key] || sig > cliSigSeen[key]) cliSigSeen[key] = sig;
+      cliCul += parseFloat(r.supCultivada)||0;
+    });
+    Object.keys(cliSigSeen).forEach(function(k){ cliSIG += cliSigSeen[k]; });
+    var nPending = group.filter(function(r){return !r.nombreFinca&&!r.codProvincia&&!r.numPoligono&&!r.clienteId;}).length;
+
+    var grpId = 'rec-grp-'+cid.replace(/[^a-zA-Z0-9]/g,'_');
+
+    // Client group header row
+    html += '<tr onclick="toggleTrt(\''+grpId+'\')" style="cursor:pointer;background:var(--card);user-select:none" id="hdr-'+grpId+'">'+
+      '<td colspan="10" style="padding:9px 14px">'+
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+          '<span style="font-size:14px">👤</span>'+
+          '<span style="font-weight:800;font-size:14px;color:var(--white)">'+cliNom+'</span>'+
+          '<span class="tag tag-green">'+group.length+' recinto'+(group.length!==1?'s':'')+'</span>'+
+          '<span class="tag tag-blue" style="font-weight:700">'+cliCul.toFixed(2)+' ha cultivadas</span>'+
+          (cliSIG>0&&Math.abs(cliSIG-cliCul)>0.01?'<span class="tag tag-gray">'+cliSIG.toFixed(2)+' ha SIGPAC</span>':'')+
+          (nPending?'<span class="tag tag-yellow">⚠️ '+nPending+' pendiente'+(nPending!==1?'s':'')+'</span>':'')+
+          '<span style="margin-left:auto;font-size:13px;color:var(--text3)" id="ico-'+grpId+'">▾</span>'+
+        '</div>'+
+      '</td>'+
+    '</tr>';
+
+    // Data rows
+    group.forEach(function(r) {
+      var sigpacRef = (r.codProvincia||'?')+'-'+((r.termMunicipal||'').split(' ')[0]||'?')+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+      var isEmpty   = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
+      var rowStyle  = isEmpty ? 'background:rgba(212,160,23,.08);' : '';
+      var warnBadge = isEmpty ? '<span class="tag tag-yellow" style="font-size:10px;margin-left:6px">⚠️ Pendiente</span>' : '';
+      html += '<tr data-grp="'+grpId+'" style="'+rowStyle+'">'+
+        '<td class="col-hide-mobile" style="color:var(--text3);padding-left:28px">'+(r.numOrden||'—')+'</td>'+
+        '<td style="padding-left:28px">'+r.nombreFinca+'<span style="font-size:11px;color:var(--text3);margin-left:5px">'+(r.campana?'C.'+r.campana:'')+'</span>'+warnBadge+'</td>'+
+        '<td><code style="font-size:11px;color:var(--accent)">'+sigpacRef+'</code></td>'+
+        '<td>'+getCropTag(r.especieVariedad)+'</td>'+
+        '<td>'+(r.supSigpac||'—')+' ha</td>'+
+        '<td class="col-hide-mobile">'+(r.supCultivada||'—')+' ha</td>'+
+        '<td class="col-hide-mobile"><span class="tag '+(r.secanoRegadio==='Regadío'?'tag-blue':'tag-gray')+'">'+(r.secanoRegadio||'—')+'</span></td>'+
+        '<td class="col-hide-mobile">'+(r.wkt?'<span class="tag tag-green">✓ WKT</span>':'<span class="tag tag-gray">Sin WKT</span>')+'</td>'+
+        '<td class="td-actions">'+
+          '<button class="btn '+(isEmpty?'btn-accent':'btn-secondary')+' btn-sm" onclick="openRecintoModal(\''+r.id+'\')" title="'+(isEmpty?'Completar':'Editar')+'">'+( isEmpty?'⚠️ Completar':'✏️')+'</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick="copyRecinto(\''+r.id+'\')" title="Copiar">📋</button>'+
+          '<button class="btn btn-danger btn-sm" onclick="deleteRecinto(\''+r.id+'\')">🗑️</button>'+
+        '</td>'+
+      '</tr>';
+    });
+  });
+
+  tbody.innerHTML = html;
+
+  // Wire up click handlers to toggle rows + arrow icon
+  cliOrder.forEach(function(cid) {
+    var grpId  = 'rec-grp-'+cid.replace(/[^a-zA-Z0-9]/g,'_');
+    var hdrRow = document.getElementById('hdr-'+grpId);
+    if(hdrRow) {
+      hdrRow.onclick = function() {
+        var open  = true;
+        var ico   = document.getElementById('ico-'+grpId);
+        document.querySelectorAll('[data-grp="'+grpId+'"]').forEach(function(tr) {
+          var isHidden = tr.style.display === 'none';
+          tr.style.display = isHidden ? '' : 'none';
+          open = isHidden; // after toggle
+        });
+        if(ico) ico.textContent = open ? '▾' : '▸';
+      };
+    }
+  });
 }
 
 function openRecintoModal(id=null) {
@@ -5750,55 +5806,96 @@ function calcNKgHa(dosis, unidad, nPct) {
 }
 
 // Build nitrogen compliance summary for an abonado record
+// Crucially: sums ALL abonado records in the same campaign that include each recinto
 function calcNitroCompliance(ab) {
-  var recs = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
-  var abonosRows = ab.abonos||[];
+  var recs    = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+  var campana = ab.campana || '';
 
-  // Total N applied (kg N/ha) — same for all recintos in this application
-  var totalNKgHa = 0;
-  abonosRows.forEach(function(row){
-    var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
-    if(abo) totalNKgHa += calcNKgHa(row.dosis, row.unidad, abo.n);
+  // For each recinto in this record, sum N across ALL abonados in same campaign
+  // that include that recinto
+  var nByRecinto = {}; // recintoId → totalNKgHa accumulated this campaign
+  recs.forEach(function(r){ nByRecinto[r.id] = 0; });
+
+  (DB.abonados||[]).forEach(function(otherAb) {
+    // Same campaign filter (if campana set)
+    if(campana && otherAb.campana && otherAb.campana !== campana) return;
+    // Only include if it shares at least one recinto with our recintos set
+    var otherRecs = otherAb.recintoIds||[];
+    otherRecs.forEach(function(rid) {
+      if(!(rid in nByRecinto)) return; // not a recinto we care about
+      // Sum N from this abonado for this recinto
+      var nThisAb = 0;
+      (otherAb.abonos||[]).forEach(function(row) {
+        var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
+        if(abo) nThisAb += calcNKgHa(row.dosis, row.unidad, abo.n);
+      });
+      nByRecinto[rid] += nThisAb;
+    });
   });
 
-  // Check compliance per unique cultivo/regime combination in selected recintos
+  // N applied in THIS record only (for display in card header)
+  var thisRecordNKgHa = 0;
+  (ab.abonos||[]).forEach(function(row){
+    var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
+    if(abo) thisRecordNKgHa += calcNKgHa(row.dosis, row.unidad, abo.n);
+  });
+
+  // Build compliance per unique cultivo/regime, using the ACCUMULATED N for each recinto
   var results = [];
-  var seenCv = {};
+  var seenCv  = {};
   recs.forEach(function(r){
-    var cv = (r.especieVariedad||'').trim();
-    var esReg = (r.secanoRegadio||'').toLowerCase().includes('regad');
-    var cvKey = cv + '|' + (esReg?'R':'S');
+    var cv     = (r.especieVariedad||'').trim();
+    var esReg  = (r.secanoRegadio||'').toLowerCase().indexOf('regad') >= 0;
+    var cvKey  = cv+'|'+(esReg?'R':'S');
     if(seenCv[cvKey]) return;
     seenCv[cvKey] = 1;
-    var info  = getNLimite(cv, esReg);
-    var pct   = info.limite > 0 ? Math.round(totalNKgHa / info.limite * 100) : 0;
+
+    // Use accumulated N for this specific recinto
+    var accN   = nByRecinto[r.id] || 0;
+    var info   = getNLimite(cv, esReg);
+    var pct    = info.limite > 0 ? Math.round(accN / info.limite * 100) : 0;
     var status = pct <= 80  ? 'ok'
                : pct <= 100 ? 'warning'
                : 'exceeded';
     results.push({
-      cultivo:   cv || 'Sin cultivo',
-      regimen:   esReg ? 'Regadío' : 'Secano',
-      limite:    info.limite,
+      cultivo:     cv || 'Sin cultivo',
+      regimen:     esReg ? 'Regadío' : 'Secano',
+      limite:      info.limite,
       limiteTipo1: info.limiteTipo1,
-      limiteOrg: N_LIMITE_ORGANICO,
-      nAplic:    totalNKgHa,
-      pct:       pct,
-      status:    status,
-      label:     info.label
+      limiteOrg:   N_LIMITE_ORGANICO,
+      nAplic:      accN,
+      nEsteAb:     thisRecordNKgHa,
+      pct:         pct,
+      status:      status,
+      label:       info.label,
+      recintoNombre: r.nombreFinca || (r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto)
     });
   });
-  return {totalNKgHa: totalNKgHa, results: results};
+
+  return {totalNKgHa: thisRecordNKgHa, results: results};
 }
 
 function renderNitroBar(result) {
-  var pct   = Math.min(result.pct, 150);  // cap bar at 150% for display
-  var color = result.status === 'ok' ? '#7acc4a'
+  var pct   = Math.min(result.pct, 150);
+  var color = result.status === 'ok'      ? '#7acc4a'
             : result.status === 'warning' ? '#d4a017'
             : '#e74c3c';
-  var icon  = result.status === 'ok' ? '✅'
+  var icon  = result.status === 'ok'      ? '✅'
             : result.status === 'warning' ? '⚠️'
             : '🚫';
-  var limite100 = (100 / Math.max(pct, 1) * pct).toFixed(0);
+
+  // Show previous applications as a darker segment
+  var nPrev     = Math.max(0, result.nAplic - result.nEsteAb);
+  var pctPrev   = result.limite > 0 ? Math.min(nPrev / result.limite * 100, 100) : 0;
+  var pctThis   = result.limite > 0 ? Math.min(result.nEsteAb / result.limite * 100, 100) : 0;
+  var prevBar   = nPrev > 0
+    ? '<div style="width:'+pctPrev.toFixed(1)+'%;height:100%;background:'+color+';opacity:.45;border-radius:4px 0 0 4px"></div>'+
+      '<div style="width:'+Math.min(pctThis,100-pctPrev).toFixed(1)+'%;height:100%;background:'+color+';border-radius:0 4px 4px 0"></div>'
+    : '<div style="width:'+Math.min(result.pct,100).toFixed(0)+'%;height:100%;background:'+color+';border-radius:4px"></div>';
+
+  var acumNote = nPrev > 0
+    ? '<span style="color:var(--text3);font-size:10px"> ('+nPrev.toFixed(1)+' kg prev. + '+result.nEsteAb.toFixed(1)+' kg este)</span>'
+    : '';
 
   return '<div style="margin:4px 0;padding:8px 10px;background:var(--surface);border-radius:6px;border-left:3px solid '+color+'">' +
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px">' +
@@ -5806,12 +5903,12 @@ function renderNitroBar(result) {
     '<span class="tag '+(result.regimen==='Regadío'?'tag-blue':'tag-gray')+'" style="font-size:10px">'+result.regimen+'</span>' +
     '<span style="color:var(--text2);margin-left:auto">Límite: <b>'+result.limite+' kg N/ha</b></span>' +
     '</div>' +
-    '<div style="background:var(--border);border-radius:4px;height:10px;overflow:hidden;position:relative">' +
-    '<div style="width:'+Math.min(pct,100)+'%;height:100%;background:'+color+';transition:width .4s;border-radius:4px"></div>' +
-    (pct > 100 ? '<div style="position:absolute;top:0;left:0;height:100%;width:100%;background:rgba(231,76,60,.35)"></div>' : '') +
+    '<div style="background:var(--border);border-radius:4px;height:10px;overflow:hidden;position:relative;display:flex">' +
+    prevBar +
+    (result.pct > 100 ? '<div style="position:absolute;top:0;left:0;height:100%;width:100%;background:rgba(231,76,60,.25)"></div>' : '') +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:var(--text2)">' +
-    '<span>Aplicado: <b style="color:'+color+'">'+result.nAplic.toFixed(1)+' kg N/ha</b> ('+result.pct+'%)</span>' +
+    '<span>Acumulado campaña: <b style="color:'+color+'">'+result.nAplic.toFixed(1)+' kg N/ha</b> ('+result.pct+'%)'+acumNote+'</span>' +
     '<span style="color:var(--text3)">Tipo 1: '+result.limiteTipo1+' | Org.máx: '+N_LIMITE_ORGANICO+'</span>' +
     '</div>' +
     '</div>';
@@ -5934,6 +6031,21 @@ function openAbonadoModal(id) {
   var cliSel = document.getElementById('abonado-cliente');
   cliSel.innerHTML = '<option value="">— Selecciona cliente —</option>' +
     DB.clientes.map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
+  cliSel.onchange = function() {
+    loadAbonadoParcelasPicker([]);
+    // Refresh abono selects in existing rows
+    document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
+      var sel = row.querySelector('.abonado-row-sel');
+      if(!sel) return;
+      var cur = sel.value;
+      var abonos = getAbonosPorCliente(cliSel.value).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+      sel.innerHTML = abonos.map(function(a){
+        var npk=[a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+        return '<option value="'+a.id+'"'+(a.id===cur?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
+      }).join('');
+      if(!sel.innerHTML) sel.innerHTML = '<option value="">Sin abonos comprados</option>';
+    });
+  };
 
   var ab = id ? (DB.abonados||[]).find(function(x){return x.id===id;}) : null;
   document.getElementById('abonado-fecha').value     = ab?.fecha||new Date().toISOString().slice(0,10);
@@ -6009,27 +6121,80 @@ function toggleFincaCheck(cb) {
   });
 }
 
+function getAbonosPorCliente(clienteId) {
+  // Returns abonos the client has purchased; if none purchased, returns all as fallback
+  if(!clienteId) return DB.abonos||[];
+  var comprados = (DB.compras||[]).filter(function(c){ return c.clienteId===clienteId && c.abonoId; });
+  if(!comprados.length) return DB.abonos||[];
+  // Deduplicate by abonoId
+  var ids = {};
+  comprados.forEach(function(c){ ids[c.abonoId]=1; });
+  return (DB.abonos||[]).filter(function(a){ return ids[a.id]; });
+}
+
 function addAbonadoRow(data) {
-  var row  = document.createElement('div');
+  var row = document.createElement('div');
   row.className = 'product-row';
   row.style.gridTemplateColumns = '2fr 90px 100px 1fr auto';
-  var opts = (DB.abonos||[]).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');}).map(function(a){
-    var npk=[a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+
+  var clienteId = document.getElementById('abonado-cliente').value;
+  var abonos    = getAbonosPorCliente(clienteId).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+
+  var opts = abonos.map(function(a){
+    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
     return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
   }).join('');
-  if(!opts) opts='<option>Sin abonos — añade en pestaña Abonos</option>';
+
+  var filteredBadge = (clienteId && abonos.length < (DB.abonos||[]).length)
+    ? '<div style="font-size:11px;color:var(--text3);padding:2px 10px 4px">Mostrando solo abonos comprados por este cliente</div>'
+    : '';
+
+  if(!opts) opts = '<option value="">Sin abonos comprados — usa "＋ Compra nueva"</option>';
+
   var modos = ['Voleo','Localizado','Fertirrigación','Foliar','Fondo','Cobertera'].map(function(m){
     return '<option'+(data&&data.modo===m?' selected':'')+'>'+m+'</option>';
   }).join('');
+
   row.innerHTML =
-    '<select class="abonado-row-sel">'+opts+'</select>' +
-    '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data?.dosis||'')+'">' +
-    '<select class="abonado-row-unidad">' +
-      ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('') +
-    '</select>' +
-    '<select class="abonado-row-modo">'+modos+'</select>' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
+    '<div class="abono-row-inner" style="display:flex;flex-direction:column;gap:4px;padding:8px 10px">' +
+      filteredBadge +
+      '<div style="display:grid;grid-template-columns:2fr 90px 100px 1fr auto;gap:8px;align-items:center">' +
+        '<select class="abonado-row-sel">'+opts+'</select>' +
+        '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data&&data.dosis!=null?data.dosis:'')+'">' +
+        '<select class="abonado-row-unidad">' +
+          ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('') +
+        '</select>' +
+        '<select class="abonado-row-modo">'+modos+'</select>' +
+        '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>' +
+      '</div>' +
+      '<div><button type="button" onclick="openNuevaCompraDesdeAbonado(this)" ' +
+        'style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">' +
+        '＋ Compra nueva (añadir abono a las compras del cliente)</button></div>' +
+    '</div>';
+
   document.getElementById('abonado-rows').appendChild(row);
+}
+
+function openNuevaCompraDesdeAbonado(btn) {
+  var clienteId = document.getElementById('abonado-cliente').value;
+  if(!clienteId) { alert('Selecciona un cliente primero'); return; }
+  // Store callback to refresh abono rows after saving compra
+  window._compraDesdeAbonadoCb = function() {
+    // Refresh all abono row selects with updated purchased list
+    document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
+      var sel = row.querySelector('.abonado-row-sel');
+      if(!sel) return;
+      var currentVal = sel.value;
+      var abonos = getAbonosPorCliente(clienteId).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+      sel.innerHTML = abonos.map(function(a){
+        var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+        return '<option value="'+a.id+'"'+(a.id===currentVal?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
+      }).join('');
+      if(!sel.innerHTML) sel.innerHTML = '<option value="">Sin abonos comprados</option>';
+    });
+  };
+  closeModal('modal-abonado');
+  openCompraModal(null, clienteId);
 }
 
 function saveAbonado() {
@@ -6312,19 +6477,19 @@ function renderCompras() {
   cont.innerHTML = html || '<div style="color:var(--text3);padding:20px;text-align:center">No hay compras con los filtros seleccionados</div>';
 }
 
-function openCompraModal(id) {
+function openCompraModal(id, prefillClienteId) {
   editingId.compra = id||null;
   document.getElementById('modal-compra-title').textContent = id ? 'Editar compra' : 'Nueva compra';
   var cliSel = document.getElementById('compra-cliente');
   cliSel.innerHTML = '<option value="">— Selecciona cliente —</option>' +
     DB.clientes.map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
   var c = id ? (DB.compras||[]).find(function(x){return x.id===id;}) : null;
-  document.getElementById('compra-fecha').value     = c?.fecha    || new Date().toISOString().slice(0,10);
-  document.getElementById('compra-campana').value   = c?.campana  || currentCampana||'';
-  document.getElementById('compra-cliente').value   = c?.clienteId|| '';
-  document.getElementById('compra-proveedor').value = c?.proveedor|| '';
-  document.getElementById('compra-factura').value   = c?.factura  || '';
-  document.getElementById('compra-obs').value       = c?.obs      || '';
+  document.getElementById('compra-fecha').value     = (c && c.fecha)    || new Date().toISOString().slice(0,10);
+  document.getElementById('compra-campana').value   = (c && c.campana)  || currentCampana||'';
+  document.getElementById('compra-cliente').value   = (c && c.clienteId)|| prefillClienteId||'';
+  document.getElementById('compra-proveedor').value = (c && c.proveedor)|| '';
+  document.getElementById('compra-factura').value   = (c && c.factura)  || '';
+  document.getElementById('compra-obs').value       = (c && c.obs)      || '';
   var rows = document.getElementById('compra-rows');
   rows.innerHTML = '';
   if(c && c.items && c.items.length) { c.items.forEach(function(i){addCompraRow(i);}); }
@@ -6457,6 +6622,13 @@ function saveCompra() {
     DB.compras.push(Object.assign({id:uid()}, data));
   }
   save(); closeModal('modal-compra'); renderCompras(); updateBadges();
+  // If called from abonado modal, refresh abono options and reopen
+  if(typeof window._compraDesdeAbonadoCb === 'function') {
+    var cb = window._compraDesdeAbonadoCb;
+    window._compraDesdeAbonadoCb = null;
+    cb();
+    openModal('modal-abonado');
+  }
 }
 
 function deleteCompra(id) {
@@ -6657,6 +6829,12 @@ function drawCreateNewRecinto() {
 // ============================================================
 // TRATAMIENTO PDF EXPORT
 // ============================================================
+// Truncate text to fit within a column width (approx chars based on ~2mm per char at font-size 9)
+function fitCol(text, maxChars) {
+  text = String(text||'');
+  return text.length > maxChars ? text.slice(0, maxChars-1) + '\u2026' : text;
+}
+
 function openTratamientoPDF(id) {
   var t = DB.tratamientos.find(function(x){return x.id===id;});
   if(!t) return;
@@ -6825,13 +7003,13 @@ function generateTratamientoPDF() {
   setFont(12,'bold','#1a3d1a');
   doc.text('PRODUCTOS FITOSANITARIOS', margin, y); y += 7;
 
-  // Dynamic columns
+  // Dynamic columns — no plazo column, more space for materia activa
   var cols = includePrice
     ? ['Producto','Materia activa','Dosis/ha','Total','PVP/ha','Total €']
-    : ['Producto','Materia activa','Plazo seg.','Dosis/ha','Total'];
+    : ['Producto','Materia activa','Dosis/ha','Total'];
   var colX = includePrice
-    ? [margin+2, 52, 105, 125, 151, 175]
-    : [margin+2, 60, 110, 133, 161];
+    ? [margin+2, 52, 112, 132, 158, 181]
+    : [margin+2, 68, 130, 158];
 
   rect(margin, y, W-2*margin, 7, '#2d5a1a');
   setFont(9,'bold','#ffffff');
@@ -6839,49 +7017,69 @@ function generateTratamientoPDF() {
   y += 7;
 
   var totalPVPTot = 0;
+  var totalPVPHa  = 0;
   altRow = false;
   prods.forEach(function(p){
-    checkPage(8);
-    if(altRow) rect(margin, y, W-2*margin, 7, '#f9fbf9');
+    var prod     = DB.productos.find(function(pr){return pr.id===p.productoId;});
+    var nombre   = fitCol(prod ? prod.nombre : '—', 26);
+    var materiaFull = (prod ? prod.materiaActiva||'—' : '—');
+    var dosisStr = p.dosis+' '+(p.unidad||'L/ha');
+    var total    = (p.dosis * totalHa).toFixed(3)+' '+(p.unidad||'L/ha').replace('/ha','');
+
+    // Calculate materia activa column width in mm
+    var materiaColW = includePrice ? 58 : 60;
+    var materiaLines = doc.splitTextToSize(materiaFull, materiaColW);
+    var rowH = Math.max(7, materiaLines.length * 5 + 3);
+
+    checkPage(rowH + 2);
+    if(altRow) rect(margin, y, W-2*margin, rowH, '#f9fbf9');
     altRow = !altRow;
-    var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var nombre = (prod?prod.nombre:'—').slice(0,28);
-    var materia = (prod?prod.materiaActiva||'—':'—').slice(0,30);
-    var plazo = prod?prod.plazo||'—':'—';
-    var total = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+
     setFont(9,'normal','#111');
-    doc.text(nombre, colX[0], y+5);
-    doc.text(materia, colX[1], y+5);
+    var midY = y + rowH/2 + 1.5;
+    doc.text(nombre, colX[0], midY);
+    doc.text(materiaLines, colX[1], y + 4.5);
+
     if(includePrice) {
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[2], y+5);
-      doc.text(total, colX[3], y+5);
-      if(prod && prod.coste && p.dosis) {
-        var costeHa = prod.coste * p.dosis;
-        var pvpHa   = costeHa * (1 + (p.margen||0)/100);
-        var pvpTot  = pvpHa * totalHa;
+      doc.text(fitCol(dosisStr, 16), colX[2], midY);
+      doc.text(fitCol(total,    20), colX[3], midY);
+      var precio = getPrecioProducto(prod, p.formatoIdx||0);
+      if(prod && precio && p.dosis) {
+        var pvpHa  = precio * p.dosis * (1 + (p.margen||0)/100);
+        var pvpTot = pvpHa * totalHa;
+        totalPVPHa  += pvpHa;
         totalPVPTot += pvpTot;
         setFont(9,'bold','#1a6b1a');
-        doc.text(pvpHa.toFixed(2)+' €', colX[4], y+5);
-        doc.text(pvpTot.toFixed(2)+' €', colX[5], y+5);
+        doc.text(pvpHa.toFixed(2)+' \u20ac', colX[4], midY);
+        doc.text(pvpTot.toFixed(2)+' \u20ac', colX[5], midY);
       } else {
-        doc.text('—', colX[4], y+5);
-        doc.text('—', colX[5], y+5);
+        setFont(9,'normal','#111');
+        doc.text('\u2014', colX[4], midY);
+        doc.text('\u2014', colX[5], midY);
       }
     } else {
-      doc.text(plazo, colX[2], y+5);
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[3], y+5);
-      doc.text(total, colX[4], y+5);
+      doc.text(fitCol(dosisStr, 22), colX[2], midY);
+      doc.text(fitCol(total,    24), colX[3], midY);
     }
-    y += 7;
+    y += rowH;
   });
 
-  // Cost total row
+  // Cost summary block
   if(includePrice && totalPVPTot > 0) {
-    checkPage(9);
-    rect(margin, y, W-2*margin, 8, '#e8f5e8');
-    setFont(11,'bold','#1a3d1a');
-    doc.text('COSTE TOTAL DEL TRATAMIENTO', margin+2, y+5.5);
-    doc.text(totalPVPTot.toFixed(2)+' €', colX[5], y+5.5);
+    checkPage(14);
+    // €/ha row
+    rect(margin, y, W-2*margin, 7, '#d4edda');
+    setFont(9,'bold','#1a3d1a');
+    doc.text('Coste por hect\u00e1rea', margin+2, y+5);
+    setFont(10,'bold','#1a6b1a');
+    doc.text(totalPVPHa.toFixed(2)+' \u20ac/ha', W-margin-30, y+5);
+    y += 7;
+    // Total row
+    rect(margin, y, W-2*margin, 8, '#b8dfc4');
+    setFont(10,'bold','#1a3d1a');
+    doc.text('COSTE TOTAL DEL TRATAMIENTO  ('+totalHa.toFixed(2)+' ha)', margin+2, y+5.5);
+    setFont(12,'bold','#1a6b1a');
+    doc.text(totalPVPTot.toFixed(2)+' \u20ac', W-margin-28, y+5.5);
     y += 11;
   }
 
