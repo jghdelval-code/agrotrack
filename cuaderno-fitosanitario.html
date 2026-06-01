@@ -6033,18 +6033,7 @@ function openAbonadoModal(id) {
     DB.clientes.map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
   cliSel.onchange = function() {
     loadAbonadoParcelasPicker([]);
-    // Refresh abono selects in existing rows
-    document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
-      var sel = row.querySelector('.abonado-row-sel');
-      if(!sel) return;
-      var cur = sel.value;
-      var abonos = getAbonosPorCliente(cliSel.value).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
-      sel.innerHTML = abonos.map(function(a){
-        var npk=[a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
-        return '<option value="'+a.id+'"'+(a.id===cur?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
-      }).join('');
-      if(!sel.innerHTML) sel.innerHTML = '<option value="">Sin abonos comprados</option>';
-    });
+    refreshAbonadoRowSels();
   };
 
   var ab = id ? (DB.abonados||[]).find(function(x){return x.id===id;}) : null;
@@ -6122,77 +6111,148 @@ function toggleFincaCheck(cb) {
 }
 
 function getAbonosPorCliente(clienteId) {
-  // Returns abonos the client has purchased; if none purchased, returns all as fallback
-  if(!clienteId) return DB.abonos||[];
-  var comprados = (DB.compras||[]).filter(function(c){ return c.clienteId===clienteId && c.abonoId; });
-  if(!comprados.length) return DB.abonos||[];
-  // Deduplicate by abonoId
-  var ids = {};
-  comprados.forEach(function(c){ ids[c.abonoId]=1; });
-  return (DB.abonos||[]).filter(function(a){ return ids[a.id]; });
+  // Returns [{abono, stock, unidad, comprado, usado}] for abonos the client has purchased.
+  // Falls back to all abonos (stock:null) if no purchases recorded.
+  if(!clienteId) {
+    return (DB.abonos||[]).map(function(a){ return {abono:a, stock:null, unidad:''}; });
+  }
+  var campana  = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
+  var stockData = calcStock(clienteId, campana);
+  var abonoStock = stockData.abonos;
+
+  var result = [];
+  Object.keys(abonoStock).forEach(function(aid) {
+    var abo = (DB.abonos||[]).find(function(a){ return a.id === aid; });
+    if(!abo) return;
+    var s = abonoStock[aid];
+    result.push({abono:abo, stock:s.stock, unidad:s.unidad, comprado:s.comprado, usado:s.usado});
+  });
+  result.sort(function(a,b){ return a.abono.nombre.localeCompare(b.abono.nombre,'es'); });
+
+  if(!result.length) {
+    return (DB.abonos||[]).map(function(a){ return {abono:a, stock:null, unidad:''}; });
+  }
+  return result;
+}
+
+function buildAbonoOpts(clienteId, selectedAbonoId) {
+  var items = getAbonosPorCliente(clienteId);
+  var haStock = items.some(function(i){ return i.stock !== null; });
+  var opts = items.map(function(item) {
+    var a   = item.abono;
+    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+    var stockLabel = '';
+    if(item.stock !== null) {
+      var stk = item.stock;
+      var u   = item.unidad || 'kg';
+      if(stk <= 0) {
+        stockLabel = ' — SIN STOCK';
+      } else {
+        stockLabel = ' — '+stk.toFixed(1)+' '+u+' en stock';
+      }
+    }
+    return '<option value="'+a.id+'"'+(selectedAbonoId===a.id?' selected':'')+'>'+
+      a.nombre+(npk?' ('+npk+')':'')+stockLabel+'</option>';
+  }).join('');
+  return {opts: opts || '<option value="">Sin abonos comprados — usa "＋ Compra nueva"</option>', haStock: haStock, count: items.length};
+}
+
+function refreshAbonadoRowSels() {
+  var clienteId = document.getElementById('abonado-cliente').value;
+  document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
+    var sel = row.querySelector('.abonado-row-sel');
+    if(!sel) return;
+    var cur   = sel.value;
+    var built = buildAbonoOpts(clienteId, cur);
+    sel.innerHTML = built.opts;
+    // Update stock indicator next to select
+    var ind = row.querySelector('.abono-stock-ind');
+    if(ind) {
+      var items = getAbonosPorCliente(clienteId);
+      var found = items.find(function(i){ return i.abono.id === cur; });
+      if(found && found.stock !== null) {
+        var color = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
+        ind.textContent = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad;
+        ind.style.color = color;
+      } else {
+        ind.textContent = '';
+      }
+    }
+  });
 }
 
 function addAbonadoRow(data) {
   var row = document.createElement('div');
   row.className = 'product-row';
-  row.style.gridTemplateColumns = '2fr 90px 100px 1fr auto';
+  row.style.padding = '0';
 
   var clienteId = document.getElementById('abonado-cliente').value;
-  var abonos    = getAbonosPorCliente(clienteId).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  var built     = buildAbonoOpts(clienteId, data && data.abonoId);
+  var haStock   = built.haStock;
 
-  var opts = abonos.map(function(a){
-    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
-    return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
-  }).join('');
+  // Find current stock for pre-selected abono
+  var stockText = '', stockColor = 'var(--text3)';
+  if(data && data.abonoId && haStock) {
+    var items = getAbonosPorCliente(clienteId);
+    var found = items.find(function(i){ return i.abono.id === data.abonoId; });
+    if(found && found.stock !== null) {
+      stockColor = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
+      stockText  = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad+' en stock';
+    }
+  }
 
-  var filteredBadge = (clienteId && abonos.length < (DB.abonos||[]).length)
-    ? '<div style="font-size:11px;color:var(--text3);padding:2px 10px 4px">Mostrando solo abonos comprados por este cliente</div>'
+  var filteredNote = (clienteId && built.count < (DB.abonos||[]).length && haStock)
+    ? '<div style="font-size:11px;color:var(--text3);padding:2px 10px 2px">Solo abonos comprados · stock de campaña actual</div>'
     : '';
-
-  if(!opts) opts = '<option value="">Sin abonos comprados — usa "＋ Compra nueva"</option>';
 
   var modos = ['Voleo','Localizado','Fertirrigación','Foliar','Fondo','Cobertera'].map(function(m){
     return '<option'+(data&&data.modo===m?' selected':'')+'>'+m+'</option>';
   }).join('');
 
   row.innerHTML =
-    '<div class="abono-row-inner" style="display:flex;flex-direction:column;gap:4px;padding:8px 10px">' +
-      filteredBadge +
-      '<div style="display:grid;grid-template-columns:2fr 90px 100px 1fr auto;gap:8px;align-items:center">' +
-        '<select class="abonado-row-sel">'+opts+'</select>' +
+    '<div class="abono-row-inner" style="display:flex;flex-direction:column;gap:4px;padding:8px 10px">'+
+      filteredNote+
+      '<div style="display:grid;grid-template-columns:2fr 90px 100px 1fr auto;gap:8px;align-items:center">'+
+        '<div style="display:flex;flex-direction:column;gap:2px">'+
+          '<select class="abonado-row-sel" onchange="onAbonadoRowSelChange(this)">'+built.opts+'</select>'+
+          '<span class="abono-stock-ind" style="font-size:11px;font-weight:700;color:'+stockColor+';padding-left:2px">'+stockText+'</span>'+
+        '</div>'+
         '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data&&data.dosis!=null?data.dosis:'')+'">' +
-        '<select class="abonado-row-unidad">' +
-          ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('') +
-        '</select>' +
-        '<select class="abonado-row-modo">'+modos+'</select>' +
-        '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>' +
-      '</div>' +
-      '<div><button type="button" onclick="openNuevaCompraDesdeAbonado(this)" ' +
-        'style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">' +
-        '＋ Compra nueva (añadir abono a las compras del cliente)</button></div>' +
+        '<select class="abonado-row-unidad">'+
+          ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+
+        '</select>'+
+        '<select class="abonado-row-modo">'+modos+'</select>'+
+        '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>'+
+      '</div>'+
+      '<div><button type="button" onclick="openNuevaCompraDesdeAbonado(this)" '+
+        'style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">'+
+        '＋ Compra nueva (añadir abono al stock del cliente)</button></div>'+
     '</div>';
 
   document.getElementById('abonado-rows').appendChild(row);
 }
 
+function onAbonadoRowSelChange(sel) {
+  var row = sel.closest('.product-row');
+  if(!row) return;
+  var ind = row.querySelector('.abono-stock-ind');
+  if(!ind) return;
+  var clienteId = document.getElementById('abonado-cliente').value;
+  var items = getAbonosPorCliente(clienteId);
+  var found = items.find(function(i){ return i.abono.id === sel.value; });
+  if(found && found.stock !== null) {
+    var color = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
+    ind.textContent = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad+' en stock';
+    ind.style.color = color;
+  } else {
+    ind.textContent = '';
+  }
+}
+
 function openNuevaCompraDesdeAbonado(btn) {
   var clienteId = document.getElementById('abonado-cliente').value;
   if(!clienteId) { alert('Selecciona un cliente primero'); return; }
-  // Store callback to refresh abono rows after saving compra
-  window._compraDesdeAbonadoCb = function() {
-    // Refresh all abono row selects with updated purchased list
-    document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
-      var sel = row.querySelector('.abonado-row-sel');
-      if(!sel) return;
-      var currentVal = sel.value;
-      var abonos = getAbonosPorCliente(clienteId).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
-      sel.innerHTML = abonos.map(function(a){
-        var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
-        return '<option value="'+a.id+'"'+(a.id===currentVal?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
-      }).join('');
-      if(!sel.innerHTML) sel.innerHTML = '<option value="">Sin abonos comprados</option>';
-    });
-  };
+  window._compraDesdeAbonadoCb = function() { refreshAbonadoRowSels(); };
   closeModal('modal-abonado');
   openCompraModal(null, clienteId);
 }
