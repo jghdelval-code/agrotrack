@@ -717,7 +717,7 @@ textarea { resize: vertical; min-height: 72px; }
             <tr>
               <th class="col-hide-mobile">Nº</th><th>Cliente</th><th>Finca</th><th>Referencia SIGPAC</th>
               <th>Cultivo</th><th>Sup. SIGPAC</th><th class="col-hide-mobile">Sup. Cultiv.</th>
-              <th class="col-hide-mobile">Régimen</th><th class="col-hide-mobile">WKT</th><th>Acciones</th>
+              <th class="col-hide-mobile">Régimen</th><th class="col-hide-mobile">Zona N</th><th class="col-hide-mobile">WKT</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="recintos-tbody"></tbody>
@@ -1316,7 +1316,17 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
       <!-- Parcelas picker grouped by finca -->
       <div class="form-group" style="margin-bottom:14px">
-        <label>Parcelas / Recintos *</label>
+        <div id="abonado-cultivo-filter" style="display:none;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Filtrar parcelas por cultivo</div>
+          <div id="abonado-cultivo-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label style="margin:0">Parcelas / Recintos *</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span id="abonado-rec-info" style="font-size:11px;color:var(--text3)"></span>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="toggleAllAbonadoRecs(true)">&#x2611; Todo</button>
+          </div>
+        </div>
         <div class="recintos-picker" id="abonado-parcelas-picker" style="max-height:220px">
           <div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>
         </div>
@@ -3061,7 +3071,7 @@ function renderRecintos() {
     var grpId = 'recgrp_' + cid.replace(/[^a-zA-Z0-9]/g,'_');
 
     rows += '<tr id="hdr-' + grpId + '" style="cursor:pointer;background:var(--card)">'
-      + '<td colspan="10" style="padding:9px 14px" onclick="toggleRecGrp2(\'' + grpId + '\')">'
+      + '<td colspan="11" style="padding:9px 14px" onclick="toggleRecGrp2(\'' + grpId + '\')">'
       + '<span style="font-weight:800;font-size:14px;color:var(--white)">' + cliNom + '</span> '
       + '<span class="tag tag-green">' + group.length + ' recintos</span> '
       + '<span class="tag tag-blue">' + cliCul.toFixed(2) + ' ha cultivadas</span>'
@@ -3080,6 +3090,13 @@ function renderRecintos() {
         + '<td>' + (r.supSigpac||'&mdash;') + ' ha</td>'
         + '<td class="col-hide-mobile">' + (r.supCultivada||'&mdash;') + ' ha</td>'
         + '<td class="col-hide-mobile"><span class="tag ' + (r.secanoRegadio===('Regad\u00edo') ? 'tag-blue' : 'tag-gray') + '">' + (r.secanoRegadio||'&mdash;') + '</span></td>'
+        + (function(){
+            var v = String(r.nitratos||'').toLowerCase();
+            var esZona = v==='s\u00ed'||v==='si'||v==='s'||v==='1'||v==='true';
+            if(esZona) return '<td class="col-hide-mobile"><span class="tag tag-red" style="font-size:11px;font-weight:700">&#x26A0; ZV</span></td>';
+            if(!r.nitratos||v==='no'||v==='n'||v==='0'||v==='false') return '<td class="col-hide-mobile"><span class="tag tag-gray" style="font-size:11px">No</span></td>';
+            return '<td class="col-hide-mobile"><span style="font-size:11px;color:var(--text3)">&mdash;</span></td>';
+          })()
         + '<td class="col-hide-mobile">' + (r.wkt ? '<span class="tag tag-green">&#x2713; WKT</span>' : '<span class="tag tag-gray">Sin WKT</span>') + '</td>'
         + '<td class="td-actions">'
         + '<button class="btn ' + (isEmpty ? 'btn-accent' : 'btn-secondary') + ' btn-sm" onclick="openRecintoModal(\'' + r.id + '\')">' + (isEmpty ? '&#x26A0; Completar' : '&#x270F;') + '</button>'
@@ -5661,60 +5678,146 @@ function openAbonadoModal(id) {
   openModal('modal-abonado');
 }
 
-function loadAbonadoParcelasPicker(selectedIds) {
-  selectedIds = selectedIds||[];
-  var clienteId = document.getElementById('abonado-cliente').value;
-  var campana   = document.getElementById('abonado-campana').value || currentCampana;
-  var picker    = document.getElementById('abonado-parcelas-picker');
-  if(!clienteId) {
-    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';
-    return;
-  }
-  var recs = DB.recintos.filter(function(r){ return r.clienteId===clienteId && (!campana||r.campana===campana); });
-  if(!recs.length) {
-    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin recintos para esta campaña</div>';
-    return;
-  }
-  // Group by finca
-  var fincas = {};
-  recs.forEach(function(r){
-    var f = r.nombreFinca||(r.numPoligono+'-'+r.numParcela);
-    if(!fincas[f]) fincas[f]=[];
-    fincas[f].push(r);
-  });
-  var html = '';
-  Object.keys(fincas).sort().forEach(function(finca) {
-    var group = fincas[finca];
-    var haTotal = group.reduce(function(s,r){return s+(parseFloat(r.supSigpac)||0);},0);
-    var allIds  = group.map(function(r){return r.id;});
-    var allChecked = allIds.every(function(id){return selectedIds.includes(id);});
-    // Finca header with "select all" checkbox
-    html += '<div style="background:var(--card);padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">' +
-      '<input type="checkbox" class="finca-check-all" data-ids="'+allIds.join(',')+'" '+(allChecked?'checked':'')+' '+
-      'onchange="toggleFincaCheck(this)" style="width:13px;height:13px;accent-color:var(--primary)">' +
-      '<span style="font-weight:700;font-size:13px;color:var(--white)">🏡 '+finca+'</span>' +
-      '<span style="font-size:11px;color:var(--text3)">'+haTotal.toFixed(2)+' ha</span>' +
-      '</div>';
-    group.forEach(function(r) {
-      var checked = selectedIds.includes(r.id)?'checked':'';
-      var color   = getCropColor(r.especieVariedad);
-      var sigpac  = r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto;
-      html += '<label class="recinto-check" style="padding-left:28px">' +
-        '<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" '+checked+'>' +
-        '<span class="crop-dot" style="background:'+color+'"></span>' +
-        '<label>'+sigpac+' · '+(r.especieVariedad||'Sin cultivo')+' · '+(r.supSigpac||0)+' ha</label>' +
-        '</label>';
-    });
-  });
-  picker.innerHTML = html;
+function getCheckedAbonadoRecs() {
+  var ids = [];
+  document.querySelectorAll('#abonado-parcelas-picker input[type=checkbox][value]').forEach(function(c){ if(c.checked) ids.push(c.value); });
+  return ids;
+}
+
+function toggleAllAbonadoRecs(val) {
+  document.querySelectorAll('#abonado-parcelas-picker input[type=checkbox]').forEach(function(cb){ cb.checked = val; });
+  updateAbonadoHaTotal();
 }
 
 function toggleFincaCheck(cb) {
-  var ids = cb.dataset.ids.split(',');
-  ids.forEach(function(id) {
-    var chk = document.querySelector('.abonado-rec-check[value="'+id+'"]');
-    if(chk) chk.checked = cb.checked;
+  var ids = (cb.dataset.ids||'').split(',').filter(Boolean);
+  ids.forEach(function(id){
+    var el = document.querySelector('#abonado-parcelas-picker input[type=checkbox][value="'+id+'"]');
+    if(el) el.checked = cb.checked;
   });
+  updateAbonadoHaTotal();
+}
+
+function updateAbonadoHaTotal() {
+  var total = 0;
+  document.querySelectorAll('#abonado-parcelas-picker .abonado-rec-check:checked').forEach(function(cb){
+    total += parseFloat(cb.dataset.ha)||0;
+  });
+  var infoEl = document.getElementById('abonado-rec-info');
+  if(infoEl) infoEl.textContent = total > 0 ? total.toFixed(2)+' ha seleccionadas' : '';
+}
+
+function abonadoCvFilter(btn) {
+  var cv = btn.dataset.cv ? decodeURIComponent(btn.dataset.cv) : '';
+  loadAbonadoParcelasPicker(getCheckedAbonadoRecs(), cv);
+}
+function loadAbonadoParcelasPicker(selectedIds, cultivoFilter) {
+  selectedIds   = selectedIds || [];
+  cultivoFilter = cultivoFilter != null ? cultivoFilter : '';
+  var clienteId = document.getElementById('abonado-cliente').value;
+  var campana   = document.getElementById('abonado-campana').value || currentCampana;
+  var picker    = document.getElementById('abonado-parcelas-picker');
+  var filterDiv = document.getElementById('abonado-cultivo-filter');
+  var chipsDiv  = document.getElementById('abonado-cultivo-chips');
+
+  if(!clienteId) {
+    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';
+    if(filterDiv) filterDiv.style.display = 'none';
+    return;
+  }
+
+  var allRecs = DB.recintos.filter(function(r){
+    if(r.clienteId !== clienteId) return false;
+    if(campana && r.campana && r.campana !== campana) return false;
+    return true;
+  });
+  if(!allRecs.length) allRecs = DB.recintos.filter(function(r){ return r.clienteId === clienteId; });
+
+  if(!allRecs.length) {
+    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Este cliente no tiene recintos</div>';
+    if(filterDiv) filterDiv.style.display = 'none';
+    return;
+  }
+
+  // Build cultivo list
+  var cvMap = {};
+  allRecs.forEach(function(r){ var cv=(r.especieVariedad||'').trim(); if(cv) cvMap[cv]=(cvMap[cv]||0)+1; });
+  var cvList = Object.keys(cvMap).sort();
+
+  // Show/hide cultivo chips
+  if(filterDiv) {
+    if(cvList.length > 1) {
+      filterDiv.style.display = 'block';
+      var chips = '';
+      chips += '<button type="button" class="cultivo-chip'+(cultivoFilter===''?' active':'')
+        +'" data-cv="" onclick="abonadoCvFilter(this)">Todos ('+allRecs.length+')</button>';
+      cvList.forEach(function(cv){
+        var color = getCropColor(cv);
+        chips += '<button type="button" class="cultivo-chip'+(cultivoFilter===cv?' active':'')+
+          '" style="--chip-color:'+color+'" onclick="abonadoCvFilter(this)" data-cv="'+encodeURIComponent(cv)+'">'+
+          cv+' <span style="opacity:.7">('+cvMap[cv]+')</span></button>';
+      });
+      if(chipsDiv) chipsDiv.innerHTML = chips;
+    } else {
+      filterDiv.style.display = 'none';
+    }
+  }
+
+  // Filter by selected cultivo
+  var filtered = cultivoFilter
+    ? allRecs.filter(function(r){ return (r.especieVariedad||'').trim() === cultivoFilter; })
+    : allRecs;
+
+  // Group by finca, sorted by numOrden within each group
+  var fincas = {}; var fincaOrder = [];
+  filtered.forEach(function(r){
+    var f = (r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto)).trim()||'Sin nombre';
+    if(!fincas[f]){ fincas[f]=[]; fincaOrder.push(f); }
+    fincas[f].push(r);
+  });
+
+  var html = '';
+  fincaOrder.sort().forEach(function(finca){
+    var group = fincas[finca];
+    group.sort(function(a,b){ return (parseFloat(a.numOrden)||9999)-(parseFloat(b.numOrden)||9999); });
+    var haTot = group.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
+    var allIds = group.map(function(r){ return r.id; });
+    var allChk = allIds.every(function(id){ return selectedIds.indexOf(id)>=0; });
+
+    html += '<div style="background:var(--card);padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:1">'
+      +'<input type="checkbox" class="finca-check-all" data-ids="'+allIds.join(',')+'" '+(allChk?'checked':'')+' onchange="toggleFincaCheck(this)" style="width:13px;height:13px;accent-color:var(--primary)">'
+      +'<span style="font-weight:700;font-size:13px;color:var(--white)">&#x1F3E1; '+finca+'</span>'
+      +'<span style="font-size:11px;color:var(--text3)">'+haTot.toFixed(2)+' ha &middot; '+group.length+' rec.</span>'
+      +'</div>';
+
+    group.forEach(function(r){
+      var checked = selectedIds.indexOf(r.id)>=0 ? 'checked' : '';
+      var color   = getCropColor(r.especieVariedad);
+      var ha      = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
+      var cv      = (r.especieVariedad||'Sin cultivo').split('/')[0].trim();
+      var orden   = r.numOrden ? '<span style="font-size:10px;color:var(--text3);margin-right:4px">#'+r.numOrden+'</span>' : '';
+      html += '<label class="recinto-check" style="padding-left:28px">'
+        +'<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" data-ha="'+ha+'" '+checked+' onchange="updateAbonadoHaTotal()">'
+        +'<span class="crop-dot" style="background:'+color+'"></span>'
+        +orden
+        +'<span style="flex:1;font-size:12px">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>'
+        +'<span style="font-size:11px;color:var(--text2)">'+cv+'</span>'
+        +'<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>'
+        +'</label>';
+    });
+  });
+
+  picker.innerHTML = html || '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin parcelas para este cultivo</div>';
+  updateAbonadoHaTotal();
+}
+
+function toggleFincaCheck(cb) {
+  var ids = (cb.dataset.ids||'').split(',').filter(Boolean);
+  ids.forEach(function(id){
+    var el = document.querySelector('#abonado-parcelas-picker input[type=checkbox][value="'+id+'"]');
+    if(el) el.checked = cb.checked;
+  });
+  updateAbonadoHaTotal();
 }
 
 function addAbonadoRow(data) {
