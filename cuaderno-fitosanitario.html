@@ -6696,62 +6696,103 @@ function exportFertilizacionExcel() {
     return (!fCli||ab.clienteId===fCli) && (!fCamp||ab.campana===fCamp);
   }).slice().sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');});
   if(!abonados.length){ alert('No hay registros de abonado para los filtros seleccionados.'); return; }
+
   var aboById={}; (DB.abonos||[]).forEach(function(a){aboById[a.id]=a;});
   var recById={}; (DB.recintos||[]).forEach(function(r){recById[r.id]=r;});
+
   function recLbl(r){ return r.numOrden ? String(r.numOrden) : [r.codProvincia||'?',(r.termMunicipal||'?').split(' ')[0],r.numPoligono||'?',r.numParcela||'?',r.numRecinto||'?'].join('-'); }
-  function mTipo(m){ m=(m||'').toLowerCase(); if(m.indexOf('fondo')>=0) return 'ABONADO DE FONDO'; if(m.indexOf('coberter')>=0) return 'ABONADO DE COBERTERA'; if(m.indexOf('fertirreg')>=0) return 'FERTIRRIGACIÓN'; return m||''; }
+  function modoTipo(m){ m=(m||'').toLowerCase(); if(m.indexOf('fondo')>=0) return 'ABONADO DE FONDO'; if(m.indexOf('coberter')>=0) return 'ABONADO DE COBERTERA'; if(m.indexOf('fertirreg')>=0||m.indexOf('fertirrig')>=0) return 'FERTIRRIGACION'; if(m.indexOf('foliar')>=0) return 'APLICACION FOLIAR'; return (m||'').toUpperCase(); }
+  function modoMetodo(m){ m=(m||'').toLowerCase(); if(m.indexOf('voleo')>=0) return '1. Esparcido general'; if(m.indexOf('fondo')>=0) return '2. Esparcido general y enterrado'; if(m.indexOf('localiz')>=0) return '3. Esparcido localizado'; if(m.indexOf('coberter')>=0) return '1. Esparcido general'; if(m.indexOf('fertirreg')>=0||m.indexOf('fertirrig')>=0) return '5. Riego por aspersion (fertirrigacion)'; if(m.indexOf('foliar')>=0) return '7. Aplicacion foliar'; return '1. Esparcido general'; }
+  function fmtDate(d){ if(!d) return ''; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; }
+
   var rows6=[]; var rows91=[];
+
   abonados.forEach(function(ab){
     var recs=(ab.recintoIds||[]).map(function(id){return recById[id];}).filter(Boolean);
     if(!recs.length) return;
-    var lbl=recs.map(recLbl).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' / ');
-    var cvMap={}; recs.forEach(function(r){if(r.especieVariedad)cvMap[r.especieVariedad.trim()]=1;});
-    var esp=Object.keys(cvMap).join(', ');
-    var zonaN=recs.some(function(r){var v=String(r.nitratos||'').toLowerCase();return v==='sí'||v==='si'||v==='1'||v==='true';});
-    var hasP3P4=recs.some(function(r){var e=r.ecoregimen||'';return e.indexOf('P3')>=0||e.indexOf('P4')>=0;});
+    var recsSorted=recs.slice().sort(function(a,b){return (parseFloat(a.numOrden)||9999)-(parseFloat(b.numOrden)||9999);});
+    var lbl=recsSorted.map(recLbl).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ');
+    var cvMap={}; recs.forEach(function(r){if(r.especieVariedad){var parts=r.especieVariedad.split('/');cvMap[parts[0].trim()]=parts[1]?parts[1].trim():'';} });
+    var especie=Object.keys(cvMap).join(', ');
+    var variedad=Object.keys(cvMap).map(function(k){return cvMap[k];}).filter(Boolean).join(', ');
+    var zonaN=recs.some(function(r){var v=String(r.nitratos||'').toLowerCase();return v==='si'||v==='s\u00ed'||v==='1'||v==='true';});
+    var hasP3=recs.some(function(r){return (r.ecoregimen||'').indexOf('P3')>=0;});
     var esReg=recs.some(function(r){return (r.secanoRegadio||'').toLowerCase().indexOf('regad')>=0;});
+
     (ab.abonos||[]).forEach(function(ar){
       var abo=aboById[ar.abonoId||'']; if(!abo) return;
       var n=parseFloat(abo.n)||0, p=parseFloat(abo.p)||0, k=parseFloat(abo.k)||0;
-      var dosis=parseFloat(ar.dosis)||0; var tipo=mTipo(ar.modo);
-      rows6.push([ab.fecha||'',lbl,esp,'',abo.nombre||'','',n||null,p||null,k||null,dosis||null,tipo,ab.obs||'',zonaN]);
-      if(hasP3P4 && esReg){
+      var dosis=parseFloat(ar.dosis)||0;
+      var unidad=ar.unidad||'kg/ha';
+      var tipo=modoTipo(ar.modo);
+      // Sheet 6: B=fecha, C=parcelas, D=especie, E=variedad, F=tipo_abono,
+      //          G=albaran, H=N, I=P, J=K, K=dosis, L=tipo_fert, M=obs
+      rows6.push([fmtDate(ab.fecha), lbl, especie, variedad, abo.nombre||'', '', n||null, p||null, k||null, dosis||null, tipo, ab.obs||'', zonaN]);
+      // Sheet 9.1: only ecorégimen P3 AND regadío
+      if(hasP3 && esReg){
         var riq=(n||p||k)?'N:'+n+'% P:'+p+'% K:'+k+'%':'';
-        rows91.push([ab.fecha||'',lbl,esp,abo.nombre+(riq?' ('+riq+')':''),abo.fabricante||'','',dosis+' '+(ar.unidad||'kg/ha'),tipo,'']);
+        rows91.push([fmtDate(ab.fecha), lbl, especie+(variedad?' / '+variedad:''), abo.nombre+(riq?' ('+riq+')':''), abo.fabricante||'', '', dosis+' '+unidad, tipo, modoMetodo(ar.modo), '']);
       }
     });
   });
-  if(!rows6.length){ alert('No hay aportaciones de abono.'); return; }
+
+  if(!rows6.length){ alert('No hay aportaciones de abono para los filtros seleccionados.'); return; }
+
   var cliNom=fCli?((DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'cliente'}).nombre):'todos';
   var anno=fCamp||new Date().getFullYear();
-  // Build workbook
   var wb=XLSX.utils.book_new();
+
+  // ==== SHEET 6 ====
+  // Template layout: col A empty, data in B-M, headers R7-R9, data from R10
   var ws6d=[
-    [null,'Explotación:',null,null,cliNom,null,null,null,null,null,null,'AÑO',anno],[null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [null,'6. REGISTRO DE FERTILIZACIÓN  (OPCIONAL [EXCEPTO ZONAS VULNERABLES])'],[null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [null,'Intervalo de fechas','Nº orden parcelas','Cultivo',null,'Tipo de abono/producto','Nº albarán','N%','P%','K%','Dosis (kg/ha)','Tipo fertilización','Observaciones'],
+    [null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,'Explotacion/Titular de la explotacion:',null,null,cliNom,null,null,null,null,null,null,'ANNO',anno],
+    [null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,'6. REGISTRO DE FERTILIZACION (OPCIONAL [EXCEPTO ZONAS VULNERABLES])'],
+    [null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,'Intervalo de fechas','No de orden de parcelas (1)','Cultivo',null,'Tipo de abono/producto (2)','No de albaran','Riqueza N/P/K',null,null,'Dosis (kg/ha, m3/ha)','Tipo de fertilizacion (3)','Observaciones'],
     [null,null,null,'Especie','Variedad',null,null,null,null,null,null,null,null],
-    [null,'(Fecha)','(Nº Orden)','(Especie)','','(Nombre abono)','','N','P','K','(kg/ha)','(Tipo)','(Obs)'],
+    [null,'Columna1','Columna2','Columna3','Columna4','Columna5','Columna6','Columna63','Columna62','Columna7','Columna8','Columna9','Columna10']
   ];
   rows6.forEach(function(r){ ws6d.push([null,r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]]); });
-  if(rows6.some(function(r){return r[12];})) ws6d.push([null,'⚠ Parcelas en ZONA VULNERABLE DE NITRÓGENO - normativa Orden MAV/398/2022']);
+  ws6d.push([]);
+  ws6d.push([null,'(1) No de orden segun la relacion en la hoja de identificacion de parcelas.']);
+  ws6d.push([null,'(2) En caso de abonos organicos indicar (EB) estiercol bovino, (EO) estiercol ovino, (P) purin, etc.']);
+  ws6d.push([null,'(3) Indicar (F) Fertirrigacion, (AF) Abonado de fondo o (AC) Abonado de cobertera.']);
+  if(rows6.some(function(r){return r[12];})) ws6d.push([null,'ATENCION: Hay parcelas en ZONA VULNERABLE DE NITROGENO (Orden MAV/398/2022). El registro es OBLIGATORIO para esas parcelas.']);
   var ws6=XLSX.utils.aoa_to_sheet(ws6d);
-  ws6['!cols']=[{wch:2},{wch:16},{wch:22},{wch:20},{wch:12},{wch:30},{wch:12},{wch:5},{wch:5},{wch:5},{wch:10},{wch:22},{wch:20}];
+  ws6['!cols']=[{wch:1},{wch:18},{wch:22},{wch:20},{wch:14},{wch:32},{wch:12},{wch:6},{wch:6},{wch:6},{wch:12},{wch:24},{wch:22}];
   XLSX.utils.book_append_sheet(wb,ws6,'6. REG. FERTILIZ');
+
+  // ==== SHEET 9.1 ====
+  // Template layout: cols A-J (10 cols), headers R7, data from R8
   var ws91d=[
-    [null,null,null,null,null,null,null,null,'AÑO: ',anno],
-    ['9. DATOS RELATIVOS A LA EXPLOTACIÓN PARA PAGOS DIRECTOS DISOCIADOS'],[],[],
-    ['9.1 FERTILIZACIÓN: ECOREGÍMENES P3-P4 EN REGADÍO'],[],
-    ['Fecha','Nº orden parcelas','Cultivo','Material fertilizante','Empresa suministradora','Nº factura','Dosis/unidad','Tipo fertilización','Método aplicación'],
+    [null,null,null,null,null,null,null,null,'ANNO: ',anno],
+    [cliNom],
+    ['9. DATOS RELATIVOS A LA EXPLOTACION PARA PAGOS DIRECTOS DISOCIADOS A REGIMENES EN FAVOR DEL CLIMA Y EL MEDIO AMBIENTE'],
+    [null],
+    ['9.1 INFORMACION SOBRE FERTILIZACION: ECOREGIMEN P3-ROTACION DE CULTIVOS - GESTION SOSTENIBLE DE INSUMOS PARA CULTIVOS EN REGADIO'],
+    [null],
+    ['Fecha o intervalo de fechas','No de orden de parcelas (1) o referencia SIGPAC','Cultivo','Material fertilizante (2)','Empresa suministradora (3)','No de factura','Dosis/unidad (4)','Tipo de fertilizacion (5)','Metodo de aplicacion del fertilizante (6)','Necesidades N/P/K segun Plan de abonado']
   ];
-  (rows91.length?rows91:[['(No hay parcelas P3/P4 en regadío)']]).forEach(function(r){ws91d.push(r);});
+  if(rows91.length){ rows91.forEach(function(r){ws91d.push(r);}); }
+  else { ws91d.push(['(No hay parcelas con Ecoregimen P3 y Regadio en la seleccion)']); }
+  ws91d.push([null]);
+  ws91d.push(['(1) No de orden segun la relacion en la hoja de identificacion de parcelas.']);
+  ws91d.push(['(5) 1.Abonado de fondo  2.Abonado de cobertera  3.Aplicacion de enmienda organica']);
+  ws91d.push(['(6) 1.Esparcido general  2.Esparcido general y enterrado  5.Fertirrigacion aspersion  6.Fertirrigacion localizada  7.Foliar']);
   var ws91=XLSX.utils.aoa_to_sheet(ws91d);
-  ws91['!cols']=[{wch:16},{wch:24},{wch:20},{wch:35},{wch:22},{wch:12},{wch:14},{wch:25},{wch:35}];
-  XLSX.utils.book_append_sheet(wb,ws91,'9.1. INF. FERTILIZACIÓN');
+  ws91['!cols']=[{wch:18},{wch:26},{wch:22},{wch:38},{wch:24},{wch:14},{wch:16},{wch:28},{wch:38},{wch:22}];
+  XLSX.utils.book_append_sheet(wb,ws91,'9.1. INF. FERTILIZACION');
+
   var fname='Cuaderno_Fertilizacion_'+cliNom+'_'+anno+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
   XLSX.writeFile(wb,fname);
   closeModal('modal-export-fertilizacion');
-  alert('✅ Excel descargado: '+fname+'\n\nHoja 6: '+rows6.length+' aportaciones'+(rows6.some(function(r){return r[12];})?'\n⚠ Hay parcelas en zona vulnerable':'')+' \nHoja 9.1: '+rows91.length+' aportaciones P3/P4+regadío');
+  alert('Excel descargado: '+fname
+    +'\n\nHoja 6 - Reg. Fertilizacion: '+rows6.length+' aportaciones'
+    +(rows6.some(function(r){return r[12];})?' [ATENCION: hay parcelas en zona vulnerable de nitrogeno]':'')
+    +'\nHoja 9.1 - Inf. Fertilizacion (P3+regadio): '+rows91.length+' aportaciones');
 }
 
 window.addEventListener('load', function() {
