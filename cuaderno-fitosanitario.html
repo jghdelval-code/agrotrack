@@ -3041,6 +3041,12 @@ function renderRecintos() {
   var rows = '';
   cliOrder.forEach(function(cid) {
     var group = byCli[cid];
+    // Sort by numOrden ascending (nulls/empty at the end)
+    group.sort(function(a,b){
+      var na = parseFloat(a.numOrden)||99999;
+      var nb = parseFloat(b.numOrden)||99999;
+      return na - nb;
+    });
     var cli3  = DB.clientes.find(function(c){return c.id===cid;});
     var cliNom = cli3 ? cli3.nombre : 'Sin cliente';
     var cliCul = 0;
