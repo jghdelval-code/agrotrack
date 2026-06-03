@@ -838,6 +838,7 @@ textarea { resize: vertical; min-height: 72px; }
             <option value="">Todas las campañas</option>
           </select>
           <button class="btn btn-primary" onclick="openAbonadoModal()">＋ Nuevo abonado</button>
+          <button class="btn btn-secondary" onclick="openExportFertilizacionModal()" title="Exportar fertilización a Excel (Cuaderno de Explotación)">📊 Excel Fertilización</button>
         </div>
       </div>
       <div class="stats-row" id="abonado-stats"></div>
@@ -1356,6 +1357,40 @@ textarea { resize: vertical; min-height: 72px; }
 </div>
 
 <!-- MODAL COMPRA -->
+<!-- Modal: Exportar Fertilización Excel -->
+<div class="modal-overlay" id="modal-export-fertilizacion">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3>📊 Exportar Fertilización</h3>
+      <button class="modal-close" onclick="closeModal('modal-export-fertilizacion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Genera el Excel de fertilización según el modelo oficial del Cuaderno de Explotación de Castilla y León.</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Cliente *</label>
+          <select id="expfert-cliente">
+            <option value="">— Todos los clientes —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Campaña *</label>
+          <select id="expfert-campana">
+            <option value="">— Todas las campañas —</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px;padding:10px;background:var(--surface);border-radius:6px;border-left:3px solid var(--primary)">
+        <b style="color:var(--white)">Formato:</b> Cada fila es una aplicación de abono. Los recintos tratados en la misma aportación aparecen agrupados con sus números de orden SIGPAC.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-export-fertilizacion')">Cancelar</button>
+      <button class="btn btn-primary" onclick="exportFertilizacionExcel()">⬇️ Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-compra">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -6712,6 +6747,178 @@ function renderCompras() {
       '</div></div>';
   });
   cont.innerHTML = html || '<div style="color:var(--text3);padding:20px;text-align:center">No hay compras con los filtros seleccionados</div>';
+}
+
+// ============================================================
+// EXPORTAR FERTILIZACIÓN A EXCEL — Cuaderno de Explotación C&L
+// ============================================================
+function openExportFertilizacionModal() {
+  var cliSel  = document.getElementById('expfert-cliente');
+  var campSel = document.getElementById('expfert-campana');
+  cliSel.innerHTML = '<option value="">— Todos los clientes —</option>' +
+    DB.clientes.map(function(c){ return '<option value="'+c.id+'">'+c.nombre+'</option>'; }).join('');
+  cliSel.value = '';
+  // Build campaign list from abonados
+  var camps = {};
+  (DB.abonados||[]).forEach(function(ab){ if(ab.campana) camps[ab.campana]=1; });
+  var campList = Object.keys(camps).sort().reverse();
+  campSel.innerHTML = '<option value="">— Todas las campañas —</option>' +
+    campList.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  if(currentCampana && camps[currentCampana]) campSel.value = currentCampana;
+  openModal('modal-export-fertilizacion');
+}
+
+function exportFertilizacionExcel() {
+  var fCli  = document.getElementById('expfert-cliente').value;
+  var fCamp = document.getElementById('expfert-campana').value;
+
+  var abonados = (DB.abonados||[]).filter(function(ab){
+    if(fCli  && ab.clienteId !== fCli)  return false;
+    if(fCamp && ab.campana  !== fCamp)  return false;
+    return true;
+  }).slice().sort(function(a,b){ return (a.fecha||'').localeCompare(b.fecha||''); });
+
+  if(!abonados.length) { alert('No hay registros de abonado para los filtros seleccionados.'); return; }
+
+  // ── Build rows ──────────────────────────────────────────
+  var dataRows = [];
+  var nAportacion = 0;
+
+  abonados.forEach(function(ab) {
+    var cli  = DB.clientes.find(function(c){ return c.id===ab.clienteId; });
+    var recs = (ab.recintoIds||[]).map(function(id){
+      return DB.recintos.find(function(r){ return r.id===id; });
+    }).filter(Boolean);
+
+    // Surface: sum supCultivada (fallback supSigpac)
+    var supTotal = recs.reduce(function(s,r){
+      return s + (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);
+    }, 0);
+
+    // Recintos label: numOrden if available, else SIGPAC ref
+    var recLabels = recs.map(function(r){
+      return r.numOrden || [r.codProvincia||'?',
+        (r.termMunicipal||'?').split(' ')[0], r.numPoligono||'?',
+        r.numParcela||'?', r.numRecinto||'?'].join('-');
+    }).join(' / ');
+
+    // Cultivos
+    var cvSet = {};
+    recs.forEach(function(r){ if(r.especieVariedad) cvSet[r.especieVariedad.trim()]=1; });
+    var cultivos = Object.keys(cvSet).join(', ') || '—';
+
+    nAportacion++;
+
+    // One row per abono applied in this record
+    (ab.abonos||[]).forEach(function(row, idx) {
+      var abo   = (DB.abonos||[]).find(function(a){ return a.id===row.abonoId; });
+      if(!abo) return;
+      var dosis    = parseFloat(row.dosis)||0;
+      var unidad   = row.unidad||'kg/ha';
+      // Normalise dosis to kg/ha or L/ha
+      var dosisKgHa = dosis;
+      if(unidad==='t/ha')  dosisKgHa = dosis * 1000;
+      if(unidad==='g/ha')  dosisKgHa = dosis / 1000;
+
+      var cantTotal = dosisKgHa * supTotal;
+      var nPct   = parseFloat(abo.n)||0;
+      var p2o5   = parseFloat(abo.p)||0;
+      var k2o    = parseFloat(abo.k)||0;
+      var nKgHa  = dosisKgHa * nPct   / 100;
+      var pKgHa  = dosisKgHa * p2o5   / 100;
+      var kKgHa  = dosisKgHa * k2o    / 100;
+
+      dataRows.push([
+        nAportacion,
+        ab.fecha   || '',
+        cli ? cli.nombre : '—',
+        fCamp ? '' : (ab.campana||''),
+        recLabels,
+        cultivos,
+        supTotal.toFixed(2),
+        abo.nombre || '—',
+        abo.tipo   || 'Mineral',
+        row.modo   || '—',
+        dosis,
+        unidad,
+        nPct   > 0 ? nPct   : '',
+        nKgHa  > 0 ? +nKgHa.toFixed(2)  : '',
+        nKgHa  > 0 ? +(nKgHa*supTotal).toFixed(2)  : '',
+        p2o5   > 0 ? p2o5   : '',
+        pKgHa  > 0 ? +pKgHa.toFixed(2)  : '',
+        pKgHa  > 0 ? +(pKgHa*supTotal).toFixed(2)  : '',
+        k2o    > 0 ? k2o    : '',
+        kKgHa  > 0 ? +kKgHa.toFixed(2)  : '',
+        kKgHa  > 0 ? +(kKgHa*supTotal).toFixed(2)  : '',
+        ab.obs || ''
+      ]);
+    });
+  });
+
+  if(!dataRows.length) { alert('No hay aplicaciones de abono en los registros seleccionados.'); return; }
+
+  // ── Build workbook with SheetJS ─────────────────────────
+  var headers = [
+    'Nº Aportación','Fecha','Cliente',
+    ...(fCamp ? [] : ['Campaña']),
+    'Recintos (Nº Orden / SIGPAC)','Cultivo','Sup. total (ha)',
+    'Abono / Fertilizante','Tipo','Modo aplicación',
+    'Dosis','Unidad dosis',
+    'N (%)','kg N/ha','kg N total',
+    'P₂O₅ (%)','kg P₂O₅/ha','kg P₂O₅ total',
+    'K₂O (%)','kg K₂O/ha','kg K₂O total',
+    'Observaciones'
+  ];
+
+  // Remove Campaña column from rows if filtering by campaign
+  var rows = fCamp ? dataRows.map(function(r){
+    return [r[0],r[1],r[2],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17],r[18],r[19],r[20],r[21]];
+  }) : dataRows;
+
+  var wsData = [headers].concat(rows);
+  var wb  = XLSX.utils.book_new();
+  var ws  = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  var colWidths = [8,12,20,12,40,20,10,25,10,14,8,10,6,8,10,6,8,10,6,8,10,30];
+  if(!fCamp) colWidths.splice(3,0,10); // insert Campaña width
+  ws['!cols'] = colWidths.slice(0,headers.length).map(function(w){ return {wch:w}; });
+
+  // Freeze top row
+  ws['!freeze'] = {xSplit:0, ySplit:1, topLeftCell:'A2', activePane:'bottomLeft', state:'frozen'};
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Fertilización');
+
+  // ── Totals summary sheet ────────────────────────────────
+  var summaryData = [
+    ['RESUMEN DE FERTILIZACIÓN'],
+    [''],
+    ['Cliente', fCli ? (DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'—'}).nombre : 'Todos'],
+    ['Campaña', fCamp||'Todas'],
+    ['Nº aportaciones', nAportacion],
+    ['Nº filas de abono', dataRows.length],
+    [''],
+    ['Abono','Nº aplicaciones','Total kg/L aplicado']
+  ];
+  var abonoTotals = {};
+  rows.forEach(function(r){
+    var nombre = r[fCamp?7:8] || '—';
+    if(!abonoTotals[nombre]) abonoTotals[nombre]={count:0,total:0};
+    abonoTotals[nombre].count++;
+    abonoTotals[nombre].total += (parseFloat(r[fCamp?10:11])||0) * (parseFloat(r[fCamp?6:7])||0);
+  });
+  Object.keys(abonoTotals).sort().forEach(function(nombre){
+    var t = abonoTotals[nombre];
+    summaryData.push([nombre, t.count, +t.total.toFixed(2)]);
+  });
+  var wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+  wsSummary['!cols'] = [{wch:30},{wch:16},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+
+  // ── Download ────────────────────────────────────────────
+  var filename = 'Fertilizacion_'+(fCli?(DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'clientes'}).nombre:'todos')+'_'+(fCamp||'todas')+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  XLSX.writeFile(wb, filename);
+  closeModal('modal-export-fertilizacion');
 }
 
 function openCompraModal(id, prefillClienteId) {
