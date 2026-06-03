@@ -136,30 +136,10 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* TREATMENT PRODUCTS */
 .products-list { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-/* ── Product rows in treatment modal ─────────────────── */
-.product-row { background:var(--surface); border-bottom:1px solid var(--border); }
-.product-row:last-child { border-bottom:none; }
-.prod-row-inner { display:flex; flex-direction:column; gap:6px; padding:10px 12px; }
-.prod-row-top { display:flex; gap:8px; align-items:center; }
-.prod-row-fields { display:grid; grid-template-columns:1fr 90px 70px 80px; gap:6px; align-items:end; }
-.prod-row-field { display:flex; flex-direction:column; gap:3px; }
-.prod-row-label { font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.3px; }
-.prod-row-pvp-wrap { align-items:center; justify-content:center; }
-.prod-row-pvp { font-size:12px; color:#7acc4a; font-weight:700; }
-/* Combobox */
-.prod-combo-wrap { position:relative; flex:1; min-width:0; }
-.prod-combo-input { width:100%; padding:8px 10px; font-size:14px; border:1px solid var(--border2); border-radius:var(--radius); background:var(--card); color:var(--white); box-sizing:border-box; }
-.prod-combo-input:focus { border-color:var(--primary); outline:none; }
-.prod-combo-list { position:absolute; top:calc(100% + 2px); left:0; right:0; background:var(--card); border:1px solid var(--primary); border-radius:var(--radius); max-height:220px; overflow-y:auto; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,.5); }
-.prod-combo-group { padding:4px 10px; font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.4px; background:var(--surface); position:sticky; top:0; }
-.prod-combo-item { padding:8px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border); color:var(--white); }
-.prod-combo-item:last-child { border-bottom:none; }
-.prod-combo-item:hover, .prod-combo-item.selected { background:rgba(74,140,42,.15); }
-/* Mobile: stack to 2 columns */
-@media(max-width:500px) {
-  .prod-row-fields { grid-template-columns:1fr 1fr; }
-  .prod-combo-input { font-size:16px; } /* prevent iOS zoom */
-}
+.product-row { display: grid; grid-template-columns: 2fr 90px 100px 1fr auto; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); align-items: center; background: var(--surface); }
+.product-row:last-child { border-bottom: none; }
+.product-row-header { background: var(--card); font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.product-row input, .product-row select { padding: 5px 8px; font-size: 12px; }
 .add-product-btn { width: 100%; padding: 9px; border: 1px dashed var(--border2); background: none; color: var(--primary); cursor: pointer; border-radius: var(--radius); margin-top: 8px; font-size: 13px; font-weight: 600; transition: all .15s; }
 .add-product-btn:hover { background: var(--primary-light); border-style: solid; }
 .remove-prod-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 16px; padding: 2px 4px; }
@@ -167,11 +147,23 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* TREATMENT RECINTOS */
 .recintos-picker { border: 1px solid var(--border); border-radius: var(--radius); max-height: 200px; overflow-y: auto; }
-/* Cultivo filter chips in treatment modal */
-.cultivo-chip { padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid var(--border2);background:var(--surface);color:var(--text2);transition:all .15s;white-space:nowrap; }
-.cultivo-chip:hover { border-color:var(--primary);color:var(--white); }
+.cultivo-chip { padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid var(--border2);background:var(--surface);color:var(--text2);white-space:nowrap; }
 .cultivo-chip.active { border-color:var(--chip-color,var(--primary));background:var(--chip-color,var(--primary));color:#fff; }
-.cultivo-chip[data-cv=""].active { background:var(--surface);border-color:var(--primary);color:var(--primary); }
+/* Product combobox */
+.prod-combo-wrap { position:relative; flex:1; min-width:0; }
+.prod-combo-input { width:100%;padding:8px 10px;font-size:16px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--card);color:var(--white);box-sizing:border-box; }
+.prod-combo-input:focus { border-color:var(--primary);outline:none; }
+.prod-combo-list { position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--card);border:1px solid var(--primary);border-radius:var(--radius);max-height:220px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.5); }
+.prod-combo-group { padding:4px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;background:var(--surface); }
+.prod-combo-item { padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);color:var(--white); }
+.prod-combo-item:hover, .prod-combo-item.sel { background:rgba(74,140,42,.15); }
+.prod-row-inner { display:flex;flex-direction:column;gap:6px;padding:10px 12px; }
+.prod-row-top { display:flex;gap:8px;align-items:center; }
+.prod-row-fields { display:grid;grid-template-columns:1fr 90px 70px 80px;gap:6px;align-items:end; }
+.prod-row-field { display:flex;flex-direction:column;gap:3px; }
+.prod-row-label { font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px; }
+.prod-row-pvp { font-size:12px;color:#7acc4a;font-weight:700; }
+@media(max-width:500px){.prod-row-fields{grid-template-columns:1fr 1fr;}}
 .recinto-check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
 .recinto-check:last-child { border-bottom: none; }
 .recinto-check:hover { background: var(--primary-light); }
@@ -384,6 +376,8 @@ textarea { resize: vertical; min-height: 72px; }
   .form-grid.cols-3 { grid-template-columns: 1fr 1fr; }
   .form-group.span-2, .form-group.span-3 { grid-column: span 1; }
   .form-section-title { grid-column: 1 / -1; }
+  .product-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .product-row .remove-prod-btn { grid-column: 2; justify-self: end; }
   .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { border-radius: 16px 16px 0 0; max-height: 92vh; overflow-y: auto; max-width: 100% !important; }
   .modal-body { padding: 16px; }
@@ -644,8 +638,7 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
           <button class="btn btn-accent btn-sm" onclick="document.getElementById('prod-mapa-import').click()" title="Actualizar desde fichero del Ministerio">📥 Actualizar MAPA</button>
           <input type="file" id="prod-mapa-import" accept=".xlsx,.xls" style="display:none" onchange="importarProductosMapa(this)">
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dc-mapa-import').click()" title="Importar archivo de denominaciones comunes del MAPA">🔗 Denominaciones</button>
-          <input type="file" id="dc-mapa-import" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importarDenominacionesMapa(this)">
+          <button class="btn btn-secondary btn-sm" onclick="applyDenominacionesComunes()" title="Comparar con lista de denominaciones comunes del MAPA">🔗 Denominaciones</button>
           <button class="btn btn-secondary btn-sm" onclick="applyMAPACultivosToAllProducts()" title="Asignar cultivos autorizados desde los datos del MAPA (28/05/2026)">🌱 Aplicar cultivos</button>
           <button class="btn btn-primary" onclick="openProductoModal()">＋ Nuevo producto</button>
         </div>
@@ -838,7 +831,7 @@ textarea { resize: vertical; min-height: 72px; }
             <option value="">Todas las campañas</option>
           </select>
           <button class="btn btn-primary" onclick="openAbonadoModal()">＋ Nuevo abonado</button>
-          <button class="btn btn-secondary" onclick="openExportFertilizacionModal()" title="Exportar fertilización a Excel (Cuaderno de Explotación)">📊 Excel Fertilización</button>
+          <button class="btn btn-secondary" onclick="openExportFertilizacionModal()">&#x1F4CA; Excel Fertilizaci&oacute;n</button>
         </div>
       </div>
       <div class="stats-row" id="abonado-stats"></div>
@@ -850,6 +843,24 @@ textarea { resize: vertical; min-height: 72px; }
 <!-- ======= MODALS ======= -->
 
 <!-- MODAL TRATAMIENTO -->
+<!-- Modal: Exportar Fertilizacion Excel -->
+<div class="modal-overlay" id="modal-export-fertilizacion">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h3>&#x1F4CA; Exportar Fertilizaci&oacute;n</h3><button class="modal-close" onclick="closeModal('modal-export-fertilizacion')">&#x2715;</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Genera el Excel de fertilizaci&oacute;n seg&uacute;n el Cuaderno de Explotaci&oacute;n oficial de Castilla y Le&oacute;n.</p>
+      <div class="form-grid">
+        <div class="form-group"><label>Cliente</label><select id="expfert-cliente"><option value="">- Todos -</option></select></div>
+        <div class="form-group"><label>Campa&ntilde;a</label><select id="expfert-campana"><option value="">- Todas -</option></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-export-fertilizacion')">Cancelar</button>
+      <button class="btn btn-primary" onclick="exportFertilizacionExcel()">&#x2B07; Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-tratamiento">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -873,7 +884,7 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
         </div>
       </div>
-      <!-- Cultivo filter — shown after selecting a client -->
+      <!-- Cultivo filter chips -->
       <div id="trt-cultivo-filter" style="display:none;margin-bottom:10px">
         <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Filtrar parcelas por cultivo</div>
         <div id="trt-cultivo-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -881,13 +892,10 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="form-group" style="margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <label style="margin:0">Recintos tratados *</label>
-          <div style="display:flex;gap:6px">
-            <span id="trt-recintos-info" style="font-size:11px;color:var(--text3)"></span>
-            <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="toggleAllTrtRecintos(true)">☑ Todo</button>
-          </div>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="toggleAllTrtRecintos(true)">&#x2611; Todo</button>
         </div>
         <div class="recintos-picker" id="recintos-picker">
-          <div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>
+          <div class="empty-state" style="padding:20px;font-size:12px;color:var(--text3)">Selecciona un cliente primero</div>
         </div>
       </div>
       <div style="margin-bottom:14px">
@@ -971,16 +979,20 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Plazo seguridad</label>
           <input type="text" id="prod-plazo" placeholder="ej: 21 días / NP">
         </div>
-        <div class="form-group span-2">
-          <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— añade uno por cada tamaño de envase disponible</span></label>
+        <div class="form-group">
+          <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
           <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
             <div style="display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:0;background:var(--card);padding:5px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">
-              <span>Nombre / descripción</span><span>Cantidad</span><span>Unidad</span><span>€ / unidad</span><span></span>
+              <span>Nombre</span><span>Cantidad</span><span>Unidad</span><span>€ / unidad</span><span></span>
             </div>
             <div id="prod-formatos-rows"></div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" onclick="addFormatoRow()" style="margin-top:6px;font-size:12px">＋ Añadir formato</button>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">El precio es por unidad de la cantidad (ej: €/L, €/kg). Los cálculos de PVP usarán el formato que elijas al tratar.</div>
+        </div>
+        <div class="form-group span-0" style="display:none">
+          <label>dummy</label>
+          <input type="hidden" id="prod-coste" value="0">
+          <input type="hidden" id="prod-unidad-coste" value="L">
         </div>
         <div class="form-group span-2">
           <label>Cultivos autorizados</label>
@@ -1302,25 +1314,11 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
         </div>
       </div>
-      <!-- Cultivo filter for abonado picker -->
-      <div id="abonado-cultivo-filter" style="display:none;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Filtrar parcelas por cultivo</div>
-        <div id="abonado-cultivo-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-      </div>
       <!-- Parcelas picker grouped by finca -->
       <div class="form-group" style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <label style="margin:0">Parcelas / Recintos *</label>
-          <div style="display:flex;gap:6px">
-            <span id="abonado-recintos-info" style="font-size:11px;color:var(--text3)"></span>
-            <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" onclick="toggleAllAbonadoRecintos(true)">☑ Todo</button>
-          </div>
-        </div>
+        <label>Parcelas / Recintos *</label>
         <div class="recintos-picker" id="abonado-parcelas-picker" style="max-height:220px">
           <div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>
-        </div>
-        <div id="abonado-ha-total" style="display:none;margin-top:6px;padding:7px 12px;background:rgba(74,140,42,.1);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:700;color:var(--white)">
-          ✅ Total seleccionado: <span id="abonado-ha-total-val">0.00</span> ha cultivadas
         </div>
       </div>
       <!-- Abonos rows -->
@@ -1357,40 +1355,6 @@ textarea { resize: vertical; min-height: 72px; }
 </div>
 
 <!-- MODAL COMPRA -->
-<!-- Modal: Exportar Fertilización Excel -->
-<div class="modal-overlay" id="modal-export-fertilizacion">
-  <div class="modal" style="max-width:460px">
-    <div class="modal-header">
-      <h3>📊 Exportar Fertilización</h3>
-      <button class="modal-close" onclick="closeModal('modal-export-fertilizacion')">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Genera el Excel de fertilización según el modelo oficial del Cuaderno de Explotación de Castilla y León.</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Cliente *</label>
-          <select id="expfert-cliente">
-            <option value="">— Todos los clientes —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Campaña *</label>
-          <select id="expfert-campana">
-            <option value="">— Todas las campañas —</option>
-          </select>
-        </div>
-      </div>
-      <div style="font-size:12px;color:var(--text3);margin-top:8px;padding:10px;background:var(--surface);border-radius:6px;border-left:3px solid var(--primary)">
-        <b style="color:var(--white)">Formato:</b> Cada fila es una aplicación de abono. Los recintos tratados en la misma aportación aparecen agrupados con sus números de orden SIGPAC.
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-export-fertilizacion')">Cancelar</button>
-      <button class="btn btn-primary" onclick="exportFertilizacionExcel()">⬇️ Descargar Excel</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modal-compra">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -1651,71 +1615,30 @@ var gDrive = {
     this.fileId        = localStorage.getItem('agrotrack_gdrive_fileid')||null;
     this._lastModified = localStorage.getItem('agrotrack_gdrive_lastmod')||null;
     updateSyncStatus(this.token ? 'connected' : 'disconnected');
-    if(this.token) {
-      // Try to verify the saved token; if expired, attempt silent refresh
-      this.verifyToken();
-      this.startAutoSync();
-    } else if(this.CLIENT_ID && window.location.protocol !== 'file:') {
-      // No token saved but we have a CLIENT_ID — try silent reconnect
-      this.silentLogin();
-    }
+    if(this.token) { this.verifyToken(); this.startAutoSync(); }
+    else if(this.CLIENT_ID && window.location.protocol !== 'file:') { this.silentLogin(); }
   },
-
-  // ── Silent login (prompt=none via hidden iframe) ──────────────
-  // Attempts to get a new token without user interaction if the user
-  // is still logged in to Google in this browser.
   silentLogin: function() {
-    var self = this;
-    if(!this.CLIENT_ID) return;
-    if(window.location.protocol === 'file:') return;
-    var redirect = window.location.href.split('?')[0].split('#')[0];
-    var src = 'https://accounts.google.com/o/oauth2/v2/auth' +
-      '?client_id='    + encodeURIComponent(this.CLIENT_ID) +
-      '&redirect_uri=' + encodeURIComponent(redirect) +
-      '&response_type=token' +
-      '&scope='        + encodeURIComponent(this.SCOPES) +
-      '&prompt=none';  // silent — no UI shown
-
-    // Use a hidden iframe to capture the redirect
-    var iframe = document.createElement('iframe');
-    iframe.style.cssText = 'display:none;width:0;height:0;position:absolute';
-    iframe.src = src;
-    var timer = null;
-    var done  = false;
-
-    iframe.onload = function() {
+    var self=this; if(!this.CLIENT_ID) return;
+    if(window.location.protocol==='file:') return;
+    var redirect=window.location.href.split('?')[0].split('#')[0];
+    var src='https://accounts.google.com/o/oauth2/v2/auth?client_id='+encodeURIComponent(this.CLIENT_ID)+'&redirect_uri='+encodeURIComponent(redirect)+'&response_type=token&scope='+encodeURIComponent(this.SCOPES)+'&prompt=none';
+    var iframe=document.createElement('iframe'); iframe.style.cssText='display:none;width:0;height:0;position:absolute'; iframe.src=src;
+    var done=false; var timer=null;
+    iframe.onload=function(){
       if(done) return;
-      try {
-        var hash = iframe.contentWindow.location.hash || '';
-        if(hash.indexOf('access_token') !== -1) {
-          var params = {};
-          hash.substring(1).split('&').forEach(function(pair){
-            var kv = pair.split('=');
-            params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]||'');
-          });
-          if(params.access_token) {
-            done = true;
-            self.token = params.access_token;
-            localStorage.setItem('agrotrack_gdrive_token', self.token);
-            updateSyncStatus('connected');
-            self.startAutoSync();
-            self.checkForUpdates();
-          }
+      try{
+        var hash=iframe.contentWindow.location.hash||'';
+        if(hash.indexOf('access_token')>=0){
+          var params={};
+          hash.substring(1).split('&').forEach(function(pair){var kv=pair.split('=');params[decodeURIComponent(kv[0])]=decodeURIComponent(kv[1]||'');});
+          if(params.access_token){done=true;self.token=params.access_token;localStorage.setItem('agrotrack_gdrive_token',self.token);updateSyncStatus('connected');self.startAutoSync();self.checkForUpdates();}
         }
-      } catch(e) {
-        // Cross-origin — normal for Google's redirect, ignore
-      }
+      }catch(e){}
       clearTimeout(timer);
-      if(!done) document.body.removeChild(iframe);
+      if(!done){try{document.body.removeChild(iframe);}catch(e){}}
     };
-
-    timer = setTimeout(function() {
-      done = true;
-      try { document.body.removeChild(iframe); } catch(e) {}
-      // Silent auth failed (user not logged in or consent needed) — show connect button
-      updateSyncStatus('disconnected');
-    }, 8000);
-
+    timer=setTimeout(function(){done=true;try{document.body.removeChild(iframe);}catch(e){}updateSyncStatus('disconnected');},8000);
     document.body.appendChild(iframe);
   },
 
@@ -1725,16 +1648,9 @@ var gDrive = {
     fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token='+this.token)
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d.error) {
-          // Token expired — try silent refresh before giving up
-          self.token = null;
-          localStorage.removeItem('agrotrack_gdrive_token');
-          updateSyncStatus('disconnected');
-          self.silentLogin();
-        } else {
-          updateSyncStatus('connected');
-        }
-      }).catch(function(){ /* network error — keep token, try later */ });
+        if(d.error) { self.logout(true); }
+        else { updateSyncStatus('connected'); }
+      }).catch(function(){ /* network error — keep token */ });
   },
 
   // ── Login ──
@@ -2333,88 +2249,58 @@ function toggleLayer(layer) {
 // ============================================================
 // TRATAMIENTOS
 // ============================================================
-// ── Build a single treatment card HTML ──────────────────
 function buildTrtCardHtml(t) {
-  var cli      = DB.clientes.find(function(c){return c.id===t.clienteId;});
-  var prods    = t.productos||[];
-  var recs     = (t.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
-  var totalHa  = recs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
-
+  var cli     = DB.clientes.find(function(c){return c.id===t.clienteId;});
+  var prods   = t.productos||[];
+  var recs    = (t.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+  var totalHa = recs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
   var totalCosteHa=0, totalPVPHa=0, hasCost=false;
   prods.forEach(function(p){
     var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
     var precio = getPrecioProducto(prod, p.formatoIdx||0);
     if(prod && precio && p.dosis) {
-      var costeHa = precio * p.dosis;
-      var pvpHa   = costeHa * (1+(p.margen||0)/100);
-      totalCosteHa += costeHa; totalPVPHa += pvpHa; hasCost = true;
+      totalCosteHa += precio*p.dosis; totalPVPHa += precio*p.dosis*(1+(p.margen||0)/100); hasCost=true;
     }
   });
-  var totalPVPTot = totalPVPHa * totalHa;
-
-  var costeBadge = hasCost
-    ? '<span class="tag tag-green" style="font-size:11px">💶 '+totalPVPTot.toFixed(2)+' €</span>'
-    : '';
-
+  var totalPVPTot = totalPVPHa*totalHa;
+  var costeBadge = hasCost ? '<span class="tag tag-green" style="font-size:11px">&#x1F4B6; '+totalPVPTot.toFixed(2)+'&euro;</span>' : '';
   var recTags = recs.map(function(r){
-    return '<span class="tag tag-green">'+(r.nombreFinca||('P'+r.numPoligono+'-Pa'+r.numParcela))+
-      ' ('+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2)+' ha)</span>';
+    return '<span class="tag tag-green">'+(r.nombreFinca||'P'+r.numPoligono+'-Pa'+r.numParcela)+' ('+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2)+' ha)</span>';
   }).join(' ');
-
-  var tableHead = '<th>Producto</th><th>Materia activa</th><th>Tipo</th><th>Dosis/ha</th><th>Total ('+totalHa.toFixed(2)+' ha)</th>'+
-    (hasCost?'<th>Coste/ha</th><th>PVP/ha</th><th>Total PVP</th>':'')+'<th>Justificación</th>';
-
+  var cols = hasCost ? '<th>Coste/ha</th><th>PVP/ha</th><th>Total PVP</th>' : '';
+  var tableHead = '<th>Producto</th><th>Materia activa</th><th>Tipo</th><th>Dosis/ha</th><th>Total ('+totalHa.toFixed(2)+' ha)</th>'+cols+'<th>Justificaci&oacute;n</th>';
   var tableBody = prods.map(function(p){
-    var prod      = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var totalProd = (p.dosis * totalHa).toFixed(3);
-    var costeCells = '';
-    if(hasCost) {
-      var precio  = getPrecioProducto(prod, p.formatoIdx||0);
-      if(prod && precio && p.dosis) {
-        var cH   = precio * p.dosis;
-        var pHa  = cH * (1+(p.margen||0)/100);
-        var pTot = pHa * totalHa;
-        costeCells = '<td style="color:var(--text3)">'+cH.toFixed(2)+' €</td>'+
-          '<td style="color:#7acc4a;font-weight:700">'+pHa.toFixed(2)+' €</td>'+
-          '<td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+' €</td>';
-      } else { costeCells = '<td>—</td><td>—</td><td>—</td>'; }
-    }
-    return '<tr>'+
-      '<td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td>'+
-      '<td style="color:var(--text2)">'+(prod?prod.materiaActiva||'—':'—')+'</td>'+
-      '<td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'—')+'</td>'+
-      '<td><b>'+p.dosis+' '+(p.unidad||'L/ha')+'</b></td>'+
-      '<td><b>'+totalProd+' '+(p.unidad||'L/ha').replace('/ha','')+'</b></td>'+
-      costeCells+
-      '<td style="color:var(--text2)">'+(p.justificacion||'—')+'</td></tr>';
+    var prod=DB.productos.find(function(pr){return pr.id===p.productoId;});
+    var totalProd=(p.dosis*totalHa).toFixed(3);
+    var cc='';
+    if(hasCost){ var precio=getPrecioProducto(prod,p.formatoIdx||0); if(prod&&precio&&p.dosis){var cH=precio*p.dosis,pHa=cH*(1+(p.margen||0)/100),pTot=pHa*totalHa; cc='<td style="color:var(--text3)">'+cH.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pHa.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+'&euro;</td>';} else{cc='<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>';}}
+    return '<tr><td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td><td style="color:var(--text2)">'+(prod?prod.materiaActiva||'&mdash;':'&mdash;')+'</td><td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'&mdash;')+'</td><td><b>'+p.dosis+' '+(p.unidad||'L/ha')+'</b></td><td><b>'+totalProd+' '+(p.unidad||'L/ha').replace('/ha','')+'</b></td>'+cc+'<td style="color:var(--text2)">'+(p.justificacion||'&mdash;')+'</td></tr>';
   }).join('');
-
-  var tableFoot = hasCost ? '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td>'+
-    '<td style="color:var(--text3);font-weight:700">'+totalCosteHa.toFixed(2)+' €/ha</td>'+
-    '<td style="color:#7acc4a;font-weight:700">'+totalPVPHa.toFixed(2)+' €/ha</td>'+
-    '<td style="color:#7acc4a;font-weight:700;font-size:14px">'+totalPVPTot.toFixed(2)+' €</td>'+
-    '<td></td></tr></tfoot>' : '';
-
-  return '<div class="treatment-card">'+
-    '<div class="treatment-card-header" onclick="toggleTrt(\'body-'+t.id+'\')">'+
-    '<span class="trt-date">📅 '+formatDate(t.fecha)+'</span>'+
-    '<span class="trt-products-count">🌿 '+prods.length+' prod.</span>'+
-    '<span class="trt-products-count">📋 '+recs.length+' rec. · '+totalHa.toFixed(2)+' ha</span>'+
-    costeBadge+
-    '<div class="trt-actions">'+
-    '<button class="btn btn-secondary btn-sm" title="PDF" onclick="event.stopPropagation();openTratamientoPDF(\''+t.id+'\')">📄</button>'+
-    '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTratamientoModal(\''+t.id+'\')">✏️</button>'+
-    '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTratamiento(\''+t.id+'\')">🗑️</button>'+
-    '</div></div>'+
-    '<div class="treatment-card-body" id="body-'+t.id+'">'+
-    '<div class="trt-detail-grid">'+
-    '<div class="trt-detail-item"><div class="k">Recintos / Parcelas</div><div class="v">'+recTags+'</div></div>'+
-    '<div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">'+(t.maquinaria||'—')+'</div></div>'+
-    '<div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">'+(t.aplicador||'—')+'</div></div>'+
-    '<div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">'+(t.obs||'—')+'</div></div>'+
-    '</div>'+
-    '<div class="trt-products-table"><table><thead><tr>'+tableHead+'</tr></thead><tbody>'+tableBody+'</tbody>'+tableFoot+'</table></div>'+
-    '</div></div>';
+  var tableFoot = hasCost?'<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td><td style="color:var(--text3);font-weight:700">'+totalCosteHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700">'+totalPVPHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700;font-size:14px">'+totalPVPTot.toFixed(2)+'&euro;</td><td></td></tr></tfoot>':'';
+  // Build HTML as array to avoid quote nesting
+  var hd = 'body-'+t.id;
+  var h = [];
+  h.push('<div class="treatment-card">');
+  h.push('<div class="treatment-card-header" onclick="toggleTrt(this.dataset.bid)" data-bid="'+hd+'">');
+  h.push('<span class="trt-date">&#x1F4C5; '+formatDate(t.fecha)+'</span>');
+  h.push('<span class="trt-products-count">&#x1F33F; '+prods.length+' prod.</span>');
+  h.push('<span class="trt-products-count">&#x1F4CB; '+recs.length+' rec. &middot; '+totalHa.toFixed(2)+' ha</span>');
+  h.push(costeBadge);
+  h.push('<div class="trt-actions">');
+  h.push('<button class="btn btn-secondary btn-sm" title="PDF" onclick="event.stopPropagation();openTratamientoPDF(this.dataset.id)" data-id="'+t.id+'">&#x1F4C4;</button>');
+  h.push('<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openTratamientoModal(this.dataset.id)" data-id="'+t.id+'">&#x270F;</button>');
+  h.push('<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTratamiento(this.dataset.id)" data-id="'+t.id+'">&#x1F5D1;</button>');
+  h.push('</div></div>');
+  h.push('<div class="treatment-card-body" id="'+hd+'">');
+  h.push('<div class="trt-detail-grid">');
+  h.push('<div class="trt-detail-item"><div class="k">Recintos / Parcelas</div><div class="v">'+recTags+'</div></div>');
+  h.push('<div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">'+(t.maquinaria||'&mdash;')+'</div></div>');
+  h.push('<div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">'+(t.aplicador||'&mdash;')+'</div></div>');
+  h.push('<div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">'+(t.obs||'&mdash;')+'</div></div>');
+  h.push('</div>');
+  h.push('<div class="trt-products-table"><table><thead><tr>'+tableHead+'</tr></thead><tbody>'+tableBody+'</tbody>'+tableFoot+'</table></div>');
+  h.push('</div></div>');
+  return h.join('');
 }
 
 function renderTratamientos() {
@@ -2423,106 +2309,72 @@ function renderTratamientos() {
   var list  = DB.tratamientos.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);});
   if(fCli)  list = list.filter(function(t){return t.clienteId===fCli;});
   if(fCamp) list = list.filter(function(t){return t.campana===fCamp;});
-
   var cont = document.getElementById('tratamientos-list');
   if(!list.length) {
-    cont.innerHTML = '<div class="empty-state"><div class="icon">💊</div><div>No hay tratamientos registrados</div>'+
-      '<div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openTratamientoModal()">+ Crear primer tratamiento</button></div></div>';
+    cont.innerHTML = '<div class="empty-state"><div class="icon">&#x1F48A;</div><div>No hay tratamientos registrados</div><div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="openTratamientoModal()">+ Crear primer tratamiento</button></div></div>';
     return;
   }
-
-  // Build campaign → clienteId → [treatments] map
-  var campOrder = []; // maintains insertion order (already sorted by date desc)
-  var byCamp    = {};
+  var campOrder = []; var byCamp = {};
   list.forEach(function(t){
-    var camp = t.campana||'—';
-    if(!byCamp[camp]) { byCamp[camp]=[]; campOrder.push(camp); }
-    byCamp[camp].push(t);
+    var camp=t.campana||'Sin campana';
+    if(!byCamp[camp]){ byCamp[camp]={}; campOrder.push(camp); }
+    if(!byCamp[camp][t.clienteId]) byCamp[camp][t.clienteId]=[];
+    byCamp[camp][t.clienteId].push(t);
   });
-  // Deduplicate and sort campaigns descending
-  var seen = {};
-  campOrder = campOrder.filter(function(c){ return seen[c] ? false : (seen[c]=true); });
-  campOrder.sort(function(a,b){ return b.localeCompare(a); });
-
-  var html = '';
-  campOrder.forEach(function(camp, campIdx) {
-    var campTrts = byCamp[camp];
-    var campHa   = campTrts.reduce(function(s,t){
-      return s+(t.recintoIds||[]).reduce(function(s2,rid){
-        var r=DB.recintos.find(function(rc){return rc.id===rid;});
-        return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);
-      },0);
-    },0);
-    var campId = 'camp-trt-blk-'+camp.replace(/[^a-zA-Z0-9]/g,'_');
-    var isOpen = campIdx === 0; // most recent campaign open by default
-
-    // Campaign header
-    html += '<div style="margin-bottom:14px">'+
-      '<div onclick="toggleTrt(\''+campId+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 16px;'+
-      'background:var(--surface);border:1px solid var(--border2);border-radius:8px;cursor:pointer;margin-bottom:6px;user-select:none">'+
-      '<span style="font-size:16px">📅</span>'+
-      '<span style="font-size:15px;font-weight:800;color:var(--white)">Campaña '+camp+'</span>'+
-      '<span class="tag tag-yellow">'+campTrts.length+' tratamiento'+(campTrts.length!==1?'s':'')+'</span>'+
-      '<span class="tag tag-green">'+campHa.toFixed(2)+' ha</span>'+
-      '<span style="margin-left:auto;font-size:14px;color:var(--text3)" id="ico-'+campId+'">'+(isOpen?'▾':'▸')+'</span>'+
-      '</div>'+
-      '<div id="'+campId+'" style="display:'+(isOpen?'block':'none')+'">';
-
-    // Group by client within this campaign
-    var cliOrder = [], byCliInCamp = {};
-    campTrts.forEach(function(t){
-      var cid = t.clienteId||'_sin_';
-      if(!byCliInCamp[cid]) { byCliInCamp[cid]=[]; cliOrder.push(cid); }
-      byCliInCamp[cid].push(t);
+  var seenCamp={};
+  campOrder=campOrder.filter(function(c){return seenCamp[c]?false:(seenCamp[c]=true);});
+  campOrder.sort(function(a,b){return b.localeCompare(a);});
+  var parts=[];
+  campOrder.forEach(function(camp,ci){
+    var campTrts=[]; Object.keys(byCamp[camp]).forEach(function(cid){(byCamp[camp][cid]||[]).forEach(function(t){campTrts.push(t);});});
+    var campHa=campTrts.reduce(function(s,t){return s+(t.recintoIds||[]).reduce(function(s2,rid){var r=DB.recintos.find(function(rc){return rc.id===rid;});return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);},0);},0);
+    var cId='ct'+ci;
+    parts.push('<div style="margin-bottom:14px">');
+    parts.push('<div onclick="toggleTrtGrp(this)" data-target="'+cId+'" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;cursor:pointer;margin-bottom:6px">');
+    parts.push('<span style="font-size:16px">&#x1F4C5;</span>');
+    parts.push('<span style="font-size:15px;font-weight:800;color:var(--white)">Campa&ntilde;a '+camp+'</span>');
+    parts.push('<span class="tag tag-yellow">'+campTrts.length+' tratamiento'+(campTrts.length!==1?'s':'')+'</span>');
+    parts.push('<span class="tag tag-green">'+campHa.toFixed(2)+' ha</span>');
+    parts.push('<span id="ico'+cId+'" style="margin-left:auto;font-size:14px;color:var(--text3)">'+(ci===0?'&#x25BE;':'&#x25B8;')+'</span>');
+    parts.push('</div>');
+    parts.push('<div id="'+cId+'" style="display:'+(ci===0?'block':'none')+'">');
+    var cliOrder2=[]; var seenCli={};
+    Object.keys(byCamp[camp]).forEach(function(cid){if(!seenCli[cid]){seenCli[cid]=true;cliOrder2.push(cid);}});
+    cliOrder2.forEach(function(cliId){
+      var cliTrts=byCamp[camp][cliId]||[];
+      var cli4=DB.clientes.find(function(c){return c.id===cliId;});
+      var cliHa=cliTrts.reduce(function(s,t){return s+(t.recintoIds||[]).reduce(function(s2,rid){var r=DB.recintos.find(function(rc){return rc.id===rid;});return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);},0);},0);
+      parts.push('<div style="margin-bottom:8px">');
+      parts.push('<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:rgba(74,140,42,.06);border-left:4px solid var(--primary);border-radius:0 6px 6px 0;margin-bottom:4px">');
+      parts.push('<span>&#x1F464;</span>');
+      parts.push('<span style="font-weight:700;color:var(--white);font-size:13px">'+(cli4?cli4.nombre:'Sin cliente')+'</span>');
+      parts.push('<span class="tag tag-blue">'+cliTrts.length+' trat.</span>');
+      parts.push('<span class="tag tag-green">'+cliHa.toFixed(2)+' ha</span>');
+      parts.push('</div>');
+      cliTrts.forEach(function(t){ parts.push(buildTrtCardHtml(t)); });
+      parts.push('</div>');
     });
-    var seenCli = {};
-    cliOrder = cliOrder.filter(function(c){return seenCli[c]?false:(seenCli[c]=true);});
-
-    cliOrder.forEach(function(cliId, cliIdx){
-      var cliTrts = byCliInCamp[cliId];
-      var cli     = DB.clientes.find(function(c){return c.id===cliId;});
-      var cliHa   = cliTrts.reduce(function(s,t){
-        return s+(t.recintoIds||[]).reduce(function(s2,rid){
-          var r=DB.recintos.find(function(rc){return rc.id===rid;});
-          return s2+(r?parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0:0);
-        },0);
-      },0);
-      var cliGrpId = 'cligrp-'+camp.replace(/[^a-zA-Z0-9]/g,'_')+'-'+(cliId||'sin');
-      var cliOpen  = true; // client groups always open
-
-      html += '<div style="margin-bottom:8px">'+
-        '<div onclick="toggleTrt(\''+cliGrpId+'\')" style="display:flex;align-items:center;gap:8px;padding:7px 14px;'+
-        'background:rgba(74,140,42,.06);border-left:4px solid var(--primary);border-radius:0 6px 6px 0;cursor:pointer;margin-bottom:4px;user-select:none">'+
-        '<span style="font-size:14px">👤</span>'+
-        '<span style="font-weight:700;color:var(--white);font-size:13px">'+(cli?cli.nombre:'Sin cliente asignado')+'</span>'+
-        '<span class="tag tag-blue">'+cliTrts.length+' trat.</span>'+
-        '<span class="tag tag-green">'+cliHa.toFixed(2)+' ha</span>'+
-        '</div>'+
-        '<div id="'+cliGrpId+'" style="display:block">'+
-        cliTrts.map(buildTrtCardHtml).join('')+
-        '</div></div>';
-    });
-
-    html += '</div></div>'; // close campId div + wrapper
+    parts.push('</div></div>');
   });
-
-  cont.innerHTML = html;
-
-  // Fix toggleTrt for campaign blocks to also toggle arrow icon
-  campOrder.forEach(function(camp){
-    var campId = 'camp-trt-blk-'+camp.replace(/[^a-zA-Z0-9]/g,'_');
-    var header = cont.querySelector('[onclick="toggleTrt(\''+campId+'\')"]');
-    if(header) {
-      header.onclick = function(){
-        var el  = document.getElementById(campId);
-        var ico = document.getElementById('ico-'+campId);
-        if(!el) return;
-        var open = el.style.display!=='none';
-        el.style.display  = open ? 'none' : 'block';
-        if(ico) ico.textContent = open ? '▸' : '▾';
-      };
-    }
-  });
+  cont.innerHTML = parts.join('');
+}
+function toggleTrtGrp(btn) {
+  var id=btn.dataset.target;
+  var el=document.getElementById(id);
+  var ico=document.getElementById('ico'+id);
+  if(!el) return;
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(ico) ico.innerHTML=open?'&#x25B8;':'&#x25BE;';
+}
+function toggleTrtGroup(id){
+  var el=document.getElementById(id);
+  if(!el) return;
+  var open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  var camp=id.replace('ct_','').replace(/_/g,' ');
+  var ico=document.getElementById('ico_'+id);
+  if(ico) ico.textContent=open?'&#x25B8;':'&#x25BE;';
 }
 
 function toggleTrt(id) {
@@ -2568,145 +2420,68 @@ function openTratamientoModal(id=null) {
   openModal('modal-tratamiento');
 }
 
+function getCheckedRecintoIds() {
+  var ids=[]; document.querySelectorAll('#recintos-picker input[type=checkbox][value]').forEach(function(c){if(c.checked)ids.push(c.value);}); return ids;
+}
+function toggleFincaRecintos(cb) {
+  var ids=(cb.dataset.ids||'').split(',').filter(Boolean);
+  ids.forEach(function(id){ var el=document.querySelector('#recintos-picker input[type=checkbox][value="'+id+'"]'); if(el) el.checked=cb.checked; });
+  refreshProductRows();
+}
+function toggleAllTrtRecintos(val) {
+  document.querySelectorAll('#recintos-picker input[type=checkbox]').forEach(function(cb){cb.checked=val;});
+  refreshProductRows();
+}
 function loadRecintosPicker(selectedIds, cultivoFilter) {
-  selectedIds   = selectedIds   || [];
-  cultivoFilter = cultivoFilter != null ? cultivoFilter : '';
-  var clienteId = document.getElementById('trt-cliente').value;
-  var picker    = document.getElementById('recintos-picker');
-  var filterDiv = document.getElementById('trt-cultivo-filter');
-  var chipsDiv  = document.getElementById('trt-cultivo-chips');
-  var infoEl    = document.getElementById('trt-recintos-info');
-
-  if(!clienteId) {
-    picker.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';
-    if(filterDiv) filterDiv.style.display = 'none';
-    return;
+  selectedIds=selectedIds||[]; cultivoFilter=cultivoFilter!=null?cultivoFilter:'';
+  var clienteId=document.getElementById('trt-cliente').value;
+  var picker=document.getElementById('recintos-picker');
+  var filterDiv=document.getElementById('trt-cultivo-filter');
+  var chipsDiv=document.getElementById('trt-cultivo-chips');
+  if(!clienteId){picker.innerHTML='<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';if(filterDiv)filterDiv.style.display='none';return;}
+  var campana=(document.getElementById('trt-campana')||{}).value||currentCampana||'';
+  var allRecs=DB.recintos.filter(function(r){if(r.clienteId!==clienteId)return false;if(campana&&r.campana&&r.campana!==campana)return false;return true;});
+  if(!allRecs.length) allRecs=DB.recintos.filter(function(r){return r.clienteId===clienteId;});
+  if(!allRecs.length){picker.innerHTML='<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Este cliente no tiene recintos</div>';if(filterDiv)filterDiv.style.display='none';return;}
+  var cvMap={};
+  allRecs.forEach(function(r){var cv=(r.especieVariedad||'').trim();if(cv)cvMap[cv]=(cvMap[cv]||0)+1;});
+  var cvList=Object.keys(cvMap).sort();
+  if(filterDiv){
+    if(cvList.length>1){
+      filterDiv.style.display='block';
+      var chips='<button type="button" class="cultivo-chip'+(cultivoFilter===''?' active':'')+'" data-cv="" onclick="loadRecintosPicker(getCheckedRecintoIds(),\'\')">Todos ('+allRecs.length+')</button>';
+      cvList.forEach(function(cv){var color=getCropColor(cv);chips+='<button type="button" class="cultivo-chip'+(cultivoFilter===cv?' active':'')+'" style="--chip-color:'+color+'" onclick="loadRecintosPicker(getCheckedRecintoIds(),decodeURIComponent(this.dataset.cv))" data-cv="'+encodeURIComponent(cv)+'">'+cv+' ('+cvMap[cv]+')</button>';});
+      if(chipsDiv) chipsDiv.innerHTML=chips;
+    } else { filterDiv.style.display='none'; }
   }
-
-  var campana  = (document.getElementById('trt-campana') || {}).value || currentCampana || '';
-  var allRecs  = DB.recintos.filter(function(r){
-    if(r.clienteId !== clienteId) return false;
-    if(campana && r.campana && r.campana !== campana) return false;
-    return true;
-  });
-  // If campaign filter gives nothing, show all for this client
-  if(!allRecs.length) {
-    allRecs = DB.recintos.filter(function(r){ return r.clienteId === clienteId; });
-  }
-
-  if(!allRecs.length) {
-    picker.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Este cliente no tiene recintos</div>';
-    if(filterDiv) filterDiv.style.display = 'none';
-    return;
-  }
-
-  // Build cultivo list
-  var cultivoMap = {};
-  allRecs.forEach(function(r){
-    var cv = (r.especieVariedad||'').trim();
-    if(cv) cultivoMap[cv] = (cultivoMap[cv]||0) + 1;
-  });
-  var cultivoList = Object.keys(cultivoMap).sort();
-
-  // Show/hide filter strip
-  if(filterDiv) {
-    if(cultivoList.length > 1) {
-      filterDiv.style.display = 'block';
-      // Build chips
-      var chips = '<button type="button" class="cultivo-chip'+(cultivoFilter===''?' active':'')+
-        '" data-cv="" onclick="loadRecintosPicker(getCheckedRecintoIds(),\'\')">'+
-        'Todos ('+allRecs.length+')</button>';
-      cultivoList.forEach(function(cv){
-        var n     = cultivoMap[cv];
-        var color = getCropColor(cv);
-        chips += '<button type="button" class="cultivo-chip'+(cultivoFilter===cv?' active':'')+
-          '" data-cv="'+cv.replace(/"/g,'&quot;')+'" style="--chip-color:'+color+'"'+
-          ' onclick="loadRecintosPicker(getCheckedRecintoIds(),\''+cv.replace(/'/g,"\\'")+'\')">' +
-          cv+' <span style="opacity:.7">('+n+')</span></button>';
-      });
-      if(chipsDiv) chipsDiv.innerHTML = chips;
-    } else {
-      filterDiv.style.display = 'none';
-    }
-  }
-
-  // Filter recintos by selected cultivo
-  var filteredRecs = cultivoFilter
-    ? allRecs.filter(function(r){ return (r.especieVariedad||'').trim() === cultivoFilter; })
-    : allRecs;
-
-  // Update info line
-  if(infoEl) {
-    var ha = filteredRecs.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
-    infoEl.textContent = filteredRecs.length+' recinto'+(filteredRecs.length!==1?'s':'')+' · '+ha.toFixed(2)+' ha';
-  }
-
-  // Group by finca
-  var fincas = {}, fincaOrder = [];
-  filteredRecs.forEach(function(r){
-    var key = (r.nombreFinca||('Pol.'+r.numPoligono+' Par.'+r.numParcela)).trim() || 'Sin nombre';
-    if(!fincas[key]) { fincas[key]=[]; fincaOrder.push(key); }
-    fincas[key].push(r);
-  });
-
-  var html = '';
+  var filtered=cultivoFilter?allRecs.filter(function(r){return(r.especieVariedad||'').trim()===cultivoFilter;}):allRecs;
+  var fincas={}; var fincaOrder=[];
+  filtered.forEach(function(r){var f=(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto)).trim()||'Sin nombre';if(!fincas[f]){fincas[f]=[];fincaOrder.push(f);}fincas[f].push(r);});
+  var html='';
   fincaOrder.forEach(function(finca){
-    var group   = fincas[finca];
-    var haF     = group.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
-    var allIds  = group.map(function(r){return r.id;});
-    var allChk  = allIds.every(function(id){return selectedIds.indexOf(id)>=0;});
-
-    // Finca header with select-all checkbox
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;'+
-      'background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1">'+
-      '<input type="checkbox" '+(allChk?'checked':'')+
-        ' data-finca-ids="'+allIds.join(',')+'"'+
-        ' onchange="toggleFincaRecintos(this)"'+
-        ' style="width:14px;height:14px;accent-color:var(--primary)">'+
-      '<span style="font-weight:700;font-size:12px;color:var(--white)">🏡 '+finca+'</span>'+
-      '<span style="font-size:11px;color:var(--text3)">'+haF.toFixed(2)+' ha · '+group.length+' rec.</span>'+
-      '</div>';
-
+    var group=fincas[finca];
+    var haF=group.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
+    var allIds=group.map(function(r){return r.id;});
+    var allChk=allIds.every(function(id){return selectedIds.indexOf(id)>=0;});
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1">'
+      +'<input type="checkbox" '+(allChk?'checked':'')+' data-ids="'+allIds.join(',')+'" onchange="toggleFincaRecintos(this)" style="width:14px;height:14px;accent-color:var(--primary)">'
+      +'<span style="font-weight:700;font-size:12px;color:var(--white)">&#x1F3E1; '+finca+'</span>'
+      +'<span style="font-size:11px;color:var(--text3)">'+haF.toFixed(2)+' ha &middot; '+group.length+' rec.</span>'
+      +'</div>';
     group.forEach(function(r){
-      var checked = selectedIds.indexOf(r.id)>=0 ? 'checked' : '';
-      var color   = getCropColor(r.especieVariedad);
-      var sigpac  = (r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
-      var ha      = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
-      html += '<label class="recinto-check" style="padding-left:28px">'+
-        '<input type="checkbox" value="'+r.id+'" '+checked+' onchange="refreshProductRows()">'+
-        '<span class="crop-dot" style="background:'+color+'"></span>'+
-        '<span style="flex:1;font-size:12px">'+(r.nombreFinca||sigpac)+'</span>'+
-        '<span style="font-size:11px;color:var(--text2)">'+((r.especieVariedad||'Sin cultivo').split('/')[0].trim())+'</span>'+
-        '<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>'+
-        '</label>';
+      var checked=selectedIds.indexOf(r.id)>=0?'checked':'';
+      var color=getCropColor(r.especieVariedad);
+      var ha=(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
+      html+='<label class="recinto-check" style="padding-left:28px">'
+        +'<input type="checkbox" value="'+r.id+'" '+checked+' onchange="refreshProductRows()">'
+        +'<span class="crop-dot" style="background:'+color+'"></span>'
+        +'<span style="flex:1;font-size:12px">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>'
+        +'<span style="font-size:11px;color:var(--text2)">'+(r.especieVariedad||'Sin cultivo').split('/')[0].trim()+'</span>'
+        +'<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>'
+        +'</label>';
     });
   });
-
-  picker.innerHTML = html ||
-    '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin parcelas para este cultivo</div>';
-}
-
-function getCheckedRecintoIds() {
-  var checks = document.querySelectorAll('#recintos-picker input[type=checkbox][value]');
-  var ids = [];
-  checks.forEach(function(c){ if(c.checked) ids.push(c.value); });
-  return ids;
-}
-
-function toggleFincaRecintos(masterCb) {
-  var ids = (masterCb.dataset.fincaIds||'').split(',').filter(Boolean);
-  ids.forEach(function(id){
-    var cb = document.querySelector('#recintos-picker input[type=checkbox][value="'+id+'"]');
-    if(cb) cb.checked = masterCb.checked;
-  });
-  refreshProductRows();
-}
-
-function toggleAllTrtRecintos(val) {
-  document.querySelectorAll('#recintos-picker input[type=checkbox]').forEach(function(cb){
-    cb.checked = val;
-  });
-  refreshProductRows();
+  picker.innerHTML=html||'<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin parcelas para este cultivo</div>';
 }
 
 function refreshProductRows() {
@@ -2714,10 +2489,10 @@ function refreshProductRows() {
   var existing = [...document.querySelectorAll('#trt-products-rows .product-row')].map(function(row) {
     return {
       productoId:   row.querySelector('.prod-row-sel')?.value,
-      dosis:        parseFloat(row.querySelector('.prod-row-dosis')?.value)||0,
-      unidad:       row.querySelector('.prod-row-unidad')?.value,
-      justificacion:row.querySelector('.prod-row-just')?.value||'',
-      margen:       parseFloat(row.querySelector('.prod-row-margen')?.value)||0
+      dosis:        parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0,
+      unidad:       (row.querySelector('.prod-row-unidad')||{}).value,
+      justificacion:(row.querySelector('.prod-row-just')||{}).value||'',
+      margen:       parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0
     };
   });
   document.getElementById('trt-products-rows').innerHTML = '';
@@ -2728,198 +2503,117 @@ function refreshProductRows() {
   }
 }
 
-function addProductRow(data=null) {
-  const row = document.createElement('div');
-  row.className = 'product-row';
-
-  // Build flat product list for the combobox
-  var selectedRecintoIds = (document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')||[]);
-  var cultivosSet = {};
-  Array.prototype.forEach.call(selectedRecintoIds, function(c){
-    var r = DB.recintos.find(function(rc){return rc.id===c.value;});
-    if(r && r.especieVariedad) cultivosSet[r.especieVariedad.toUpperCase()] = 1;
-  });
-  var cultivoKeys = Object.keys(cultivosSet);
-
-  var authorized = [], others = [];
-  DB.productos.forEach(function(p) {
-    var isAuth = false;
-    if(cultivoKeys.length && p.cultivosAutorizados && p.cultivosAutorizados.length) {
-      isAuth = p.cultivosAutorizados.some(function(cv){
-        return cultivoKeys.some(function(cp){
-          return cp.indexOf(cv.toUpperCase())>=0 || cv.toUpperCase().indexOf(cp.split('/')[0].trim())>=0;
-        });
-      });
+function addProductRow(data) {
+  var row=document.createElement('div'); row.className='product-row'; row.style.padding='0';
+  var selectedRecintoIds=document.querySelectorAll('#recintos-picker input[type=checkbox]:checked');
+  var cvSet={};
+  Array.prototype.forEach.call(selectedRecintoIds,function(c){var r=DB.recintos.find(function(rc){return rc.id===c.value;});if(r&&r.especieVariedad)cvSet[r.especieVariedad.toUpperCase()]=1;});
+  var cvKeys=Object.keys(cvSet);
+  var authorized=[]; var others=[];
+  (DB.productos||[]).forEach(function(p){
+    var isAuth=false;
+    if(cvKeys.length&&p.cultivosAutorizados&&p.cultivosAutorizados.length){
+      isAuth=p.cultivosAutorizados.some(function(cv){return cvKeys.some(function(cp){return cp.indexOf(cv.toUpperCase())>=0||cv.toUpperCase().indexOf(cp.split('/')[0].trim())>=0;});});
     }
     if(isAuth) authorized.push(p); else others.push(p);
   });
-
-  var allProds = [];
-  authorized.forEach(function(p){ allProds.push({id:p.id, nombre:p.nombre, tipo:p.tipo||'', group:'auth'}); });
-  others.forEach(function(p){ allProds.push({id:p.id, nombre:p.nombre, tipo:p.tipo||'', group:'other'}); });
-
-  var selId    = (data && data.productoId) || '';
-  var selProd  = selId ? allProds.find(function(p){return p.id===selId;}) : null;
-  var selLabel = selProd ? selProd.nombre + (selProd.tipo?' ('+selProd.tipo+')':'') : '';
-  var cbId     = 'prodcb-'+Date.now()+'-'+Math.random().toString(36).slice(2,5);
-
-  // Build card-style layout for good mobile UX
-  row.innerHTML =
-    '<div class="prod-row-inner">' +
-      // Line 1: searchable input + remove
-      '<div class="prod-row-top">' +
-        '<div class="prod-combo-wrap">' +
-          '<input type="text" class="prod-combo-input" id="'+cbId+'" autocomplete="off" autocorrect="off"' +
-          ' spellcheck="false" placeholder="🔍 Buscar producto..."' +
-          ' value="'+selLabel.replace(/"/g,'&quot;')+'"' +
-          ' data-prod-id="'+selId+'"' +
-          ' oninput="prodComboFilter(this)"' +
-          ' onfocus="prodComboOpen(this)"' +
-          ' onblur="prodComboBlur(this)">' +
-          '<div class="prod-combo-list" style="display:none"></div>' +
-        '</div>' +
-        '<button type="button" class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">\u2715</button>' +
-      '</div>' +
-      // Line 2: numeric fields
-      '<div class="prod-row-fields">' +
-        '<div class="prod-row-field"><label class="prod-row-label">Dosis</label>' +
-          '<input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis!=null?data.dosis:'')+'" oninput="calcProdRowPVP(this)"></div>' +
-        '<div class="prod-row-field"><label class="prod-row-label">Unidad</label>' +
-          '<select class="prod-row-unidad">' +
-          ['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'].map(function(u){
-            return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
-          }).join('') +
-          '</select></div>' +
-        '<div class="prod-row-field"><label class="prod-row-label">Margen %</label>' +
-          '<input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>' +
-        '<div class="prod-row-field prod-row-pvp-wrap"><label class="prod-row-label">PVP/ha</label>' +
-          '<span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+' \u20ac/ha':'\u2014')+'</span></div>' +
-      '</div>' +
-      // Line 3: justification
-      '<input type="text" placeholder="Justificaci\u00f3n / plaga objetivo" class="prod-row-just" value="'+(data&&data.justificacion?data.justificacion.replace(/"/g,'&quot;'):'')+'" style="width:100%;margin-top:5px">' +
-    '</div>';
-
-  row._prodList = allProds;
-  row.style.gridTemplateColumns = '1fr';
-  row.style.padding = '10px 12px';
+  var allProds=[];
+  authorized.forEach(function(p){allProds.push({id:p.id,nombre:p.nombre,tipo:p.tipo||'',group:'auth'});});
+  others.forEach(function(p){allProds.push({id:p.id,nombre:p.nombre,tipo:p.tipo||'',group:'other'});});
+  var selId=(data&&data.productoId)?data.productoId:'';
+  var selProd=selId?allProds.find(function(p){return p.id===selId;}):null;
+  var selLabel=selProd?selProd.nombre+(selProd.tipo?' ('+selProd.tipo+')':''):'';
+  var cbId='prodcb'+Date.now()+(Math.random()*1000|0);
+  var inner=document.createElement('div'); inner.className='prod-row-inner';
+  var top=document.createElement('div'); top.className='prod-row-top';
+  var wrap=document.createElement('div'); wrap.className='prod-combo-wrap';
+  var inp=document.createElement('input'); inp.type='text'; inp.className='prod-combo-input'; inp.id=cbId;
+  inp.autocomplete='off'; inp.autocorrect='off'; inp.spellcheck=false;
+  inp.placeholder='&#x1F50D; Buscar producto...'; inp.value=selLabel;
+  inp.dataset.prodId=selId;
+  inp.addEventListener('input',function(){prodComboFilter(this);});
+  inp.addEventListener('focus',function(){prodComboFilter(this);});
+  inp.addEventListener('blur',function(){prodComboBlur(this);});
+  var drop=document.createElement('div'); drop.className='prod-combo-list'; drop.style.display='none';
+  wrap.appendChild(inp); wrap.appendChild(drop);
+  var removeBtn=document.createElement('button'); removeBtn.type='button'; removeBtn.className='remove-prod-btn';
+  removeBtn.innerHTML='&#x2715;'; removeBtn.onclick=function(){this.closest('.product-row').remove();};
+  top.appendChild(wrap); top.appendChild(removeBtn);
+  var fields=document.createElement('div'); fields.className='prod-row-fields';
+  var unidades=['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'];
+  fields.innerHTML='<div class="prod-row-field"><label class="prod-row-label">Dosis</label><input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis!=null?data.dosis:'')+'" oninput="calcProdRowPVP(this)"></div>'
+    +'<div class="prod-row-field"><label class="prod-row-label">Unidad</label><select class="prod-row-unidad">'+unidades.map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></div>'
+    +'<div class="prod-row-field"><label class="prod-row-label">Margen %</label><input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>'
+    +'<div class="prod-row-field"><label class="prod-row-label">PVP/ha</label><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
+  var justInp=document.createElement('input'); justInp.type='text';
+  justInp.placeholder='Justificación / plaga objetivo'; justInp.className='prod-row-just';
+  justInp.style.cssText='width:100%;margin-top:5px';
+  if(data&&data.justificacion) justInp.value=data.justificacion;
+  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(justInp);
+  row._prodList=allProds;
+  row.appendChild(inner);
   document.getElementById('trt-products-rows').appendChild(row);
 }
-
-// ── Combobox functions ──────────────────────────────────
-function prodComboOpen(inp) { prodComboFilter(inp); }
-
 function prodComboFilter(inp) {
-  var row   = inp.closest('.product-row');
-  var list  = row ? row._prodList : [];
-  var drop  = inp.parentNode ? inp.parentNode.querySelector('.prod-combo-list') : null;
-  if(!drop) return;
-  var q = (inp.value||'').trim().toLowerCase();
-  var filtered = q
-    ? list.filter(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0 || (p.tipo||'').toLowerCase().indexOf(q) >= 0; })
-    : list;
-  filtered = filtered.slice(0,80);
-  if(!filtered.length) {
-    drop.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>';
-    drop.style.display = 'block'; return;
-  }
-  var html = '', lastGroup = '';
-  filtered.forEach(function(p) {
-    if(p.group !== lastGroup) {
-      html += '<div class="prod-combo-group">'+(p.group==='auth' ? '\u2705 Autorizados para el cultivo' : '\u2014 Otros productos')+'</div>';
-      lastGroup = p.group;
-    }
-    var label  = p.nombre + (p.tipo ? ' <span style="font-size:10px;color:var(--text3)">'+p.tipo+'</span>' : '');
-    var marked = q ? label.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<b style="color:var(--primary)">$1</b>') : label;
-    var sel    = p.id === inp.dataset.prodId ? ' selected' : '';
-    html += '<div class="prod-combo-item'+sel+'" data-id="'+p.id+'" data-label="'+p.nombre.replace(/"/g,'&quot;')+(p.tipo?' ('+p.tipo+')':'').replace(/"/g,'&quot;')+'" onmousedown="prodComboSelect(this)">'+marked+'</div>';
+  var row=inp.closest('.product-row'); if(!row) return;
+  var list=row._prodList||[];
+  var drop=inp.parentNode?inp.parentNode.querySelector('.prod-combo-list'):null; if(!drop) return;
+  var q=(inp.value||'').trim().toLowerCase();
+  var filtered=q?list.filter(function(p){return p.nombre.toLowerCase().indexOf(q)>=0||(p.tipo||'').toLowerCase().indexOf(q)>=0;}):list;
+  filtered=filtered.slice(0,80);
+  if(!filtered.length){drop.innerHTML='<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>';drop.style.display='block';return;}
+  var html=''; var lastGroup='';
+  filtered.forEach(function(p){
+    if(p.group!==lastGroup){html+='<div class="prod-combo-group">'+(p.group==='auth'?'&#x2705; Autorizados':'&mdash; Otros productos')+'</div>';lastGroup=p.group;}
+    var label=p.nombre+(p.tipo?' <span style="font-size:10px;color:var(--text3)">'+p.tipo+'</span>':'');
+    var sel=p.id===inp.dataset.prodId?' sel':'';
+    html+='<div class="prod-combo-item'+sel+'" data-id="'+p.id+'" data-label="'+p.nombre.replace(/"/g,'&quot;')+(p.tipo?' ('+p.tipo+')':'')+'" onmousedown="prodComboSelect(this)">'+label+'</div>';
   });
-  drop.innerHTML = html;
-  drop.style.display = 'block';
+  drop.innerHTML=html; drop.style.display='block';
 }
-
 function prodComboSelect(item) {
-  var drop = item.closest('.prod-combo-list');
-  var wrap = drop ? drop.parentNode : null;
-  var inp  = wrap ? wrap.querySelector('.prod-combo-input') : null;
-  if(!inp) return;
-  inp.value = item.dataset.label;
-  inp.dataset.prodId = item.dataset.id;
-  drop.style.display = 'none';
-  // Show format selector if product has multiple formats
-  var row  = inp.closest('.product-row');
-  var prod = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
-  if(prod) {
-    var fmts = (prod.formatos&&prod.formatos.length) ? prod.formatos : (prod.coste?[{nombre:'Est\u00e1ndar',cantidad:1,unidad:prod.unidadCoste||'L',precio:prod.coste}]:[]);
-    var existing = row ? row.querySelector('.prod-row-formato-wrap') : null;
-    if(existing) existing.remove();
-    if(fmts.length > 1 && row) {
-      var wrap2 = document.createElement('div');
-      wrap2.className = 'prod-row-formato-wrap';
-      wrap2.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px';
-      var fopts = fmts.map(function(f,i){ return '<option value="'+i+'">'+f.nombre+' \u2014 '+f.precio+' \u20ac/'+f.unidad+'</option>'; }).join('');
-      wrap2.innerHTML = '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>'+
-        '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="calcProdRowPVP(this)">'+fopts+'</select>';
-      wrap2._formatos = fmts;
-      var fieldsDiv = row.querySelector('.prod-row-fields');
-      if(fieldsDiv) fieldsDiv.parentNode.insertBefore(wrap2, fieldsDiv);
-    }
-  }
+  var drop=item.closest('.prod-combo-list'); if(!drop) return;
+  var inp=drop.parentNode?drop.parentNode.querySelector('.prod-combo-input'):null; if(!inp) return;
+  inp.value=item.dataset.label; inp.dataset.prodId=item.dataset.id;
+  drop.style.display='none';
   calcProdRowPVP(inp);
 }
-
 function prodComboBlur(inp) {
   setTimeout(function(){
-    var drop = inp.parentNode ? inp.parentNode.querySelector('.prod-combo-list') : null;
-    if(drop) drop.style.display = 'none';
-    // Auto-select first match if text changed
-    var row  = inp.closest('.product-row');
-    var list = row ? (row._prodList||[]) : [];
-    var q    = (inp.value||'').trim().toLowerCase();
-    if(q) {
-      var match = list.find(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0; });
-      if(match) { inp.value = match.nombre+(match.tipo?' ('+match.tipo+')':''); inp.dataset.prodId = match.id; calcProdRowPVP(inp); }
-    }
-  }, 200);
+    var drop=inp.parentNode?inp.parentNode.querySelector('.prod-combo-list'):null;
+    if(drop) drop.style.display='none';
+  },200);
+}
+function calcProdRowPVP(input) {
+  var row=input.closest('.product-row'); if(!row) return;
+  var comboInp=row.querySelector('.prod-combo-input');
+  var dosis=parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+  var margen=parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
+  var pvpSpan=row.querySelector('.prod-row-pvp'); if(!pvpSpan) return;
+  var prodId=comboInp?comboInp.dataset.prodId:'';
+  var prod=prodId?(DB.productos||[]).find(function(p){return p.id===prodId;}):null;
+  if(!prod||!dosis){pvpSpan.textContent='&mdash;';pvpSpan.style.color='var(--text3)';return;}
+  var fmtSel=row.querySelector('.prod-row-formato');
+  var fmtIdx=fmtSel?parseInt(fmtSel.value)||0:0;
+  var precio=getPrecioProducto(prod,fmtIdx);
+  if(!precio){pvpSpan.textContent='&mdash;';pvpSpan.style.color='var(--text3)';return;}
+  pvpSpan.textContent=(precio*dosis*(1+margen/100)).toFixed(2)+'&euro;/ha';
+  pvpSpan.style.color='#7acc4a';
 }
 
 function calcProdRowPVP(input) {
-  var row     = input.closest('.product-row');
-  if(!row) return;
-  var comboInp = row.querySelector('.prod-combo-input');
-  var dosis    = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
-  var margen   = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
-  var pvpSpan  = row.querySelector('.prod-row-pvp');
+  var row       = input.closest('.product-row');
+  var sel       = row.querySelector('.prod-row-sel');
+  var dosis     = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+  var margen    = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
+  var pvpSpan   = row.querySelector('.prod-row-pvp');
   if(!pvpSpan) return;
-  var prodId   = comboInp ? (comboInp.dataset.prodId||'') : ((row.querySelector('.prod-row-sel')||{}).value||'');
-  var prod     = prodId ? (DB.productos||[]).find(function(p){return p.id===prodId;}) : null;
-  if(!prod || !dosis) { pvpSpan.textContent = '\u2014'; pvpSpan.style.color='var(--text3)'; return; }
-  var fmtSel  = row.querySelector('.prod-row-formato');
-  var fmtIdx  = fmtSel ? parseInt(fmtSel.value)||0 : 0;
-  var precio  = getPrecioProducto(prod, fmtIdx);
-  if(!precio) { pvpSpan.textContent = '\u2014'; pvpSpan.style.color='var(--text3)'; return; }
-  var pvpHa   = precio * dosis * (1 + margen/100);
-  pvpSpan.textContent = pvpHa.toFixed(2) + ' \u20ac/ha';
+  var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
+  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; return; }
+  var costeHa = prod.coste * dosis;
+  var pvpHa   = costeHa * (1 + margen/100);
+  pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
   pvpSpan.style.color = '#7acc4a';
-}
-
-// When a product is selected in treatment row, update formato selector if product has multiple formats
-function onProdRowSelChange(sel) {
-  var row  = sel.closest('.product-row');
-  if(!row) return;
-  var prod = (DB.productos||[]).find(function(p){return p.id===sel.value;});
-  var fmts = (prod && prod.formatos && prod.formatos.length) ? prod.formatos : [];
-  var existing = row.querySelector('.prod-row-formato-wrap');
-  if(existing) existing.remove();
-  if(fmts.length > 1) {
-    var wrap = document.createElement('div');
-    wrap.className = 'prod-row-formato-wrap';
-    wrap.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;grid-column:1/-1';
-    var opts = fmts.map(function(f,i){ return '<option value="'+i+'">'+f.nombre+' \u2014 '+f.precio+' \u20ac/'+f.unidad+'</option>'; }).join('');
-    wrap.innerHTML = '<label style="font-size:11px;font-weight:700;color:var(--text3);white-space:nowrap">Formato:</label>' +
-      '<select class="prod-row-formato" style="flex:1;font-size:13px" onchange="calcProdRowPVP(this)">' + opts + '</select>';
-    row.appendChild(wrap);
-  }
-  calcProdRowPVP(sel);
 }
 
 function saveTratamiento() {
@@ -2933,17 +2627,14 @@ function saveTratamiento() {
 
   const productos = [];
   document.querySelectorAll('#trt-products-rows .product-row').forEach(row => {
-    const comboInp = row.querySelector('.prod-combo-input');
-    const pid   = comboInp ? (comboInp.dataset.prodId||'') : (row.querySelector('.prod-row-sel')||{value:''}).value;
-    const dosis = parseFloat((row.querySelector('.prod-row-dosis')||{value:0}).value)||0;
-    const unidad = (row.querySelector('.prod-row-unidad')||{value:'L/ha'}).value;
-    const just   = (row.querySelector('.prod-row-just')||{value:''}).value||'';
-    const margen = parseFloat((row.querySelector('.prod-row-margen')||{value:0}).value)||0;
-    const pvpText= (row.querySelector('.prod-row-pvp')||{textContent:''}).textContent||'';
+    var comboInp=row.querySelector('.prod-combo-input'); var pid=comboInp?comboInp.dataset.prodId:(row.querySelector('.prod-row-sel')||{value:''}).value;
+    const dosis = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+    const unidad = (row.querySelector('.prod-row-unidad')||{}).value;
+    const just   = (row.querySelector('.prod-row-just')||{}).value||'';
+    const margen = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
+    const pvpText= row.querySelector('.prod-row-pvp')?.textContent||'';
     const pvpHa  = parseFloat(pvpText)||0;
-    const fmtSel = row.querySelector('.prod-row-formato');
-    const formatoIdx = fmtSel ? parseInt(fmtSel.value)||0 : 0;
-    if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa, formatoIdx});
+    if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
 
@@ -3089,18 +2780,6 @@ function renderProductos() {
       '<span>📏 Dosis: '+(p.dosis||'—')+'</span>' +
       '<span>⏱️ Plazo: '+(p.plazo||'—')+'</span>' +
       '</div>' +
-      // Formats / prices block
-      (function(){
-        var fmts = (p.formatos && p.formatos.length) ? p.formatos
-          : (p.coste ? [{nombre:'Estándar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}] : []);
-        if(!fmts.length) return '';
-        var pills = fmts.map(function(f){
-          return '<span style="font-size:11px;padding:2px 9px;border-radius:10px;background:rgba(74,140,42,.12);border:1px solid var(--border2);color:var(--white)">' +
-            '<b>'+(f.nombre||f.cantidad+' '+f.unidad)+'</b> — '+f.precio+' €/'+f.unidad+'</span>';
-        }).join('');
-        return '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">' +
-          '<span style="font-size:11px;color:var(--text3);align-self:center">💶</span>' + pills + '</div>';
-      })() +
       (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📋 '+p.usos+'</div>' : '') +
       cultivosPills +
       dcBlock +
@@ -3148,18 +2827,11 @@ function openProductoModal(id=null) {
   document.getElementById('prod-formulacion').value = p ? p.formulacion||'' : '';
   document.getElementById('prod-dosis').value = p ? p.dosis||'' : '';
   document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
+  // formats loaded below
+  var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
-
-  // Load formats — migrate legacy single coste if no formatos array
-  var formatos = (p && p.formatos && p.formatos.length) ? p.formatos : [];
-  if(!formatos.length && p && p.coste) {
-    formatos = [{nombre:'Formato estándar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}];
-  }
-  renderFormatoRows(formatos);
-
-  // Render cultivos tags
   renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
   openModal('modal-producto');
 }
@@ -3208,47 +2880,48 @@ function getCultivoTagsValues() {
   return [...container.querySelectorAll('span[data-cv]')].map(s=>s.dataset.cv);
 }
 
-// Get the price per unit for a product, considering a specific format index
 function getPrecioProducto(prod, formatoIdx) {
   if(!prod) return 0;
   var fmts = (prod.formatos && prod.formatos.length) ? prod.formatos : [];
-  if(fmts.length) {
-    var fmt = fmts[formatoIdx != null ? formatoIdx : 0];
-    return fmt ? (fmt.precio||0) : 0;
-  }
-  return prod.coste||0; // fallback to legacy field
+  if(fmts.length) { var fmt = fmts[formatoIdx != null ? formatoIdx : 0]; return fmt ? (fmt.precio||0) : 0; }
+  return prod.coste||0;
 }
-
-// ── Formatos / prices helpers ─────────────────────────────
 function renderFormatoRows(formatos) {
   var cont = document.getElementById('prod-formatos-rows');
   if(!cont) return;
   cont.innerHTML = '';
-  if(formatos && formatos.length) {
-    formatos.forEach(function(f){ addFormatoRow(f); });
-  } else {
-    addFormatoRow(); // start with one empty row
-  }
+  if(formatos && formatos.length) { formatos.forEach(function(f){ addFormatoRow(f); }); }
+  else { addFormatoRow(); }
 }
-
 function addFormatoRow(data) {
   var cont = document.getElementById('prod-formatos-rows');
   if(!cont) return;
   var row = document.createElement('div');
   row.style.cssText = 'display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:6px;padding:6px 10px;border-top:1px solid var(--border);align-items:center';
   var units = ['L','kg','ud','saco','t','mL','g'];
-  var uOpts = units.map(function(u){
-    return '<option value="'+u+'"'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
-  }).join('');
-  row.innerHTML =
-    '<input type="text" class="fmt-nombre" placeholder="ej: Envase 1 L" value="'+(data&&data.nombre?data.nombre.replace(/"/g,'&quot;'):'')+'" style="font-size:13px">' +
-    '<input type="number" step="0.001" min="0" class="fmt-cantidad" placeholder="1" value="'+(data&&data.cantidad?data.cantidad:'')+'" style="font-size:13px">' +
-    '<select class="fmt-unidad" style="font-size:13px">'+uOpts+'</select>' +
-    '<input type="number" step="0.01" min="0" class="fmt-precio" placeholder="0.00" value="'+(data&&data.precio?data.precio:'')+'" style="font-size:13px">' +
-    '<button type="button" onclick="this.closest(\'div\').remove()" class="btn btn-danger btn-sm" style="padding:4px 8px">✕</button>';
+  var inp1 = document.createElement('input');
+  inp1.type='text'; inp1.className='fmt-nombre'; inp1.placeholder='Ej: Envase 1L';
+  inp1.style.fontSize='13px';
+  if(data&&data.nombre) inp1.value=data.nombre;
+  var inp2 = document.createElement('input');
+  inp2.type='number'; inp2.step='0.001'; inp2.min='0'; inp2.className='fmt-cantidad';
+  inp2.placeholder='1'; inp2.style.fontSize='13px';
+  if(data&&data.cantidad) inp2.value=data.cantidad;
+  var sel = document.createElement('select');
+  sel.className='fmt-unidad'; sel.style.fontSize='13px';
+  units.forEach(function(u){ var o=document.createElement('option'); o.value=u; o.textContent=u; if(data&&data.unidad===u) o.selected=true; sel.appendChild(o); });
+  var inp3 = document.createElement('input');
+  inp3.type='number'; inp3.step='0.01'; inp3.min='0'; inp3.className='fmt-precio';
+  inp3.placeholder='0.00'; inp3.style.fontSize='13px';
+  if(data&&data.precio) inp3.value=data.precio;
+  var btn = document.createElement('button');
+  btn.type='button'; btn.className='btn btn-danger btn-sm'; btn.style.cssText='padding:4px 8px';
+  btn.textContent='×';
+  btn.onclick=function(){ this.parentNode.remove(); };
+  row.appendChild(inp1); row.appendChild(inp2); row.appendChild(sel);
+  row.appendChild(inp3); row.appendChild(btn);
   cont.appendChild(row);
 }
-
 function getFormatosValues() {
   var rows = document.querySelectorAll('#prod-formatos-rows > div');
   var out = [];
@@ -3257,22 +2930,18 @@ function getFormatosValues() {
     var cantidad = parseFloat((row.querySelector('.fmt-cantidad')||{}).value)||1;
     var unidad   = (row.querySelector('.fmt-unidad')||{}).value||'L';
     var precio   = parseFloat((row.querySelector('.fmt-precio')||{}).value)||0;
-    if(nombre || precio) {
-      out.push({nombre: nombre||('Formato '+out.length+1), cantidad: cantidad, unidad: unidad, precio: precio});
-    }
+    if(nombre || precio) out.push({nombre: nombre||('Formato '+(out.length+1)), cantidad: cantidad, unidad: unidad, precio: precio});
   });
   return out;
 }
-
 function saveProducto() {
   var nombre = document.getElementById('prod-nombre').value.trim();
   if(!nombre) { alert('Introduce el nombre del producto'); return; }
   var formatos = getFormatosValues();
-  // Keep legacy coste = first format's precio for backward compatibility
-  var legacyCoste    = formatos.length ? (formatos[0].precio||0) : 0;
-  var legacyUnidad   = formatos.length ? (formatos[0].unidad||'L') : 'L';
+  var legacyCoste  = formatos.length ? (formatos[0].precio||0) : 0;
+  var legacyUnidad = formatos.length ? (formatos[0].unidad||'L') : 'L';
   var data = {
-    nombre,
+    nombre: nombre,
     numRegistro: document.getElementById('prod-registro').value.trim(),
     tipo:        document.getElementById('prod-tipo').value,
     materiaActiva: document.getElementById('prod-materia').value.trim(),
@@ -3321,142 +2990,101 @@ function renderRecintos() {
     if(fCli  && r.clienteId !== fCli) return false;
     if(fCult && (r.especieVariedad||'').toLowerCase().indexOf(fCult.toLowerCase()) < 0) return false;
     if(search) {
-      var cli = DB.clientes.find(function(c){return c.id===r.clienteId;});
-      var cliNombre = cli ? cli.nombre.toLowerCase() : '';
+      var cli2 = DB.clientes.find(function(c){return c.id===r.clienteId;});
+      var cliN = cli2 ? cli2.nombre.toLowerCase() : '';
       if((r.nombreFinca||'').toLowerCase().indexOf(search) < 0 &&
          ((r.numPoligono||'')+'-'+(r.numParcela||'')).indexOf(search) < 0 &&
          (r.especieVariedad||'').toLowerCase().indexOf(search) < 0 &&
-         cliNombre.indexOf(search) < 0) return false;
+         cliN.indexOf(search) < 0) return false;
     }
     return true;
   });
-
-  // Stats
-  var sigSeen = {}, totalSIGPAC = 0, totalHa = 0;
+  var sigSeen = {}; var totalSIGPAC = 0; var totalHa = 0;
   list.forEach(function(r) {
-    var key = [String(r.codProvincia||'').trim(), String(r.termMunicipal||'').split(' ')[0].trim(),
-               String(r.numPoligono||'').trim(), String(r.numParcela||'').trim(), String(r.numRecinto||'').trim()].join('-');
+    var key = [String(r.codProvincia||'').trim(),String(r.termMunicipal||'').split(' ')[0].trim(),String(r.numPoligono||'').trim(),String(r.numParcela||'').trim(),String(r.numRecinto||'').trim()].join('-');
     var sig = parseFloat(r.supSigpac)||0;
     if(!sigSeen[key] || sig > sigSeen[key]) sigSeen[key] = sig;
     totalHa += parseFloat(r.supCultivada)||0;
   });
   Object.keys(sigSeen).forEach(function(k){ totalSIGPAC += sigSeen[k]; });
-  var uniqueSigpacCount = Object.keys(sigSeen).length;
-  var splitCount = list.length - uniqueSigpacCount;
+  var uniqueN = Object.keys(sigSeen).length;
+  var splitN  = list.length - uniqueN;
 
-  var campBanner = currentCampana
-    ? '<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;font-size:13px;">'+
-      '<span style="font-size:16px">📅</span>'+
-      '<span style="color:var(--accent);font-weight:700">Campaña activa: '+currentCampana+'</span>'+
-      '<span style="color:var(--text2)">— '+list.length+' recintos</span>'+
-      '<button onclick="document.getElementById(\'campana-global\').value=\'\';onCampanaChange()" '+
-      'style="margin-left:auto;background:none;border:1px solid var(--accent);color:var(--accent);padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600">Ver todas</button>'+
-      '</div>'
-    : '';
-
-  document.getElementById('recintos-stats').innerHTML =
-    campBanner +
-    '<div class="stat-card"><div class="icon">📋</div><div class="val">'+list.length+'</div><div class="lbl">Filas'+(splitCount>0?' <span style="font-size:11px;color:var(--accent)">('+splitCount+' divis.)</span>':'')+' </div></div>'+
-    '<div class="stat-card"><div class="icon">📐</div><div class="val">'+uniqueSigpacCount+'</div><div class="lbl">Recintos únicos</div></div>'+
-    '<div class="stat-card"><div class="icon">🌾</div><div class="val">'+totalSIGPAC.toFixed(2)+'</div><div class="lbl">ha SIGPAC</div></div>'+
-    '<div class="stat-card"><div class="icon">✅</div><div class="val">'+totalHa.toFixed(2)+'</div><div class="lbl">ha Cultivadas</div></div>'+
-    '<div class="stat-card"><div class="icon">📍</div><div class="val">'+list.filter(function(r){return r.wkt;}).length+'</div><div class="lbl">Con geometría</div></div>';
-
-  var tbody = document.getElementById('recintos-tbody');
-  if(!list.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="icon">📋</div>Sin recintos</td></tr>';
-    return;
+  var campBanner = '';
+  if(currentCampana) {
+    campBanner = '<div style="grid-column:1/-1;padding:9px 14px;background:var(--accent-light);border:1px solid var(--accent);border-radius:8px;font-size:13px;display:flex;align-items:center;gap:10px">'
+      + '<b style="color:var(--accent)">Campana: ' + currentCampana + '</b>'
+      + '<span style="color:var(--text2)">- ' + list.length + ' recintos</span>'
+      + '</div>';
   }
 
-  // Group by clienteId
-  var cliOrder = [], byCli = {};
+  document.getElementById('recintos-stats').innerHTML =
+    campBanner
+    + '<div class="stat-card"><div class="icon">&#x1F4CB;</div><div class="val">' + list.length + '</div><div class="lbl">Filas' + (splitN>0?' ('+splitN+' divis.)':'') + '</div></div>'
+    + '<div class="stat-card"><div class="icon">&#x1F4D0;</div><div class="val">' + uniqueN + '</div><div class="lbl">Recintos</div></div>'
+    + '<div class="stat-card"><div class="icon">&#x1F33E;</div><div class="val">' + totalSIGPAC.toFixed(2) + '</div><div class="lbl">ha SIGPAC</div></div>'
+    + '<div class="stat-card"><div class="icon">&#x2705;</div><div class="val">' + totalHa.toFixed(2) + '</div><div class="lbl">ha Cultivadas</div></div>'
+    + '<div class="stat-card"><div class="icon">&#x1F4CD;</div><div class="val">' + list.filter(function(r){return r.wkt;}).length + '</div><div class="lbl">Con geometria</div></div>';
+
+  var tbody = document.getElementById('recintos-tbody');
+  if(!list.length) { tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="icon">&#x1F4CB;</div>Sin recintos</td></tr>'; return; }
+
+  var cliOrder = []; var byCli = {};
   list.forEach(function(r) {
     var cid = r.clienteId || '__sin__';
-    if(!byCli[cid]) { byCli[cid] = []; cliOrder.push(cid); }
+    if(!byCli[cid]) { byCli[cid]=[]; cliOrder.push(cid); }
     byCli[cid].push(r);
   });
-  // Deduplicate order
   var seenC = {};
   cliOrder = cliOrder.filter(function(c){ return seenC[c] ? false : (seenC[c]=true); });
 
-  var html = '';
+  var rows = '';
   cliOrder.forEach(function(cid) {
-    var group  = byCli[cid];
-    var cli    = DB.clientes.find(function(c){return c.id===cid;});
-    var cliNom = cli ? cli.nombre : 'Sin cliente';
-    // Group stats
-    var cliSigSeen = {}, cliSIG = 0, cliCul = 0;
-    group.forEach(function(r){
-      var key = [String(r.codProvincia||'').trim(), String(r.termMunicipal||'').split(' ')[0].trim(),
-                 String(r.numPoligono||'').trim(), String(r.numParcela||'').trim(), String(r.numRecinto||'').trim()].join('-');
-      var sig = parseFloat(r.supSigpac)||0;
-      if(!cliSigSeen[key] || sig > cliSigSeen[key]) cliSigSeen[key] = sig;
-      cliCul += parseFloat(r.supCultivada)||0;
-    });
-    Object.keys(cliSigSeen).forEach(function(k){ cliSIG += cliSigSeen[k]; });
-    var nPending = group.filter(function(r){return !r.nombreFinca&&!r.codProvincia&&!r.numPoligono&&!r.clienteId;}).length;
+    var group = byCli[cid];
+    var cli3  = DB.clientes.find(function(c){return c.id===cid;});
+    var cliNom = cli3 ? cli3.nombre : 'Sin cliente';
+    var cliCul = 0;
+    group.forEach(function(r){ cliCul += parseFloat(r.supCultivada)||0; });
+    var nPend = group.filter(function(r){return !r.nombreFinca&&!r.codProvincia&&!r.numPoligono&&!r.clienteId;}).length;
+    var grpId = 'recgrp_' + cid.replace(/[^a-zA-Z0-9]/g,'_');
 
-    var grpId = 'rec-grp-'+cid.replace(/[^a-zA-Z0-9]/g,'_');
+    rows += '<tr id="hdr-' + grpId + '" style="cursor:pointer;background:var(--card)">'
+      + '<td colspan="10" style="padding:9px 14px" onclick="toggleRecGrp2(\'' + grpId + '\')">'
+      + '<span style="font-weight:800;font-size:14px;color:var(--white)">' + cliNom + '</span> '
+      + '<span class="tag tag-green">' + group.length + ' recintos</span> '
+      + '<span class="tag tag-blue">' + cliCul.toFixed(2) + ' ha cultivadas</span>'
+      + (nPend ? ' <span class="tag tag-yellow">' + nPend + ' pendientes</span>' : '')
+      + ' <span id="ico_' + grpId + '" style="float:right;color:var(--text3)">&#x25BE;</span>'
+      + '</td></tr>';
 
-    // Client group header row
-    html += '<tr onclick="toggleTrt(\''+grpId+'\')" style="cursor:pointer;background:var(--card);user-select:none" id="hdr-'+grpId+'">'+
-      '<td colspan="10" style="padding:9px 14px">'+
-        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-          '<span style="font-size:14px">👤</span>'+
-          '<span style="font-weight:800;font-size:14px;color:var(--white)">'+cliNom+'</span>'+
-          '<span class="tag tag-green">'+group.length+' recinto'+(group.length!==1?'s':'')+'</span>'+
-          '<span class="tag tag-blue" style="font-weight:700">'+cliCul.toFixed(2)+' ha cultivadas</span>'+
-          (cliSIG>0&&Math.abs(cliSIG-cliCul)>0.01?'<span class="tag tag-gray">'+cliSIG.toFixed(2)+' ha SIGPAC</span>':'')+
-          (nPending?'<span class="tag tag-yellow">⚠️ '+nPending+' pendiente'+(nPending!==1?'s':'')+'</span>':'')+
-          '<span style="margin-left:auto;font-size:13px;color:var(--text3)" id="ico-'+grpId+'">▾</span>'+
-        '</div>'+
-      '</td>'+
-    '</tr>';
-
-    // Data rows
     group.forEach(function(r) {
-      var sigpacRef = (r.codProvincia||'?')+'-'+((r.termMunicipal||'').split(' ')[0]||'?')+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
-      var isEmpty   = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
-      var rowStyle  = isEmpty ? 'background:rgba(212,160,23,.08);' : '';
-      var warnBadge = isEmpty ? '<span class="tag tag-yellow" style="font-size:10px;margin-left:6px">⚠️ Pendiente</span>' : '';
-      html += '<tr data-grp="'+grpId+'" style="'+rowStyle+'">'+
-        '<td class="col-hide-mobile" style="color:var(--text3);padding-left:28px">'+(r.numOrden||'—')+'</td>'+
-        '<td style="padding-left:28px">'+r.nombreFinca+'<span style="font-size:11px;color:var(--text3);margin-left:5px">'+(r.campana?'C.'+r.campana:'')+'</span>'+warnBadge+'</td>'+
-        '<td><code style="font-size:11px;color:var(--accent)">'+sigpacRef+'</code></td>'+
-        '<td>'+getCropTag(r.especieVariedad)+'</td>'+
-        '<td>'+(r.supSigpac||'—')+' ha</td>'+
-        '<td class="col-hide-mobile">'+(r.supCultivada||'—')+' ha</td>'+
-        '<td class="col-hide-mobile"><span class="tag '+(r.secanoRegadio==='Regadío'?'tag-blue':'tag-gray')+'">'+(r.secanoRegadio||'—')+'</span></td>'+
-        '<td class="col-hide-mobile">'+(r.wkt?'<span class="tag tag-green">✓ WKT</span>':'<span class="tag tag-gray">Sin WKT</span>')+'</td>'+
-        '<td class="td-actions">'+
-          '<button class="btn '+(isEmpty?'btn-accent':'btn-secondary')+' btn-sm" onclick="openRecintoModal(\''+r.id+'\')" title="'+(isEmpty?'Completar':'Editar')+'">'+( isEmpty?'⚠️ Completar':'✏️')+'</button>'+
-          '<button class="btn btn-secondary btn-sm" onclick="copyRecinto(\''+r.id+'\')" title="Copiar">📋</button>'+
-          '<button class="btn btn-danger btn-sm" onclick="deleteRecinto(\''+r.id+'\')">🗑️</button>'+
-        '</td>'+
-      '</tr>';
+      var isEmpty = !r.nombreFinca && !r.codProvincia && !r.numPoligono && !r.clienteId;
+      var sigRef  = (r.codProvincia||'?')+'-'+((r.termMunicipal||'?').split(' ')[0])+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+      rows += '<tr data-grp="' + grpId + '" style="' + (isEmpty ? 'background:rgba(212,160,23,.08)' : '') + '">'
+        + '<td class="col-hide-mobile" style="color:var(--text3);padding-left:24px">' + (r.numOrden||'&mdash;') + '</td>'
+        + '<td style="padding-left:24px">' + (r.nombreFinca||'') + (r.campana ? ' <span style="font-size:11px;color:var(--text3)">C.' + r.campana + '</span>' : '') + (isEmpty ? ' <span class="tag tag-yellow" style="font-size:10px">&#x26A0; Pendiente</span>' : '') + '</td>'
+        + '<td><code style="font-size:11px;color:var(--accent)">' + sigRef + '</code></td>'
+        + '<td>' + getCropTag(r.especieVariedad) + '</td>'
+        + '<td>' + (r.supSigpac||'&mdash;') + ' ha</td>'
+        + '<td class="col-hide-mobile">' + (r.supCultivada||'&mdash;') + ' ha</td>'
+        + '<td class="col-hide-mobile"><span class="tag ' + (r.secanoRegadio===('Regad\u00edo') ? 'tag-blue' : 'tag-gray') + '">' + (r.secanoRegadio||'&mdash;') + '</span></td>'
+        + '<td class="col-hide-mobile">' + (r.wkt ? '<span class="tag tag-green">&#x2713; WKT</span>' : '<span class="tag tag-gray">Sin WKT</span>') + '</td>'
+        + '<td class="td-actions">'
+        + '<button class="btn ' + (isEmpty ? 'btn-accent' : 'btn-secondary') + ' btn-sm" onclick="openRecintoModal(\'' + r.id + '\')">' + (isEmpty ? '&#x26A0; Completar' : '&#x270F;') + '</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="copyRecinto(\'' + r.id + '\')">&#x1F4CB;</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="deleteRecinto(\'' + r.id + '\')">&#x1F5D1;</button>'
+        + '</td></tr>';
     });
   });
-
-  tbody.innerHTML = html;
-
-  // Wire up click handlers to toggle rows + arrow icon
-  cliOrder.forEach(function(cid) {
-    var grpId  = 'rec-grp-'+cid.replace(/[^a-zA-Z0-9]/g,'_');
-    var hdrRow = document.getElementById('hdr-'+grpId);
-    if(hdrRow) {
-      hdrRow.onclick = function() {
-        var open  = true;
-        var ico   = document.getElementById('ico-'+grpId);
-        document.querySelectorAll('[data-grp="'+grpId+'"]').forEach(function(tr) {
-          var isHidden = tr.style.display === 'none';
-          tr.style.display = isHidden ? '' : 'none';
-          open = isHidden; // after toggle
-        });
-        if(ico) ico.textContent = open ? '▾' : '▸';
-      };
-    }
-  });
+  tbody.innerHTML = rows;
 }
+function toggleRecGrp2(grpId) {
+  var ico = document.getElementById('ico_' + grpId);
+  var open = ico && ico.textContent === '\u25be';
+  document.querySelectorAll('[data-grp="' + grpId + '"]').forEach(function(tr){ tr.style.display = open ? 'none' : ''; });
+  if(ico) ico.textContent = open ? '\u25b8' : '\u25be';
+}
+function toggleRecGrp(id){} // stub, replaced by onclick above
 
 function openRecintoModal(id=null) {
   editingId.recinto = id;
@@ -3686,22 +3314,6 @@ function renderClientes() {
 
     // ── Header chips ──
     var totalRecAll = allRecs.length;
-
-    // Surface for the active campaign (or all if no filter)
-    var recsForSurface = currentCampana
-      ? allRecs.filter(function(r){ return r.campana === currentCampana; })
-      : allRecs;
-    // Deduplicate SIGPAC keys for totSIG, sum supCultivada for totCul
-    var sigSeen = {}, totSIG = 0, totCul = 0;
-    recsForSurface.forEach(function(r){
-      var key = [r.codProvincia||'',String(r.termMunicipal||'').split(' ')[0],
-                 r.numPoligono||'',r.numParcela||'',r.numRecinto||''].join('-');
-      var sig = parseFloat(r.supSigpac)||0;
-      if(!sigSeen[key] || sig > sigSeen[key]) sigSeen[key] = sig;
-      totCul += parseFloat(r.supCultivada)||0;
-    });
-    Object.keys(sigSeen).forEach(function(k){ totSIG += sigSeen[k]; });
-
     var campanaChips = allCampanas.map(function(camp){
       return '<button onclick="document.getElementById(\'campana-global\').value=\''+camp+'\';onCampanaChange()" ' +
         'style="background:none;border:1px solid var(--border2);color:var(--text2);padding:2px 8px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600" ' +
@@ -3720,8 +3332,6 @@ function renderClientes() {
     html += '</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-left:8px">' +
       '<span class="tag tag-green">'+totalRecAll+' recinto'+(totalRecAll!==1?'s':'')+'</span>' +
-      (totCul > 0 ? '<span class="tag tag-blue" style="font-weight:700">'+totCul.toFixed(2)+' ha cultivadas</span>' : '') +
-      (totSIG > 0 && totSIG !== totCul ? '<span class="tag tag-gray">'+totSIG.toFixed(2)+' ha SIGPAC</span>' : '') +
       campanaChips + '</div>';
     html += '<div class="cliente-card-actions">'+actions+'</div>';
     html += '</div>'; // end header
@@ -5466,158 +5076,89 @@ DC_MAPA.forEach(function(d){
 });
 
 function importarDenominacionesMapa(input) {
-  var file = input.files && input.files[0];
-  if(!file) return;
-  input.value = '';
-
-  var ext = file.name.split('.').pop().toLowerCase();
-
-  if(ext === 'xlsx' || ext === 'xls') {
-    // Parse Excel format (same structure as MAPA product files)
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        var data  = new Uint8Array(e.target.result);
-        var wb    = XLSX.read(data, {type:'array'});
-        var ws    = wb.Sheets[wb.SheetNames[0]];
-        var rows  = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-
-        // Find header row
-        var headerRow = -1;
-        for(var i=0; i<Math.min(rows.length, 35); i++) {
-          var r = rows[i].map(function(c){return String(c||'').trim().toUpperCase();});
-          if(r.indexOf('NUMREGISTRO')>=0 || r.indexOf('NOMBRE')>=0) { headerRow=i; break; }
-        }
-        if(headerRow < 0) { alert('No se encontró la cabecera en el archivo. Asegúrate de que sea el archivo de denominaciones comunes del MAPA.'); return; }
-
-        var headers = rows[headerRow].map(function(c){return String(c||'').trim().toUpperCase();});
-        var iNumReg  = headers.indexOf('NUMREGISTRO');
-        var iRef     = headers.indexOf('PRODUCTOREF'); // may not exist
-        var iNombre  = headers.indexOf('NOMBRE');
-        var iEmpresa = headers.indexOf('EMPRESA') >= 0 ? headers.indexOf('EMPRESA') : headers.indexOf('TITULAR');
-        var iRefAlt  = headers.indexOf('PRODUCTOREF') >= 0 ? headers.indexOf('PRODUCTOREF') : -1;
-
-        // Build new DC_MAPA structure: [{numReg, productoRef, dcs:[{nombre, empresa}]}]
-        var byReg = {};
-        for(var j=headerRow+1; j<rows.length; j++) {
-          var row  = rows[j];
-          var nr   = String(row[iNumReg]||'').trim();
-          var dc   = String(row[iNombre]||'').trim();
-          var emp  = iEmpresa >= 0 ? String(row[iEmpresa]||'').trim() : '';
-          var ref  = iRefAlt >= 0 ? String(row[iRefAlt]||'').trim() : '';
-          if(!nr || !dc) continue;
-          if(!byReg[nr]) byReg[nr] = {numReg:nr, productoRef:ref, dcs:[]};
-          byReg[nr].dcs.push({nombre:dc, empresa:emp});
-          if(ref && !byReg[nr].productoRef) byReg[nr].productoRef = ref;
-        }
-
-        var newDC = Object.values ? Object.values(byReg) : Object.keys(byReg).map(function(k){return byReg[k];});
-        var total = newDC.length;
-
-        if(!total) { alert('No se encontraron denominaciones comunes en el archivo.'); return; }
-
-        // Update embedded DC_MAPA in memory and re-apply
-        window._DC_MAPA_OVERRIDE = newDC;
-        var res = _applyDenominacionesComunesFromData(newDC);
-        alert('✅ Denominaciones comunes actualizadas desde el archivo.\n\n' +
-          '📦 Productos de referencia actualizados: ' + res.updated + '\n' +
-          '🆕 Nuevos productos creados: ' + res.created + '\n' +
-          (res.skipped ? '⏭️ Ya existían: ' + res.skipped + '\n' : '') +
-          '\nLos nuevos productos tienen los datos del producto de referencia.\nAñade el precio en cada uno (Productos → ✏️ Editar).');
-      } catch(err) {
-        alert('Error al procesar el archivo: ' + err.message);
-        console.error(err);
+  var file=input.files&&input.files[0]; if(!file){return;} input.value='';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=new Uint8Array(e.target.result);
+      var wb=XLSX.read(data,{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      var hdrRow=-1;
+      for(var i=0;i<Math.min(rows.length,35);i++){
+        var r=rows[i].map(function(c){return String(c||'').trim().toUpperCase();});
+        if(r.indexOf('NUMREGISTRO')>=0||r.indexOf('NOMBRE')>=0){hdrRow=i;break;}
       }
-    };
-    reader.readAsArrayBuffer(file);
-
-  } else {
-    alert('Formato no compatible. Por favor sube el archivo Excel (.xlsx) de denominaciones comunes descargado del MAPA (Registro de Productos Fitosanitarios → Denominaciones Comunes).');
-  }
+      if(hdrRow<0){alert('No se encontró la cabecera.');return;}
+      var hdrs=rows[hdrRow].map(function(c){return String(c||'').trim().toUpperCase();});
+      var iNR=hdrs.indexOf('NUMREGISTRO'),iNom=hdrs.indexOf('NOMBRE'),iEmp=hdrs.indexOf('EMPRESA')>=0?hdrs.indexOf('EMPRESA'):hdrs.indexOf('TITULAR'),iRef=hdrs.indexOf('PRODUCTOREF');
+      var byReg={};
+      for(var j=hdrRow+1;j<rows.length;j++){
+        var row=rows[j]; var nr=String(row[iNR]||'').trim(); var dc=String(row[iNom]||'').trim();
+        var emp=iEmp>=0?String(row[iEmp]||'').trim():''; var ref=iRef>=0?String(row[iRef]||'').trim():'';
+        if(!nr||!dc) continue;
+        if(!byReg[nr]) byReg[nr]={numReg:nr,productoRef:ref,dcs:[]};
+        byReg[nr].dcs.push({nombre:dc,empresa:emp});
+        if(ref&&!byReg[nr].productoRef) byReg[nr].productoRef=ref;
+      }
+      var newDC=Object.keys(byReg).map(function(k){return byReg[k];});
+      if(!newDC.length){alert('No se encontraron denominaciones.');return;}
+      window._DC_MAPA_OVERRIDE=newDC;
+      var res=_applyDenominacionesComunesFromData(newDC);
+      alert('&#x2705; Denominaciones actualizadas.\n\n&#x1F4E6; Ref. actualizados: '+res.updated+'\n&#x1F195; Nuevos productos: '+res.created+(res.skipped?'\n&#x23ED; Ya existían: '+res.skipped:''));
+    }catch(err){alert('Error al procesar: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
 }
-
 function _applyDenominacionesComunesFromData(dcData) {
-  // Build lookup: numReg (normalised) → {productoRef, dcs}
-  var lookup = {};
-  dcData.forEach(function(d) {
-    var key = String(d.numReg||'').trim().toUpperCase().replace(/\s/g,'');
-    if(key) lookup[key] = d;
-    var keyNum = key.replace('ES-','').replace(/^0+/,'') || '0';
-    if(keyNum !== key) lookup[keyNum] = d;
+  var lookup={};
+  dcData.forEach(function(d){
+    var key=String(d.numReg||'').trim().toUpperCase().replace(/\s/g,'');
+    if(key) lookup[key]=d;
+    var keyNum=key.replace('ES-','').replace(/^0+/,'')||'0';
+    if(keyNum!==key) lookup[keyNum]=d;
   });
-
-  var updated = 0, created = 0, skipped = 0;
-
-  DB.productos.forEach(function(refProd) {
-    // Find denominaciones for this reference product
-    var keys = [];
-    if(refProd.numRegistro) {
-      var k = String(refProd.numRegistro).trim().toUpperCase().replace(/\s/g,'');
-      keys.push(k);
-      keys.push(k.replace('ES-','').replace(/^0+/,'') || '0');
-    }
-    var found = null;
-    for(var i=0; i<keys.length; i++) {
-      if(lookup[keys[i]]) { found = lookup[keys[i]]; break; }
-    }
+  var updated=0,created=0,skipped=0;
+  DB.productos.forEach(function(refProd){
+    var keys=[];
+    if(refProd.numRegistro){var k=String(refProd.numRegistro).trim().toUpperCase().replace(/\s/g,'');keys.push(k);keys.push(k.replace('ES-','').replace(/^0+/,'')||'0');}
+    var found=null;
+    for(var i=0;i<keys.length;i++){if(lookup[keys[i]]){found=lookup[keys[i]];break;}}
     if(!found) return;
-
-    // Update the reference product's denominacionesComunes list
-    refProd.denominacionesComunes = found.dcs;
-    if(found.productoRef && !refProd.productoReferencia) refProd.productoReferencia = found.productoRef;
-    updated++;
-
-    // For each denomination, create a new product if it doesn't already exist
-    (found.dcs||[]).forEach(function(dc) {
-      var dcNombre = (dc.nombre||'').trim();
-      if(!dcNombre) return;
-
-      // Check if a product with this name already exists
-      var exists = DB.productos.find(function(p) {
-        return p.nombre.trim().toUpperCase() === dcNombre.toUpperCase();
-      });
-      if(exists) { skipped++; return; }
-
-      // Create a copy of the reference product with the denomination name
-      var newProd = {
-        id:                  uid(),
-        nombre:              dcNombre,
-        numRegistro:         refProd.numRegistro || '',
-        tipo:                refProd.tipo         || 'Fitosanitario',
-        materiaActiva:       refProd.materiaActiva|| '',
-        titular:             dc.empresa           || refProd.titular || '',
-        formulacion:         refProd.formulacion  || '',
-        dosis:               refProd.dosis        || '',
-        plazo:               refProd.plazo        || '',
-        formatos:            [],          // empty — user sets their own price
-        coste:               0,
-        unidadCoste:         refProd.unidadCoste  || 'L',
-        usos:                refProd.usos         || '',
-        obs:                 'Denominación común de: ' + refProd.nombre +
-                             (dc.empresa ? ' (' + dc.empresa + ')' : ''),
-        cultivosAutorizados: (refProd.cultivosAutorizados||[]).slice(),
-        productoReferencia:  refProd.nombre,
-        denominacionesComunes: [],
-        _cancelado:          false
-      };
-      DB.productos.push(newProd);
+    refProd.denominacionesComunes=found.dcs; updated++;
+    (found.dcs||[]).forEach(function(dc){
+      var dcN=(dc.nombre||'').trim(); if(!dcN) return;
+      var exists=DB.productos.find(function(p){return p.nombre.trim().toUpperCase()===dcN.toUpperCase();});
+      if(exists){skipped++;return;}
+      DB.productos.push({id:uid(),nombre:dcN,numRegistro:refProd.numRegistro||'',tipo:refProd.tipo||'Fitosanitario',materiaActiva:refProd.materiaActiva||'',titular:dc.empresa||refProd.titular||'',formulacion:refProd.formulacion||'',dosis:refProd.dosis||'',plazo:refProd.plazo||'',formatos:[],coste:0,unidadCoste:refProd.unidadCoste||'L',usos:refProd.usos||'',obs:'Denominación común de: '+refProd.nombre+(dc.empresa?' ('+dc.empresa+')':''),cultivosAutorizados:(refProd.cultivosAutorizados||[]).slice(),productoReferencia:refProd.nombre,denominacionesComunes:[]});
       created++;
     });
   });
-
+  save(); renderProductos();
+  return {updated:updated,created:created,skipped:skipped};
+}
+function applyDenominacionesComunes() {
+  var matched = 0, noMatch = 0;
+  DB.productos.forEach(function(p) {
+    var raw = (p.numRegistro||'').trim().toUpperCase();
+    // Normalise: "ES-00169", "ES00169", "169" all should work
+    var keys = [raw, raw.replace(/^ES-?/,''), 'ES-'+raw.replace(/^ES-?/,'')];
+    var found = null;
+    keys.forEach(function(k){ if(!found && DC_INDEX[k]) found = DC_INDEX[k]; });
+    if(found) {
+      p.productoReferencia     = found.productoRef;
+      p.denominacionesComunes  = found.dcs;
+      matched++;
+    } else {
+      noMatch++;
+    }
+  });
   save();
   renderProductos();
-  return {updated: updated, created: created, skipped: skipped};
+  alert('✅ Comparación completada:\n\n🔗 Con denominaciones encontradas: '+matched+'\n⚠️ Sin coincidencia: '+noMatch);
 }
 
-function applyDenominacionesComunes() {
-  var dcData = window._DC_MAPA_OVERRIDE || DC_MAPA;
-  var res = _applyDenominacionesComunesFromData(dcData);
-  alert('✅ Denominaciones comunes aplicadas.\n\n' +
-    '📦 Productos de referencia actualizados: ' + res.updated + '\n' +
-    '🆕 Nuevos productos creados: ' + res.created + '\n' +
-    (res.skipped ? '⏭️ Ya existían: ' + res.skipped : ''));
-}
+
 // ============================================================
 // CULTIVOS AUTORIZADOS — datos extraídos de fichas MAPA por cultivo
 // Fuente: Registro Fitosanitarios MAPA — 28/05/2026
@@ -5924,112 +5465,52 @@ function calcNKgHa(dosis, unidad, nPct) {
 }
 
 // Build nitrogen compliance summary for an abonado record
-// Crucially: sums ALL abonado records in the same campaign that include each recinto
 function calcNitroCompliance(ab) {
-  var recs    = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
-  var campana = ab.campana || '';
-
-  // For each recinto in this record, sum N across ALL abonados in same campaign
-  // that include that recinto
-  var nByRecinto = {}; // recintoId → totalNKgHa accumulated this campaign
-  recs.forEach(function(r){ nByRecinto[r.id] = 0; });
-
-  (DB.abonados||[]).forEach(function(otherAb) {
-    // Same campaign filter (if campana set)
-    if(campana && otherAb.campana && otherAb.campana !== campana) return;
-    // Only include if it shares at least one recinto with our recintos set
-    var otherRecs = otherAb.recintoIds||[];
-    otherRecs.forEach(function(rid) {
-      if(!(rid in nByRecinto)) return; // not a recinto we care about
-      // Sum N from this abonado for this recinto
-      var nThisAb = 0;
-      (otherAb.abonos||[]).forEach(function(row) {
-        var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
-        if(abo) nThisAb += calcNKgHa(row.dosis, row.unidad, abo.n);
-      });
-      nByRecinto[rid] += nThisAb;
+  var recs=(ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+  var campana=ab.campana||'';
+  var nByRec={};
+  recs.forEach(function(r){nByRec[r.id]=0;});
+  (DB.abonados||[]).forEach(function(ot){
+    if(campana&&ot.campana&&ot.campana!==campana) return;
+    (ot.recintoIds||[]).forEach(function(rid){
+      if(!(rid in nByRec)) return;
+      var nAb=0;
+      (ot.abonos||[]).forEach(function(row){var abo=(DB.abonos||[]).find(function(a){return a.id===row.abonoId;});if(abo)nAb+=calcNKgHa(row.dosis,row.unidad,abo.n);});
+      nByRec[rid]+=nAb;
     });
   });
-
-  // N applied in THIS record only (for display in card header)
-  var thisRecordNKgHa = 0;
-  (ab.abonos||[]).forEach(function(row){
-    var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
-    if(abo) thisRecordNKgHa += calcNKgHa(row.dosis, row.unidad, abo.n);
-  });
-
-  // Build compliance per unique cultivo/regime, using the ACCUMULATED N for each recinto
-  var results = [];
-  var seenCv  = {};
+  var thisN=0;
+  (ab.abonos||[]).forEach(function(row){var abo=(DB.abonos||[]).find(function(a){return a.id===row.abonoId;});if(abo)thisN+=calcNKgHa(row.dosis,row.unidad,abo.n);});
+  var results=[]; var seenCv={};
   recs.forEach(function(r){
-    var cv     = (r.especieVariedad||'').trim();
-    var esReg  = (r.secanoRegadio||'').toLowerCase().indexOf('regad') >= 0;
-    var cvKey  = cv+'|'+(esReg?'R':'S');
-    if(seenCv[cvKey]) return;
-    seenCv[cvKey] = 1;
-
-    // Use accumulated N for this specific recinto
-    var accN   = nByRecinto[r.id] || 0;
-    var info   = getNLimite(cv, esReg);
-    var pct    = info.limite > 0 ? Math.round(accN / info.limite * 100) : 0;
-    var status = pct <= 80  ? 'ok'
-               : pct <= 100 ? 'warning'
-               : 'exceeded';
-    results.push({
-      cultivo:     cv || 'Sin cultivo',
-      regimen:     esReg ? 'Regadío' : 'Secano',
-      limite:      info.limite,
-      limiteTipo1: info.limiteTipo1,
-      limiteOrg:   N_LIMITE_ORGANICO,
-      nAplic:      accN,
-      nEsteAb:     thisRecordNKgHa,
-      pct:         pct,
-      status:      status,
-      label:       info.label,
-      recintoNombre: r.nombreFinca || (r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto)
-    });
+    var cv=(r.especieVariedad||'').trim();
+    var esReg=(r.secanoRegadio||'').toLowerCase().indexOf('regad')>=0;
+    var cvKey=cv+'|'+(esReg?'R':'S');
+    if(seenCv[cvKey]) return; seenCv[cvKey]=1;
+    var accN=nByRec[r.id]||0;
+    var info=getNLimite(cv,esReg);
+    var pct=info.limite>0?Math.round(accN/info.limite*100):0;
+    var status=pct<=80?'ok':pct<=100?'warning':'exceeded';
+    results.push({cultivo:cv||'Sin cultivo',regimen:esReg?'Regadío':'Secano',limite:info.limite,limiteTipo1:info.limiteTipo1,limiteOrg:N_LIMITE_ORGANICO,nAplic:accN,nEsteAb:thisN,pct:pct,status:status,label:info.label});
   });
-
-  return {totalNKgHa: thisRecordNKgHa, results: results};
+  return {totalNKgHa:thisN,results:results};
 }
 
 function renderNitroBar(result) {
-  var pct   = Math.min(result.pct, 150);
-  var color = result.status === 'ok'      ? '#7acc4a'
-            : result.status === 'warning' ? '#d4a017'
-            : '#e74c3c';
-  var icon  = result.status === 'ok'      ? '✅'
-            : result.status === 'warning' ? '⚠️'
-            : '🚫';
-
-  // Show previous applications as a darker segment
-  var nPrev     = Math.max(0, result.nAplic - result.nEsteAb);
-  var pctPrev   = result.limite > 0 ? Math.min(nPrev / result.limite * 100, 100) : 0;
-  var pctThis   = result.limite > 0 ? Math.min(result.nEsteAb / result.limite * 100, 100) : 0;
-  var prevBar   = nPrev > 0
-    ? '<div style="width:'+pctPrev.toFixed(1)+'%;height:100%;background:'+color+';opacity:.45;border-radius:4px 0 0 4px"></div>'+
-      '<div style="width:'+Math.min(pctThis,100-pctPrev).toFixed(1)+'%;height:100%;background:'+color+';border-radius:0 4px 4px 0"></div>'
-    : '<div style="width:'+Math.min(result.pct,100).toFixed(0)+'%;height:100%;background:'+color+';border-radius:4px"></div>';
-
-  var acumNote = nPrev > 0
-    ? '<span style="color:var(--text3);font-size:10px"> ('+nPrev.toFixed(1)+' kg prev. + '+result.nEsteAb.toFixed(1)+' kg este)</span>'
-    : '';
-
-  return '<div style="margin:4px 0;padding:8px 10px;background:var(--surface);border-radius:6px;border-left:3px solid '+color+'">' +
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px">' +
-    icon+' <b style="color:var(--white)">'+result.cultivo+'</b>' +
-    '<span class="tag '+(result.regimen==='Regadío'?'tag-blue':'tag-gray')+'" style="font-size:10px">'+result.regimen+'</span>' +
-    '<span style="color:var(--text2);margin-left:auto">Límite: <b>'+result.limite+' kg N/ha</b></span>' +
-    '</div>' +
-    '<div style="background:var(--border);border-radius:4px;height:10px;overflow:hidden;position:relative;display:flex">' +
-    prevBar +
-    (result.pct > 100 ? '<div style="position:absolute;top:0;left:0;height:100%;width:100%;background:rgba(231,76,60,.25)"></div>' : '') +
-    '</div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:var(--text2)">' +
-    '<span>Acumulado campaña: <b style="color:'+color+'">'+result.nAplic.toFixed(1)+' kg N/ha</b> ('+result.pct+'%)'+acumNote+'</span>' +
-    '<span style="color:var(--text3)">Tipo 1: '+result.limiteTipo1+' | Org.máx: '+N_LIMITE_ORGANICO+'</span>' +
-    '</div>' +
-    '</div>';
+  var color=result.status==='ok'?'#7acc4a':result.status==='warning'?'#d4a017':'#e74c3c';
+  var icon=result.status==='ok'?'&#x2705;':result.status==='warning'?'&#x26A0;':'&#x1F6AB;';
+  var nPrev=Math.max(0,result.nAplic-(result.nEsteAb||0));
+  var pctPrev=result.limite>0?Math.min(nPrev/result.limite*100,100):0;
+  var pctThis=result.limite>0?Math.min((result.nEsteAb||0)/result.limite*100,100):0;
+  var barPrev=nPrev>0?'<div style="width:'+pctPrev.toFixed(1)+'%;height:100%;background:'+color+';opacity:.4;border-radius:4px 0 0 4px"></div><div style="width:'+Math.min(pctThis,100-pctPrev).toFixed(1)+'%;height:100%;background:'+color+';border-radius:0 4px 4px 0"></div>':'<div style="width:'+Math.min(result.pct,100).toFixed(0)+'%;height:100%;background:'+color+';border-radius:4px"></div>';
+  var acumNote=nPrev>0?' ('+nPrev.toFixed(1)+' kg prev. + '+(result.nEsteAb||0).toFixed(1)+' kg este)':'';
+  var h=[];
+  h.push('<div style="margin:4px 0;padding:8px 10px;background:var(--surface);border-radius:6px;border-left:3px solid '+color+'">');
+  h.push('<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px">'+icon+' <b style="color:var(--white)">'+result.cultivo+'</b><span class="tag '+(result.regimen.indexOf('Regad')>=0?'tag-blue':'tag-gray')+'" style="font-size:10px">'+result.regimen+'</span><span style="color:var(--text2);margin-left:auto">Límite: <b>'+result.limite+' kg N/ha</b></span></div>');
+  h.push('<div style="background:var(--border);border-radius:4px;height:10px;overflow:hidden;position:relative;display:flex">'+barPrev+(result.pct>100?'<div style="position:absolute;top:0;left:0;height:100%;width:100%;background:rgba(231,76,60,.25)"></div>':'')+'</div>');
+  h.push('<div style="display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:var(--text2)"><span>Acumulado campa&ntilde;a: <b style="color:'+color+'">'+result.nAplic.toFixed(1)+' kg N/ha</b> ('+result.pct+'%)'+acumNote+'</span><span style="color:var(--text3)">Tipo 1: '+result.limiteTipo1+' | Org.máx: '+N_LIMITE_ORGANICO+'</span></div>');
+  h.push('</div>');
+  return h.join('');
 }
 
 function renderAbonado() {
@@ -6149,10 +5630,6 @@ function openAbonadoModal(id) {
   var cliSel = document.getElementById('abonado-cliente');
   cliSel.innerHTML = '<option value="">— Selecciona cliente —</option>' +
     DB.clientes.map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
-  cliSel.onchange = function() {
-    loadAbonadoParcelasPicker([]);
-    refreshAbonadoRowSels();
-  };
 
   var ab = id ? (DB.abonados||[]).find(function(x){return x.id===id;}) : null;
   document.getElementById('abonado-fecha').value     = ab?.fecha||new Date().toISOString().slice(0,10);
@@ -6172,301 +5649,83 @@ function openAbonadoModal(id) {
   openModal('modal-abonado');
 }
 
-function getCheckedAbonadoRecintoIds() {
-  var ids = [];
-  document.querySelectorAll('#abonado-parcelas-picker input[type=checkbox][value]').forEach(function(c){
-    if(c.checked) ids.push(c.value);
-  });
-  return ids;
-}
-
-function loadAbonadoParcelasPicker(selectedIds, cultivoFilter) {
-  selectedIds   = selectedIds || [];
-  cultivoFilter = cultivoFilter != null ? cultivoFilter : '';
+function loadAbonadoParcelasPicker(selectedIds) {
+  selectedIds = selectedIds||[];
   var clienteId = document.getElementById('abonado-cliente').value;
   var campana   = document.getElementById('abonado-campana').value || currentCampana;
   var picker    = document.getElementById('abonado-parcelas-picker');
-  var filterDiv = document.getElementById('abonado-cultivo-filter');
-  var chipsDiv  = document.getElementById('abonado-cultivo-chips');
-  var infoEl    = document.getElementById('abonado-recintos-info');
-
   if(!clienteId) {
     picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Selecciona un cliente primero</div>';
-    if(filterDiv) filterDiv.style.display = 'none';
     return;
   }
-
-  var allRecs = DB.recintos.filter(function(r){
-    if(r.clienteId !== clienteId) return false;
-    if(campana && r.campana && r.campana !== campana) return false;
-    return true;
-  });
-  if(!allRecs.length) allRecs = DB.recintos.filter(function(r){ return r.clienteId === clienteId; });
-
-  if(!allRecs.length) {
-    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Este cliente no tiene recintos</div>';
-    if(filterDiv) filterDiv.style.display = 'none';
+  var recs = DB.recintos.filter(function(r){ return r.clienteId===clienteId && (!campana||r.campana===campana); });
+  if(!recs.length) {
+    picker.innerHTML = '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin recintos para esta campaña</div>';
     return;
   }
-
-  // Build cultivo chips
-  var cultivoMap = {};
-  allRecs.forEach(function(r){
-    var cv = (r.especieVariedad||'').trim();
-    if(cv) cultivoMap[cv] = (cultivoMap[cv]||0) + 1;
-  });
-  var cultivoList = Object.keys(cultivoMap).sort();
-
-  if(filterDiv) {
-    if(cultivoList.length > 1) {
-      filterDiv.style.display = 'block';
-      var chips = '<button type="button" class="cultivo-chip'+(cultivoFilter===''?' active':'')+
-        '" data-cv="" onclick="loadAbonadoParcelasPicker(getCheckedAbonadoRecintoIds(),\'\')">'+
-        'Todos ('+allRecs.length+')</button>';
-      cultivoList.forEach(function(cv) {
-        var color = getCropColor(cv);
-        chips += '<button type="button" class="cultivo-chip'+(cultivoFilter===cv?' active':'')+
-          '" data-cv="'+cv.replace(/"/g,'&quot;')+'" style="--chip-color:'+color+'"'+
-          ' onclick="loadAbonadoParcelasPicker(getCheckedAbonadoRecintoIds(),\''+cv.replace(/'/g,"\\'")+'\')">' +
-          cv+' <span style="opacity:.7">('+cultivoMap[cv]+')</span></button>';
-      });
-      if(chipsDiv) chipsDiv.innerHTML = chips;
-    } else {
-      filterDiv.style.display = 'none';
-    }
-  }
-
-  // Filter by selected cultivo
-  var filteredRecs = cultivoFilter
-    ? allRecs.filter(function(r){ return (r.especieVariedad||'').trim() === cultivoFilter; })
-    : allRecs;
-
-  if(infoEl) {
-    var ha = filteredRecs.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
-    infoEl.textContent = filteredRecs.length+' recinto'+(filteredRecs.length!==1?'s':'')+' · '+ha.toFixed(2)+' ha';
-  }
-
   // Group by finca
-  var fincas = {}, fincaOrder = [];
-  filteredRecs.forEach(function(r){
-    var f = (r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto)).trim();
-    if(!fincas[f]) { fincas[f]=[]; fincaOrder.push(f); }
+  var fincas = {};
+  recs.forEach(function(r){
+    var f = r.nombreFinca||(r.numPoligono+'-'+r.numParcela);
+    if(!fincas[f]) fincas[f]=[];
     fincas[f].push(r);
   });
-
   var html = '';
-  fincaOrder.sort().forEach(function(finca) {
-    var group   = fincas[finca];
-    var haTotal = group.reduce(function(s,r){ return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0); }, 0);
-    var allIds  = group.map(function(r){ return r.id; });
-    var allChk  = allIds.every(function(id){ return selectedIds.indexOf(id) >= 0; });
-
-    html += '<div style="background:var(--card);padding:7px 12px;border-bottom:1px solid var(--border);'+
-      'display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:1">' +
-      '<input type="checkbox" class="finca-check-all" data-ids="'+allIds.join(',')+'" '+(allChk?'checked':'')+
-      ' onchange="toggleFincaCheckAbonado(this)" style="width:13px;height:13px;accent-color:var(--primary)">' +
+  Object.keys(fincas).sort().forEach(function(finca) {
+    var group = fincas[finca];
+    var haTotal = group.reduce(function(s,r){return s+(parseFloat(r.supSigpac)||0);},0);
+    var allIds  = group.map(function(r){return r.id;});
+    var allChecked = allIds.every(function(id){return selectedIds.includes(id);});
+    // Finca header with "select all" checkbox
+    html += '<div style="background:var(--card);padding:7px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">' +
+      '<input type="checkbox" class="finca-check-all" data-ids="'+allIds.join(',')+'" '+(allChecked?'checked':'')+' '+
+      'onchange="toggleFincaCheck(this)" style="width:13px;height:13px;accent-color:var(--primary)">' +
       '<span style="font-weight:700;font-size:13px;color:var(--white)">🏡 '+finca+'</span>' +
-      '<span style="font-size:11px;color:var(--text3)">'+haTotal.toFixed(2)+' ha · '+group.length+' rec.</span>' +
+      '<span style="font-size:11px;color:var(--text3)">'+haTotal.toFixed(2)+' ha</span>' +
       '</div>';
-
     group.forEach(function(r) {
-      var checked = selectedIds.indexOf(r.id) >= 0 ? 'checked' : '';
+      var checked = selectedIds.includes(r.id)?'checked':'';
       var color   = getCropColor(r.especieVariedad);
-      var ha = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
-      var cv      = (r.especieVariedad||'Sin cultivo').split('/')[0].trim();
+      var sigpac  = r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto;
       html += '<label class="recinto-check" style="padding-left:28px">' +
-        '<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" data-ha="'+ha+'" '+checked+' onchange="updateAbonadoHaTotal()">' +
+        '<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" '+checked+'>' +
         '<span class="crop-dot" style="background:'+color+'"></span>' +
-        '<span style="flex:1;font-size:12px">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>' +
-        '<span style="font-size:11px;color:var(--text2)">'+cv+'</span>' +
-        '<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>' +
+        '<label>'+sigpac+' · '+(r.especieVariedad||'Sin cultivo')+' · '+(r.supSigpac||0)+' ha</label>' +
         '</label>';
     });
   });
-
-  picker.innerHTML = html ||
-    '<div style="padding:14px;color:var(--text3);font-size:12px;text-align:center">Sin parcelas para este cultivo</div>';
-  updateAbonadoHaTotal();
+  picker.innerHTML = html;
 }
 
-function updateAbonadoHaTotal() {
-  var total = 0;
-  document.querySelectorAll('#abonado-parcelas-picker .abonado-rec-check:checked').forEach(function(cb){
-    total += parseFloat(cb.dataset.ha)||0;
-  });
-  var wrap = document.getElementById('abonado-ha-total');
-  var val  = document.getElementById('abonado-ha-total-val');
-  if(wrap && val) {
-    if(total > 0) {
-      val.textContent = total.toFixed(2);
-      wrap.style.display = 'block';
-    } else {
-      wrap.style.display = 'none';
-    }
-  }
-}
-
-function toggleFincaCheckAbonado(cb) {
-  var ids = (cb.dataset.ids||'').split(',').filter(Boolean);
+function toggleFincaCheck(cb) {
+  var ids = cb.dataset.ids.split(',');
   ids.forEach(function(id) {
-    var el = document.querySelector('#abonado-parcelas-picker input[type=checkbox][value="'+id+'"]');
-    if(el) el.checked = cb.checked;
-  });
-  updateAbonadoHaTotal();
-}
-
-function toggleAllAbonadoRecintos(val) {
-  document.querySelectorAll('#abonado-parcelas-picker input[type=checkbox]').forEach(function(cb){
-    cb.checked = val;
-  });
-  updateAbonadoHaTotal();
-}
-
-function getAbonosPorCliente(clienteId) {
-  // Returns [{abono, stock, unidad, comprado, usado}] for abonos the client has purchased.
-  // Falls back to all abonos (stock:null) if no purchases recorded.
-  if(!clienteId) {
-    return (DB.abonos||[]).map(function(a){ return {abono:a, stock:null, unidad:''}; });
-  }
-  var campana  = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
-  var stockData = calcStock(clienteId, campana);
-  var abonoStock = stockData.abonos;
-
-  var result = [];
-  Object.keys(abonoStock).forEach(function(aid) {
-    var abo = (DB.abonos||[]).find(function(a){ return a.id === aid; });
-    if(!abo) return;
-    var s = abonoStock[aid];
-    result.push({abono:abo, stock:s.stock, unidad:s.unidad, comprado:s.comprado, usado:s.usado});
-  });
-  result.sort(function(a,b){ return a.abono.nombre.localeCompare(b.abono.nombre,'es'); });
-
-  if(!result.length) {
-    return (DB.abonos||[]).map(function(a){ return {abono:a, stock:null, unidad:''}; });
-  }
-  return result;
-}
-
-function buildAbonoOpts(clienteId, selectedAbonoId) {
-  var items = getAbonosPorCliente(clienteId);
-  var haStock = items.some(function(i){ return i.stock !== null; });
-  var opts = items.map(function(item) {
-    var a   = item.abono;
-    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
-    var stockLabel = '';
-    if(item.stock !== null) {
-      var stk = item.stock;
-      var u   = item.unidad || 'kg';
-      if(stk <= 0) {
-        stockLabel = ' — SIN STOCK';
-      } else {
-        stockLabel = ' — '+stk.toFixed(1)+' '+u+' en stock';
-      }
-    }
-    return '<option value="'+a.id+'"'+(selectedAbonoId===a.id?' selected':'')+'>'+
-      a.nombre+(npk?' ('+npk+')':'')+stockLabel+'</option>';
-  }).join('');
-  return {opts: opts || '<option value="">Sin abonos comprados — usa "＋ Compra nueva"</option>', haStock: haStock, count: items.length};
-}
-
-function refreshAbonadoRowSels() {
-  var clienteId = document.getElementById('abonado-cliente').value;
-  document.querySelectorAll('#abonado-rows .product-row').forEach(function(row) {
-    var sel = row.querySelector('.abonado-row-sel');
-    if(!sel) return;
-    var cur   = sel.value;
-    var built = buildAbonoOpts(clienteId, cur);
-    sel.innerHTML = built.opts;
-    // Update stock indicator next to select
-    var ind = row.querySelector('.abono-stock-ind');
-    if(ind) {
-      var items = getAbonosPorCliente(clienteId);
-      var found = items.find(function(i){ return i.abono.id === cur; });
-      if(found && found.stock !== null) {
-        var color = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
-        ind.textContent = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad;
-        ind.style.color = color;
-      } else {
-        ind.textContent = '';
-      }
-    }
+    var chk = document.querySelector('.abonado-rec-check[value="'+id+'"]');
+    if(chk) chk.checked = cb.checked;
   });
 }
 
 function addAbonadoRow(data) {
-  var row = document.createElement('div');
+  var row  = document.createElement('div');
   row.className = 'product-row';
-  row.style.padding = '0';
-
-  var clienteId = document.getElementById('abonado-cliente').value;
-  var built     = buildAbonoOpts(clienteId, data && data.abonoId);
-  var haStock   = built.haStock;
-
-  // Find current stock for pre-selected abono
-  var stockText = '', stockColor = 'var(--text3)';
-  if(data && data.abonoId && haStock) {
-    var items = getAbonosPorCliente(clienteId);
-    var found = items.find(function(i){ return i.abono.id === data.abonoId; });
-    if(found && found.stock !== null) {
-      stockColor = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
-      stockText  = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad+' en stock';
-    }
-  }
-
-  var filteredNote = (clienteId && built.count < (DB.abonos||[]).length && haStock)
-    ? '<div style="font-size:11px;color:var(--text3);padding:2px 10px 2px">Solo abonos comprados · stock de campaña actual</div>'
-    : '';
-
+  row.style.gridTemplateColumns = '2fr 90px 100px 1fr auto';
+  var opts = (DB.abonos||[]).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');}).map(function(a){
+    var npk=[a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+    return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
+  }).join('');
+  if(!opts) opts='<option>Sin abonos — añade en pestaña Abonos</option>';
   var modos = ['Voleo','Localizado','Fertirrigación','Foliar','Fondo','Cobertera'].map(function(m){
     return '<option'+(data&&data.modo===m?' selected':'')+'>'+m+'</option>';
   }).join('');
-
   row.innerHTML =
-    '<div class="abono-row-inner" style="display:flex;flex-direction:column;gap:4px;padding:8px 10px">'+
-      filteredNote+
-      '<div style="display:grid;grid-template-columns:2fr 90px 100px 1fr auto;gap:8px;align-items:center">'+
-        '<div style="display:flex;flex-direction:column;gap:2px">'+
-          '<select class="abonado-row-sel" onchange="onAbonadoRowSelChange(this)">'+built.opts+'</select>'+
-          '<span class="abono-stock-ind" style="font-size:11px;font-weight:700;color:'+stockColor+';padding-left:2px">'+stockText+'</span>'+
-        '</div>'+
-        '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data&&data.dosis!=null?data.dosis:'')+'">' +
-        '<select class="abonado-row-unidad">'+
-          ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+
-        '</select>'+
-        '<select class="abonado-row-modo">'+modos+'</select>'+
-        '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>'+
-      '</div>'+
-      '<div><button type="button" onclick="openNuevaCompraDesdeAbonado(this)" '+
-        'style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">'+
-        '＋ Compra nueva (añadir abono al stock del cliente)</button></div>'+
-    '</div>';
-
+    '<select class="abonado-row-sel">'+opts+'</select>' +
+    '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data?.dosis||'')+'">' +
+    '<select class="abonado-row-unidad">' +
+      ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('') +
+    '</select>' +
+    '<select class="abonado-row-modo">'+modos+'</select>' +
+    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
   document.getElementById('abonado-rows').appendChild(row);
-}
-
-function onAbonadoRowSelChange(sel) {
-  var row = sel.closest('.product-row');
-  if(!row) return;
-  var ind = row.querySelector('.abono-stock-ind');
-  if(!ind) return;
-  var clienteId = document.getElementById('abonado-cliente').value;
-  var items = getAbonosPorCliente(clienteId);
-  var found = items.find(function(i){ return i.abono.id === sel.value; });
-  if(found && found.stock !== null) {
-    var color = found.stock <= 0 ? '#e74c3c' : found.stock < 50 ? '#d4a017' : '#7acc4a';
-    ind.textContent = found.stock <= 0 ? '🚫 Sin stock' : '📦 '+found.stock.toFixed(1)+' '+found.unidad+' en stock';
-    ind.style.color = color;
-  } else {
-    ind.textContent = '';
-  }
-}
-
-function openNuevaCompraDesdeAbonado(btn) {
-  var clienteId = document.getElementById('abonado-cliente').value;
-  if(!clienteId) { alert('Selecciona un cliente primero'); return; }
-  window._compraDesdeAbonadoCb = function() { refreshAbonadoRowSels(); };
-  closeModal('modal-abonado');
-  openCompraModal(null, clienteId);
 }
 
 function saveAbonado() {
@@ -6749,191 +6008,19 @@ function renderCompras() {
   cont.innerHTML = html || '<div style="color:var(--text3);padding:20px;text-align:center">No hay compras con los filtros seleccionados</div>';
 }
 
-// ============================================================
-// EXPORTAR FERTILIZACIÓN A EXCEL — Cuaderno de Explotación C&L
-// ============================================================
-function openExportFertilizacionModal() {
-  var cliSel  = document.getElementById('expfert-cliente');
-  var campSel = document.getElementById('expfert-campana');
-  cliSel.innerHTML = '<option value="">— Todos los clientes —</option>' +
-    DB.clientes.map(function(c){ return '<option value="'+c.id+'">'+c.nombre+'</option>'; }).join('');
-  cliSel.value = '';
-  // Build campaign list from abonados
-  var camps = {};
-  (DB.abonados||[]).forEach(function(ab){ if(ab.campana) camps[ab.campana]=1; });
-  var campList = Object.keys(camps).sort().reverse();
-  campSel.innerHTML = '<option value="">— Todas las campañas —</option>' +
-    campList.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
-  if(currentCampana && camps[currentCampana]) campSel.value = currentCampana;
-  openModal('modal-export-fertilizacion');
-}
-
-function exportFertilizacionExcel() {
-  var fCli  = document.getElementById('expfert-cliente').value;
-  var fCamp = document.getElementById('expfert-campana').value;
-
-  var abonados = (DB.abonados||[]).filter(function(ab){
-    if(fCli  && ab.clienteId !== fCli)  return false;
-    if(fCamp && ab.campana  !== fCamp)  return false;
-    return true;
-  }).slice().sort(function(a,b){ return (a.fecha||'').localeCompare(b.fecha||''); });
-
-  if(!abonados.length) { alert('No hay registros de abonado para los filtros seleccionados.'); return; }
-
-  // ── Build rows ──────────────────────────────────────────
-  var dataRows = [];
-  var nAportacion = 0;
-
-  abonados.forEach(function(ab) {
-    var cli  = DB.clientes.find(function(c){ return c.id===ab.clienteId; });
-    var recs = (ab.recintoIds||[]).map(function(id){
-      return DB.recintos.find(function(r){ return r.id===id; });
-    }).filter(Boolean);
-
-    // Surface: sum supCultivada (fallback supSigpac)
-    var supTotal = recs.reduce(function(s,r){
-      return s + (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);
-    }, 0);
-
-    // Recintos label: numOrden if available, else SIGPAC ref
-    var recLabels = recs.map(function(r){
-      return r.numOrden || [r.codProvincia||'?',
-        (r.termMunicipal||'?').split(' ')[0], r.numPoligono||'?',
-        r.numParcela||'?', r.numRecinto||'?'].join('-');
-    }).join(' / ');
-
-    // Cultivos
-    var cvSet = {};
-    recs.forEach(function(r){ if(r.especieVariedad) cvSet[r.especieVariedad.trim()]=1; });
-    var cultivos = Object.keys(cvSet).join(', ') || '—';
-
-    nAportacion++;
-
-    // One row per abono applied in this record
-    (ab.abonos||[]).forEach(function(row, idx) {
-      var abo   = (DB.abonos||[]).find(function(a){ return a.id===row.abonoId; });
-      if(!abo) return;
-      var dosis    = parseFloat(row.dosis)||0;
-      var unidad   = row.unidad||'kg/ha';
-      // Normalise dosis to kg/ha or L/ha
-      var dosisKgHa = dosis;
-      if(unidad==='t/ha')  dosisKgHa = dosis * 1000;
-      if(unidad==='g/ha')  dosisKgHa = dosis / 1000;
-
-      var cantTotal = dosisKgHa * supTotal;
-      var nPct   = parseFloat(abo.n)||0;
-      var p2o5   = parseFloat(abo.p)||0;
-      var k2o    = parseFloat(abo.k)||0;
-      var nKgHa  = dosisKgHa * nPct   / 100;
-      var pKgHa  = dosisKgHa * p2o5   / 100;
-      var kKgHa  = dosisKgHa * k2o    / 100;
-
-      dataRows.push([
-        nAportacion,
-        ab.fecha   || '',
-        cli ? cli.nombre : '—',
-        fCamp ? '' : (ab.campana||''),
-        recLabels,
-        cultivos,
-        supTotal.toFixed(2),
-        abo.nombre || '—',
-        abo.tipo   || 'Mineral',
-        row.modo   || '—',
-        dosis,
-        unidad,
-        nPct   > 0 ? nPct   : '',
-        nKgHa  > 0 ? +nKgHa.toFixed(2)  : '',
-        nKgHa  > 0 ? +(nKgHa*supTotal).toFixed(2)  : '',
-        p2o5   > 0 ? p2o5   : '',
-        pKgHa  > 0 ? +pKgHa.toFixed(2)  : '',
-        pKgHa  > 0 ? +(pKgHa*supTotal).toFixed(2)  : '',
-        k2o    > 0 ? k2o    : '',
-        kKgHa  > 0 ? +kKgHa.toFixed(2)  : '',
-        kKgHa  > 0 ? +(kKgHa*supTotal).toFixed(2)  : '',
-        ab.obs || ''
-      ]);
-    });
-  });
-
-  if(!dataRows.length) { alert('No hay aplicaciones de abono en los registros seleccionados.'); return; }
-
-  // ── Build workbook with SheetJS ─────────────────────────
-  var headers = [
-    'Nº Aportación','Fecha','Cliente',
-    ...(fCamp ? [] : ['Campaña']),
-    'Recintos (Nº Orden / SIGPAC)','Cultivo','Sup. total (ha)',
-    'Abono / Fertilizante','Tipo','Modo aplicación',
-    'Dosis','Unidad dosis',
-    'N (%)','kg N/ha','kg N total',
-    'P₂O₅ (%)','kg P₂O₅/ha','kg P₂O₅ total',
-    'K₂O (%)','kg K₂O/ha','kg K₂O total',
-    'Observaciones'
-  ];
-
-  // Remove Campaña column from rows if filtering by campaign
-  var rows = fCamp ? dataRows.map(function(r){
-    return [r[0],r[1],r[2],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[12],r[13],r[14],r[15],r[16],r[17],r[18],r[19],r[20],r[21]];
-  }) : dataRows;
-
-  var wsData = [headers].concat(rows);
-  var wb  = XLSX.utils.book_new();
-  var ws  = XLSX.utils.aoa_to_sheet(wsData);
-
-  // Column widths
-  var colWidths = [8,12,20,12,40,20,10,25,10,14,8,10,6,8,10,6,8,10,6,8,10,30];
-  if(!fCamp) colWidths.splice(3,0,10); // insert Campaña width
-  ws['!cols'] = colWidths.slice(0,headers.length).map(function(w){ return {wch:w}; });
-
-  // Freeze top row
-  ws['!freeze'] = {xSplit:0, ySplit:1, topLeftCell:'A2', activePane:'bottomLeft', state:'frozen'};
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Fertilización');
-
-  // ── Totals summary sheet ────────────────────────────────
-  var summaryData = [
-    ['RESUMEN DE FERTILIZACIÓN'],
-    [''],
-    ['Cliente', fCli ? (DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'—'}).nombre : 'Todos'],
-    ['Campaña', fCamp||'Todas'],
-    ['Nº aportaciones', nAportacion],
-    ['Nº filas de abono', dataRows.length],
-    [''],
-    ['Abono','Nº aplicaciones','Total kg/L aplicado']
-  ];
-  var abonoTotals = {};
-  rows.forEach(function(r){
-    var nombre = r[fCamp?7:8] || '—';
-    if(!abonoTotals[nombre]) abonoTotals[nombre]={count:0,total:0};
-    abonoTotals[nombre].count++;
-    abonoTotals[nombre].total += (parseFloat(r[fCamp?10:11])||0) * (parseFloat(r[fCamp?6:7])||0);
-  });
-  Object.keys(abonoTotals).sort().forEach(function(nombre){
-    var t = abonoTotals[nombre];
-    summaryData.push([nombre, t.count, +t.total.toFixed(2)]);
-  });
-  var wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-  wsSummary['!cols'] = [{wch:30},{wch:16},{wch:20}];
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
-
-  // ── Download ────────────────────────────────────────────
-  var filename = 'Fertilizacion_'+(fCli?(DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'clientes'}).nombre:'todos')+'_'+(fCamp||'todas')+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
-  XLSX.writeFile(wb, filename);
-  closeModal('modal-export-fertilizacion');
-}
-
-function openCompraModal(id, prefillClienteId) {
+function openCompraModal(id) {
   editingId.compra = id||null;
   document.getElementById('modal-compra-title').textContent = id ? 'Editar compra' : 'Nueva compra';
   var cliSel = document.getElementById('compra-cliente');
   cliSel.innerHTML = '<option value="">— Selecciona cliente —</option>' +
     DB.clientes.map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
   var c = id ? (DB.compras||[]).find(function(x){return x.id===id;}) : null;
-  document.getElementById('compra-fecha').value     = (c && c.fecha)    || new Date().toISOString().slice(0,10);
-  document.getElementById('compra-campana').value   = (c && c.campana)  || currentCampana||'';
-  document.getElementById('compra-cliente').value   = (c && c.clienteId)|| prefillClienteId||'';
-  document.getElementById('compra-proveedor').value = (c && c.proveedor)|| '';
-  document.getElementById('compra-factura').value   = (c && c.factura)  || '';
-  document.getElementById('compra-obs').value       = (c && c.obs)      || '';
+  document.getElementById('compra-fecha').value     = c?.fecha    || new Date().toISOString().slice(0,10);
+  document.getElementById('compra-campana').value   = c?.campana  || currentCampana||'';
+  document.getElementById('compra-cliente').value   = c?.clienteId|| '';
+  document.getElementById('compra-proveedor').value = c?.proveedor|| '';
+  document.getElementById('compra-factura').value   = c?.factura  || '';
+  document.getElementById('compra-obs').value       = c?.obs      || '';
   var rows = document.getElementById('compra-rows');
   rows.innerHTML = '';
   if(c && c.items && c.items.length) { c.items.forEach(function(i){addCompraRow(i);}); }
@@ -7066,13 +6153,6 @@ function saveCompra() {
     DB.compras.push(Object.assign({id:uid()}, data));
   }
   save(); closeModal('modal-compra'); renderCompras(); updateBadges();
-  // If called from abonado modal, refresh abono options and reopen
-  if(typeof window._compraDesdeAbonadoCb === 'function') {
-    var cb = window._compraDesdeAbonadoCb;
-    window._compraDesdeAbonadoCb = null;
-    cb();
-    openModal('modal-abonado');
-  }
 }
 
 function deleteCompra(id) {
@@ -7273,12 +6353,6 @@ function drawCreateNewRecinto() {
 // ============================================================
 // TRATAMIENTO PDF EXPORT
 // ============================================================
-// Truncate text to fit within a column width (approx chars based on ~2mm per char at font-size 9)
-function fitCol(text, maxChars) {
-  text = String(text||'');
-  return text.length > maxChars ? text.slice(0, maxChars-1) + '\u2026' : text;
-}
-
 function openTratamientoPDF(id) {
   var t = DB.tratamientos.find(function(x){return x.id===id;});
   if(!t) return;
@@ -7447,83 +6521,72 @@ function generateTratamientoPDF() {
   setFont(12,'bold','#1a3d1a');
   doc.text('PRODUCTOS FITOSANITARIOS', margin, y); y += 7;
 
-  // Dynamic columns — no plazo column, more space for materia activa
+  // Dynamic columns
   var cols = includePrice
     ? ['Producto','Materia activa','Dosis/ha','Total','PVP/ha','Total €']
-    : ['Producto','Materia activa','Dosis/ha','Total'];
+    : ['Producto','Materia activa','Plazo seg.','Dosis/ha','Total'];
   var colX = includePrice
-    ? [margin+2, 52, 112, 132, 158, 181]
-    : [margin+2, 68, 130, 158];
+    ? [margin+2, 52, 105, 125, 151, 175]
+    : [margin+2, 60, 110, 133, 161];
 
   rect(margin, y, W-2*margin, 7, '#2d5a1a');
   setFont(9,'bold','#ffffff');
   cols.forEach(function(c,i){ doc.text(c, colX[i], y+5); });
   y += 7;
 
-  var totalPVPTot = 0;
-  var totalPVPHa  = 0;
+  var totalPVPTot = 0; var totalPVPHa = 0;
   altRow = false;
   prods.forEach(function(p){
-    var prod     = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var nombre   = fitCol(prod ? prod.nombre : '—', 26);
-    var materiaFull = (prod ? prod.materiaActiva||'—' : '—');
-    var dosisStr = p.dosis+' '+(p.unidad||'L/ha');
-    var total    = (p.dosis * totalHa).toFixed(3)+' '+(p.unidad||'L/ha').replace('/ha','');
-
-    // Calculate materia activa column width in mm
-    var materiaColW = includePrice ? 58 : 60;
-    var materiaLines = doc.splitTextToSize(materiaFull, materiaColW);
-    var rowH = Math.max(7, materiaLines.length * 5 + 3);
-
-    checkPage(rowH + 2);
-    if(altRow) rect(margin, y, W-2*margin, rowH, '#f9fbf9');
+    checkPage(8);
+    if(altRow) rect(margin, y, W-2*margin, 7, '#f9fbf9');
     altRow = !altRow;
-
+    var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
+    var nombre = (prod?prod.nombre:'—').slice(0,28);
+    var materia = (prod?prod.materiaActiva||'—':'—').slice(0,30);
+    var plazo = prod?prod.plazo||'—':'—';
+    var total = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
     setFont(9,'normal','#111');
-    var midY = y + rowH/2 + 1.5;
-    doc.text(nombre, colX[0], midY);
-    doc.text(materiaLines, colX[1], y + 4.5);
-
+    doc.text(nombre, colX[0], y+5);
+    doc.text(materia, colX[1], y+5);
     if(includePrice) {
-      doc.text(fitCol(dosisStr, 16), colX[2], midY);
-      doc.text(fitCol(total,    20), colX[3], midY);
-      var precio = getPrecioProducto(prod, p.formatoIdx||0);
-      if(prod && precio && p.dosis) {
-        var pvpHa  = precio * p.dosis * (1 + (p.margen||0)/100);
-        var pvpTot = pvpHa * totalHa;
-        totalPVPHa  += pvpHa;
-        totalPVPTot += pvpTot;
+      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[2], y+5);
+      doc.text(total, colX[3], y+5);
+      if(prod && prod.coste && p.dosis) {
+        var costeHa = prod.coste * p.dosis;
+        var pvpHa   = costeHa * (1 + (p.margen||0)/100);
+        var pvpTot  = pvpHa * totalHa;
+        totalPVPTot += pvpTot; totalPVPHa += pvpHa;
         setFont(9,'bold','#1a6b1a');
-        doc.text(pvpHa.toFixed(2)+' \u20ac', colX[4], midY);
-        doc.text(pvpTot.toFixed(2)+' \u20ac', colX[5], midY);
+        doc.text(pvpHa.toFixed(2)+' €', colX[4], y+5);
+        doc.text(pvpTot.toFixed(2)+' €', colX[5], y+5);
       } else {
-        setFont(9,'normal','#111');
-        doc.text('\u2014', colX[4], midY);
-        doc.text('\u2014', colX[5], midY);
+        doc.text('—', colX[4], y+5);
+        doc.text('—', colX[5], y+5);
       }
     } else {
-      doc.text(fitCol(dosisStr, 22), colX[2], midY);
-      doc.text(fitCol(total,    24), colX[3], midY);
+      doc.text(plazo, colX[2], y+5);
+      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[3], y+5);
+      doc.text(total, colX[4], y+5);
     }
-    y += rowH;
+    y += 7;
   });
 
-  // Cost summary block
+  // Cost total row
   if(includePrice && totalPVPTot > 0) {
     checkPage(14);
-    // €/ha row
+    // Cost/ha row
     rect(margin, y, W-2*margin, 7, '#d4edda');
     setFont(9,'bold','#1a3d1a');
-    doc.text('Coste por hect\u00e1rea', margin+2, y+5);
+    doc.text('Coste por hectárea', margin+2, y+5);
     setFont(10,'bold','#1a6b1a');
-    doc.text(totalPVPHa.toFixed(2)+' \u20ac/ha', W-margin-30, y+5);
+    doc.text(totalPVPHa.toFixed(2)+' €/ha', W-margin-30, y+5);
     y += 7;
     // Total row
     rect(margin, y, W-2*margin, 8, '#b8dfc4');
     setFont(10,'bold','#1a3d1a');
     doc.text('COSTE TOTAL DEL TRATAMIENTO  ('+totalHa.toFixed(2)+' ha)', margin+2, y+5.5);
     setFont(12,'bold','#1a6b1a');
-    doc.text(totalPVPTot.toFixed(2)+' \u20ac', W-margin-28, y+5.5);
+    doc.text(totalPVPTot.toFixed(2)+' €', W-margin-28, y+5.5);
     y += 11;
   }
 
@@ -7603,6 +6666,82 @@ function updateDriveModalStatus() {
 // ============================================================
 // APP INIT
 // ============================================================
+
+function openExportFertilizacionModal() {
+  var cliSel = document.getElementById('expfert-cliente');
+  var campSel = document.getElementById('expfert-campana');
+  cliSel.innerHTML = '<option value="">- Todos -</option>' + (DB.clientes||[]).map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
+  var camps = {};
+  (DB.abonados||[]).forEach(function(ab){ if(ab.campana) camps[ab.campana]=1; });
+  campSel.innerHTML = '<option value="">- Todas -</option>' + Object.keys(camps).sort().reverse().map(function(c){return '<option value="'+c+'"'+(currentCampana===c?' selected':'')+'>'+c+'</option>';}).join('');
+  openModal('modal-export-fertilizacion');
+}
+
+function exportFertilizacionExcel() {
+  var fCli = document.getElementById('expfert-cliente').value;
+  var fCamp= document.getElementById('expfert-campana').value;
+  var abonados = (DB.abonados||[]).filter(function(ab){
+    return (!fCli||ab.clienteId===fCli) && (!fCamp||ab.campana===fCamp);
+  }).slice().sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');});
+  if(!abonados.length){ alert('No hay registros de abonado para los filtros seleccionados.'); return; }
+  var aboById={}; (DB.abonos||[]).forEach(function(a){aboById[a.id]=a;});
+  var recById={}; (DB.recintos||[]).forEach(function(r){recById[r.id]=r;});
+  function recLbl(r){ return r.numOrden ? String(r.numOrden) : [r.codProvincia||'?',(r.termMunicipal||'?').split(' ')[0],r.numPoligono||'?',r.numParcela||'?',r.numRecinto||'?'].join('-'); }
+  function mTipo(m){ m=(m||'').toLowerCase(); if(m.indexOf('fondo')>=0) return 'ABONADO DE FONDO'; if(m.indexOf('coberter')>=0) return 'ABONADO DE COBERTERA'; if(m.indexOf('fertirreg')>=0) return 'FERTIRRIGACIÓN'; return m||''; }
+  var rows6=[]; var rows91=[];
+  abonados.forEach(function(ab){
+    var recs=(ab.recintoIds||[]).map(function(id){return recById[id];}).filter(Boolean);
+    if(!recs.length) return;
+    var lbl=recs.map(recLbl).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' / ');
+    var cvMap={}; recs.forEach(function(r){if(r.especieVariedad)cvMap[r.especieVariedad.trim()]=1;});
+    var esp=Object.keys(cvMap).join(', ');
+    var zonaN=recs.some(function(r){var v=String(r.nitratos||'').toLowerCase();return v==='sí'||v==='si'||v==='1'||v==='true';});
+    var hasP3P4=recs.some(function(r){var e=r.ecoregimen||'';return e.indexOf('P3')>=0||e.indexOf('P4')>=0;});
+    var esReg=recs.some(function(r){return (r.secanoRegadio||'').toLowerCase().indexOf('regad')>=0;});
+    (ab.abonos||[]).forEach(function(ar){
+      var abo=aboById[ar.abonoId||'']; if(!abo) return;
+      var n=parseFloat(abo.n)||0, p=parseFloat(abo.p)||0, k=parseFloat(abo.k)||0;
+      var dosis=parseFloat(ar.dosis)||0; var tipo=mTipo(ar.modo);
+      rows6.push([ab.fecha||'',lbl,esp,'',abo.nombre||'','',n||null,p||null,k||null,dosis||null,tipo,ab.obs||'',zonaN]);
+      if(hasP3P4 && esReg){
+        var riq=(n||p||k)?'N:'+n+'% P:'+p+'% K:'+k+'%':'';
+        rows91.push([ab.fecha||'',lbl,esp,abo.nombre+(riq?' ('+riq+')':''),abo.fabricante||'','',dosis+' '+(ar.unidad||'kg/ha'),tipo,'']);
+      }
+    });
+  });
+  if(!rows6.length){ alert('No hay aportaciones de abono.'); return; }
+  var cliNom=fCli?((DB.clientes.find(function(c){return c.id===fCli;})||{nombre:'cliente'}).nombre):'todos';
+  var anno=fCamp||new Date().getFullYear();
+  // Build workbook
+  var wb=XLSX.utils.book_new();
+  var ws6d=[
+    [null,'Explotación:',null,null,cliNom,null,null,null,null,null,null,'AÑO',anno],[null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,'6. REGISTRO DE FERTILIZACIÓN  (OPCIONAL [EXCEPTO ZONAS VULNERABLES])'],[null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [null,'Intervalo de fechas','Nº orden parcelas','Cultivo',null,'Tipo de abono/producto','Nº albarán','N%','P%','K%','Dosis (kg/ha)','Tipo fertilización','Observaciones'],
+    [null,null,null,'Especie','Variedad',null,null,null,null,null,null,null,null],
+    [null,'(Fecha)','(Nº Orden)','(Especie)','','(Nombre abono)','','N','P','K','(kg/ha)','(Tipo)','(Obs)'],
+  ];
+  rows6.forEach(function(r){ ws6d.push([null,r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]]); });
+  if(rows6.some(function(r){return r[12];})) ws6d.push([null,'⚠ Parcelas en ZONA VULNERABLE DE NITRÓGENO - normativa Orden MAV/398/2022']);
+  var ws6=XLSX.utils.aoa_to_sheet(ws6d);
+  ws6['!cols']=[{wch:2},{wch:16},{wch:22},{wch:20},{wch:12},{wch:30},{wch:12},{wch:5},{wch:5},{wch:5},{wch:10},{wch:22},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws6,'6. REG. FERTILIZ');
+  var ws91d=[
+    [null,null,null,null,null,null,null,null,'AÑO: ',anno],
+    ['9. DATOS RELATIVOS A LA EXPLOTACIÓN PARA PAGOS DIRECTOS DISOCIADOS'],[],[],
+    ['9.1 FERTILIZACIÓN: ECOREGÍMENES P3-P4 EN REGADÍO'],[],
+    ['Fecha','Nº orden parcelas','Cultivo','Material fertilizante','Empresa suministradora','Nº factura','Dosis/unidad','Tipo fertilización','Método aplicación'],
+  ];
+  (rows91.length?rows91:[['(No hay parcelas P3/P4 en regadío)']]).forEach(function(r){ws91d.push(r);});
+  var ws91=XLSX.utils.aoa_to_sheet(ws91d);
+  ws91['!cols']=[{wch:16},{wch:24},{wch:20},{wch:35},{wch:22},{wch:12},{wch:14},{wch:25},{wch:35}];
+  XLSX.utils.book_append_sheet(wb,ws91,'9.1. INF. FERTILIZACIÓN');
+  var fname='Cuaderno_Fertilizacion_'+cliNom+'_'+anno+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  XLSX.writeFile(wb,fname);
+  closeModal('modal-export-fertilizacion');
+  alert('✅ Excel descargado: '+fname+'\n\nHoja 6: '+rows6.length+' aportaciones'+(rows6.some(function(r){return r[12];})?'\n⚠ Hay parcelas en zona vulnerable':'')+' \nHoja 9.1: '+rows91.length+' aportaciones P3/P4+regadío');
+}
+
 window.addEventListener('load', function() {
   if(window.location.hash.indexOf('access_token') !== -1 ||
      window.location.hash.indexOf('error') !== -1) {
