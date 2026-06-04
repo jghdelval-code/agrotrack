@@ -6000,7 +6000,7 @@ function loadAbonadoParcelasPicker(selectedIds, cultivoFilter) {
       var cv      = (r.especieVariedad||'Sin cultivo').split('/')[0].trim();
       var orden   = r.numOrden ? '<span style="font-size:10px;color:var(--text3);margin-right:4px">#'+r.numOrden+'</span>' : '';
       html += '<label class="recinto-check" style="padding-left:28px">'
-        +'<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" data-ha="'+ha+'" '+checked+' onchange="updateAbonadoHaTotal()">'
+        +'<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" data-ha="'+ha+'" '+checked+' onchange="updateAbonadoHaTotal();calcAbonadoStockPreview()">'
         +'<span class="crop-dot" style="background:'+color+'"></span>'
         +orden
         +'<span style="flex:1;font-size:12px">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>'
@@ -6023,27 +6023,158 @@ function toggleFincaCheck(cb) {
   updateAbonadoHaTotal();
 }
 
+function getAbonoStock(clienteId) {
+  // Returns {abonoId: {stock, unidad, comprado, usado}} for purchased abonos
+  if(!clienteId) return {};
+  var campana = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
+  return calcStock(clienteId, campana).abonos;
+}
+
+function calcAbonadoStockPreview() {
+  // Called whenever parcelas selection or dosis changes
+  // Recalculates stock preview for each abono row
+  var clienteId = document.getElementById('abonado-cliente').value;
+  if(!clienteId) return;
+
+  // Get selected parcelas total ha
+  var haTotal = 0;
+  document.querySelectorAll('#abonado-parcelas-picker .abonado-rec-check:checked').forEach(function(cb){
+    haTotal += parseFloat(cb.dataset.ha)||0;
+  });
+
+  // Get current stock from DB
+  var stockMap = getAbonoStock(clienteId);
+
+  document.querySelectorAll('#abonado-rows .product-row').forEach(function(row){
+    var sel    = row.querySelector('.abonado-row-sel'); if(!sel) return;
+    var dosisEl= row.querySelector('.abonado-row-dosis');
+    var unidEl = row.querySelector('.abonado-row-unidad');
+    var indEl  = row.querySelector('.abono-stock-preview');
+    if(!indEl) return;
+
+    var abonoId = sel.value;
+    var s = stockMap[abonoId];
+    if(!s) { indEl.textContent=''; return; }
+
+    var dosis = parseFloat((dosisEl||{}).value)||0;
+    var unidad= (unidEl||{}).value||'kg/ha';
+
+    // Normalize dosis to same unit as stock
+    function toBase(qty, u){ u=(u||'').toLowerCase(); if(u==='t'||u==='t/ha') return qty*1000; if(u==='g'||u==='g/ha') return qty/1000; return qty; }
+    var usado = toBase(dosis, unidad) * haTotal;
+    var restante = s.stock - usado;
+    var pct = s.stock > 0 ? Math.max(0, restante/s.stock*100) : 0;
+
+    var color = restante < 0 ? '#e74c3c' : restante < s.stock*0.1 ? '#d4a017' : '#7acc4a';
+    var msg = 'Stock: '+s.stock.toFixed(1)+' '+s.unidad;
+    if(dosis && haTotal) {
+      msg += ' | Necesario: '+usado.toFixed(1)+' '+s.unidad;
+      msg += ' | Restante: ';
+      if(restante < 0) msg += '<b style="color:#e74c3c">\u00a1FALTA '+(Math.abs(restante).toFixed(1))+' '+s.unidad+'!</b>';
+      else msg += '<b style="color:'+color+'">'+restante.toFixed(1)+' '+s.unidad+'</b>';
+    }
+    indEl.innerHTML = msg;
+
+    // Update mini bar
+    var barEl = row.querySelector('.abono-stock-bar-fill');
+    if(barEl) {
+      barEl.style.width = Math.min(100, pct).toFixed(0)+'%';
+      barEl.style.background = color;
+    }
+  });
+}
+
 function addAbonadoRow(data) {
-  var row  = document.createElement('div');
+  var row = document.createElement('div');
   row.className = 'product-row';
-  row.style.gridTemplateColumns = '2fr 90px 100px 1fr auto';
-  var opts = (DB.abonos||[]).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');}).map(function(a){
-    var npk=[a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
-    return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+'</option>';
+  row.style.padding = '0';
+
+  var clienteId = document.getElementById('abonado-cliente').value;
+  var campana   = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
+  var stockMap  = clienteId ? calcStock(clienteId, campana).abonos : {};
+
+  // Build abono options — only purchased abonos, sorted by name
+  var allAbonos = (DB.abonos||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  var purchased = Object.keys(stockMap);
+  var list = purchased.length
+    ? allAbonos.filter(function(a){ return stockMap[a.id]; })
+    : allAbonos; // fallback: show all if no purchases
+
+  var opts = list.map(function(a){
+    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+    var s   = stockMap[a.id];
+    var stockTxt = s ? ' | Stock: '+s.stock.toFixed(1)+' '+s.unidad : '';
+    return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+stockTxt+'</option>';
   }).join('');
-  if(!opts) opts='<option>Sin abonos — añade en pestaña Abonos</option>';
-  var modos = ['Voleo','Localizado','Fertirrigación','Foliar','Fondo','Cobertera'].map(function(m){
+  if(!opts) opts='<option value="">Sin abonos comprados</option>';
+
+  var modos = ['Voleo','Localizado','Fertirrigaci\u00f3n','Foliar','Fondo','Cobertera'].map(function(m){
     return '<option'+(data&&data.modo===m?' selected':'')+'>'+m+'</option>';
   }).join('');
-  row.innerHTML =
-    '<select class="abonado-row-sel">'+opts+'</select>' +
-    '<input type="number" step="0.1" min="0" class="abonado-row-dosis" placeholder="0" value="'+(data?.dosis||'')+'">' +
-    '<select class="abonado-row-unidad">' +
-      ['kg/ha','L/ha','t/ha','g/ha','kg','L'].map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('') +
-    '</select>' +
-    '<select class="abonado-row-modo">'+modos+'</select>' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
+
+  var inner = document.createElement('div');
+  inner.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:8px 10px';
+
+  // Hint if no purchases
+  if(purchased.length && list.length < allAbonos.length) {
+    var hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px;color:var(--text3)';
+    hint.textContent = 'Solo abonos comprados por este cliente \u00b7 stock de la campa\u00f1a actual';
+    inner.appendChild(hint);
+  }
+
+  // Main grid
+  var grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:2fr 80px 100px 1fr auto;gap:8px;align-items:center';
+
+  var sel = document.createElement('select');
+  sel.className='abonado-row-sel'; sel.innerHTML=opts;
+  sel.addEventListener('change', function(){ calcAbonadoStockPreview(); });
+
+  var dosisInp = document.createElement('input');
+  dosisInp.type='number'; dosisInp.step='0.1'; dosisInp.min='0'; dosisInp.className='abonado-row-dosis';
+  dosisInp.placeholder='0'; if(data&&data.dosis!=null) dosisInp.value=data.dosis;
+  dosisInp.addEventListener('input', calcAbonadoStockPreview);
+
+  var unidSel = document.createElement('select'); unidSel.className='abonado-row-unidad';
+  ['kg/ha','L/ha','t/ha','g/ha','kg','L'].forEach(function(u){
+    var o=document.createElement('option'); o.textContent=u; if(data&&data.unidad===u) o.selected=true; unidSel.appendChild(o);
+  });
+  unidSel.addEventListener('change', calcAbonadoStockPreview);
+
+  var modSel = document.createElement('select'); modSel.className='abonado-row-modo';
+  modSel.innerHTML=modos;
+
+  var delBtn = document.createElement('button'); delBtn.type='button'; delBtn.className='remove-prod-btn';
+  delBtn.textContent='\u00d7'; delBtn.onclick=function(){ this.closest('.product-row').remove(); };
+
+  grid.appendChild(sel); grid.appendChild(dosisInp); grid.appendChild(unidSel);
+  grid.appendChild(modSel); grid.appendChild(delBtn);
+  inner.appendChild(grid);
+
+  // Stock preview bar + text
+  var barWrap = document.createElement('div');
+  barWrap.style.cssText='display:flex;align-items:center;gap:8px';
+
+  var barBg = document.createElement('div');
+  barBg.style.cssText='flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden';
+  var barFill = document.createElement('div');
+  barFill.className='abono-stock-bar-fill';
+  barFill.style.cssText='width:0%;height:100%;background:#7acc4a;border-radius:3px;transition:width .3s';
+  barBg.appendChild(barFill);
+
+  var preview = document.createElement('div');
+  preview.className='abono-stock-preview';
+  preview.style.cssText='font-size:11px;color:var(--text2);flex:2';
+
+  barWrap.appendChild(barBg); barWrap.appendChild(preview);
+  inner.appendChild(barWrap);
+
+  row.appendChild(inner);
   document.getElementById('abonado-rows').appendChild(row);
+
+  // Trigger initial calculation
+  setTimeout(calcAbonadoStockPreview, 50);
 }
 
 function saveAbonado() {
