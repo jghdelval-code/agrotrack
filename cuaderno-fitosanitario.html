@@ -979,15 +979,16 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Plazo seguridad</label>
           <input type="text" id="prod-plazo" placeholder="ej: 21 días / NP">
         </div>
-        <div class="form-group">
+        <div class="form-group span-2">
           <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
           <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
-            <div style="display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:0;background:var(--card);padding:5px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">
-              <span>Nombre</span><span>Cantidad</span><span>Unidad</span><span>€ / unidad</span><span></span>
+            <div style="display:grid;grid-template-columns:1fr 70px 70px 90px auto;gap:0;background:var(--card);padding:5px 10px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">
+              <span>Nombre / descripción</span><span>Cant.</span><span>Unidad</span><span>€ / envase</span><span></span>
             </div>
             <div id="prod-formatos-rows"></div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" onclick="addFormatoRow()" style="margin-top:6px;font-size:12px">＋ Añadir formato</button>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">El precio es por envase completo (ej: botella de 1 L → precio de esa botella).</div>
         </div>
         <div class="form-group span-0" style="display:none">
           <label>dummy</label>
@@ -2267,9 +2268,17 @@ function buildTrtCardHtml(t) {
   var totalCosteHa=0, totalPVPHa=0, hasCost=false;
   prods.forEach(function(p){
     var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var precio = getPrecioProducto(prod, p.formatoIdx||0);
-    if(prod && precio && p.dosis) {
-      totalCosteHa += precio*p.dosis; totalPVPHa += precio*p.dosis*(1+(p.margen||0)/100); hasCost=true;
+    // Use stored pvpHa if available (preserves historical price) — only recalc if missing
+    if(p.pvpHa && p.dosis) {
+      totalPVPHa += p.pvpHa; hasCost=true;
+      totalCosteHa += p.pvpHa / (1+(p.margen||0)/100);
+    } else {
+      var precio = getPrecioProducto(prod, p.formatoIdx||0, t.fecha);
+      if(prod && precio && p.dosis) {
+        totalCosteHa += precio*p.dosis;
+        totalPVPHa   += precio*p.dosis*(1+(p.margen||0)/100);
+        hasCost = true;
+      }
     }
   });
   var totalPVPTot = totalPVPHa*totalHa;
@@ -2283,7 +2292,17 @@ function buildTrtCardHtml(t) {
     var prod=DB.productos.find(function(pr){return pr.id===p.productoId;});
     var totalProd=(p.dosis*totalHa).toFixed(3);
     var cc='';
-    if(hasCost){ var precio=getPrecioProducto(prod,p.formatoIdx||0); if(prod&&precio&&p.dosis){var cH=precio*p.dosis,pHa=cH*(1+(p.margen||0)/100),pTot=pHa*totalHa; cc='<td style="color:var(--text3)">'+cH.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pHa.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+'&euro;</td>';} else{cc='<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>';}}
+    if(hasCost){
+      var pvpHaP, costeHaP;
+      if(p.pvpHa && p.dosis) {
+        pvpHaP = p.pvpHa;
+        costeHaP = p.pvpHa / (1+(p.margen||0)/100);
+      } else {
+        var precio2=getPrecioProducto(prod,p.formatoIdx||0,t.fecha);
+        if(prod&&precio2&&p.dosis){costeHaP=precio2*p.dosis;pvpHaP=costeHaP*(1+(p.margen||0)/100);}
+      }
+      if(pvpHaP&&p.dosis){var pTot=pvpHaP*totalHa; cc='<td style="color:var(--text3)">'+costeHaP.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pvpHaP.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+'&euro;</td>';} else{cc='<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>';}
+    }
     return '<tr><td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td><td style="color:var(--text2)">'+(prod?prod.materiaActiva||'&mdash;':'&mdash;')+'</td><td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'&mdash;')+'</td><td><b>'+p.dosis+' '+(p.unidad||'L/ha')+'</b></td><td><b>'+totalProd+' '+(p.unidad||'L/ha').replace('/ha','')+'</b></td>'+cc+'<td style="color:var(--text2)">'+(p.justificacion||'&mdash;')+'</td></tr>';
   }).join('');
   var tableFoot = hasCost?'<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td><td style="color:var(--text3);font-weight:700">'+totalCosteHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700">'+totalPVPHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700;font-size:14px">'+totalPVPTot.toFixed(2)+'&euro;</td><td></td></tr></tfoot>':'';
@@ -2602,28 +2621,15 @@ function calcProdRowPVP(input) {
   var pvpSpan=row.querySelector('.prod-row-pvp'); if(!pvpSpan) return;
   var prodId=comboInp?comboInp.dataset.prodId:'';
   var prod=prodId?(DB.productos||[]).find(function(p){return p.id===prodId;}):null;
-  if(!prod||!dosis){pvpSpan.textContent='&mdash;';pvpSpan.style.color='var(--text3)';return;}
+  if(!prod||!dosis){pvpSpan.textContent='\u2014';pvpSpan.style.color='var(--text3)';return;}
+  // Use treatment date to find correct price
+  var trtFecha=(document.getElementById('trt-fecha')||{}).value||'';
   var fmtSel=row.querySelector('.prod-row-formato');
   var fmtIdx=fmtSel?parseInt(fmtSel.value)||0:0;
-  var precio=getPrecioProducto(prod,fmtIdx);
-  if(!precio){pvpSpan.textContent='&mdash;';pvpSpan.style.color='var(--text3)';return;}
-  pvpSpan.textContent=(precio*dosis*(1+margen/100)).toFixed(2)+'&euro;/ha';
+  var precio=getPrecioProducto(prod,fmtIdx,trtFecha);
+  if(!precio){pvpSpan.textContent='\u2014';pvpSpan.style.color='var(--text3)';return;}
+  pvpSpan.textContent=(precio*dosis*(1+margen/100)).toFixed(2)+'\u20ac/ha';
   pvpSpan.style.color='#7acc4a';
-}
-
-function calcProdRowPVP(input) {
-  var row       = input.closest('.product-row');
-  var sel       = row.querySelector('.prod-row-sel');
-  var dosis     = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
-  var margen    = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
-  var pvpSpan   = row.querySelector('.prod-row-pvp');
-  if(!pvpSpan) return;
-  var prod = sel ? (DB.productos||[]).find(function(p){return p.id===sel.value;}) : null;
-  if(!prod || !prod.coste || !dosis) { pvpSpan.textContent = '—'; return; }
-  var costeHa = prod.coste * dosis;
-  var pvpHa   = costeHa * (1 + margen/100);
-  pvpSpan.textContent = pvpHa.toFixed(2) + ' €/ha';
-  pvpSpan.style.color = '#7acc4a';
 }
 
 function saveTratamiento() {
@@ -2783,14 +2789,33 @@ function renderProductos() {
       '<div class="product-card-info">' +
       '<div class="product-card-name">'+p.nombre+nameExtra+' <span class="tag '+tipoBadge(p.tipo)+'" style="font-size:11px">'+p.tipo+'</span></div>' +
       '<div class="product-card-meta">' +
-      '<span>🔬 '+(p.materiaActiva||'—')+'</span>' +
-      '<span>📄 Reg: '+(p.numRegistro||'—')+'</span>' +
-      '<span>🏭 '+(p.titular||'—')+'</span>' +
-      '<span>💊 Form: '+(p.formulacion||'—')+'</span>' +
-      '<span>📏 Dosis: '+(p.dosis||'—')+'</span>' +
-      '<span>⏱️ Plazo: '+(p.plazo||'—')+'</span>' +
+      '<span>&#x1F52C; '+(p.materiaActiva||'&mdash;')+'</span>' +
+      '<span>&#x1F4C4; Reg: '+(p.numRegistro||'&mdash;')+'</span>' +
+      '<span>&#x1F3ED; '+(p.titular||'&mdash;')+'</span>' +
+      '<span>&#x1F48A; Form: '+(p.formulacion||'&mdash;')+'</span>' +
+      '<span>&#x1F4CF; Dosis: '+(p.dosis||'&mdash;')+'</span>' +
+      '<span>&#x23F1; Plazo: '+(p.plazo||'&mdash;')+'</span>' +
       '</div>' +
-      (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">📋 '+p.usos+'</div>' : '') +
+      // Formats/prices block
+      (function(){
+        var fmts = (p.formatos && p.formatos.length) ? p.formatos
+          : (p.coste ? [{nombre:'Est\u00e1ndar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}] : []);
+        if(!fmts.length) return '';
+        var pills = fmts.map(function(f){
+          var label = f.nombre || (f.cantidad+' '+f.unidad);
+          var price = f.precio ? f.precio.toFixed(2)+' \u20ac' : 'sin precio';
+          return '<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(74,140,42,.08);border-radius:6px;border:1px solid var(--border2)">'
+            +'<span style="font-size:12px;font-weight:700;color:var(--white)">'+label+'</span>'
+            +'<span style="font-size:11px;color:var(--text3)">'+(f.cantidad?f.cantidad+' '+f.unidad:'')+'</span>'
+            +'<span style="margin-left:auto;font-size:13px;font-weight:700;color:#7acc4a">'+price+'</span>'
+            +'</div>';
+        }).join('');
+        return '<div style="margin-top:7px">'
+          +'<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">&#x1F4E6; Formatos disponibles</div>'
+          +'<div style="display:flex;flex-direction:column;gap:4px">'+pills+'</div>'
+          +'</div>';
+      })() +
+      (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">&#x1F4CB; '+p.usos+'</div>' : '') +
       cultivosPills +
       dcBlock +
       '</div>' +
@@ -2890,12 +2915,52 @@ function getCultivoTagsValues() {
   return [...container.querySelectorAll('span[data-cv]')].map(s=>s.dataset.cv);
 }
 
-function getPrecioProducto(prod, formatoIdx) {
+// ── Price history helpers ─────────────────────────────────────────────────
+// A format's prices are stored as: [{fecha:'2025-01-01', precio:14.50}, ...]
+// sorted descending. Legacy formats with a single `precio` field are migrated.
+
+function normalizarPrecios(fmt) {
+  if(fmt.precios && fmt.precios.length) return fmt.precios;
+  if(fmt.precio) return [{fecha:'', precio:fmt.precio}];
+  return [];
+}
+
+function getPrecioEnFecha(fmt, fecha) {
+  // Returns the most recent price on or before `fecha`.
+  // If fecha is empty/null, returns the most recent price.
+  var precios = normalizarPrecios(fmt);
+  if(!precios.length) return 0;
+  if(!fecha) {
+    // Most recent (highest date or first in list)
+    var sorted = precios.slice().sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+    return sorted[0].precio||0;
+  }
+  // Filter to prices on or before fecha, take the most recent
+  var valid = precios.filter(function(p){ return !p.fecha || p.fecha <= fecha; });
+  if(!valid.length) {
+    // All prices are after fecha — use the oldest available
+    var oldest = precios.slice().sort(function(a,b){ return (a.fecha||'').localeCompare(b.fecha||''); });
+    return oldest[0].precio||0;
+  }
+  valid.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+  return valid[0].precio||0;
+}
+
+function getPrecioProducto(prod, formatoIdx, fecha) {
   if(!prod) return 0;
   var fmts = (prod.formatos && prod.formatos.length) ? prod.formatos : [];
-  if(fmts.length) { var fmt = fmts[formatoIdx != null ? formatoIdx : 0]; return fmt ? (fmt.precio||0) : 0; }
+  if(fmts.length) {
+    var fmt = fmts[formatoIdx != null ? formatoIdx : 0];
+    if(!fmt) return 0;
+    return getPrecioEnFecha(fmt, fecha||null);
+  }
   return prod.coste||0;
 }
+
+function precioActual(fmt) {
+  return getPrecioEnFecha(fmt, null);
+}
+
 function renderFormatoRows(formatos) {
   var cont = document.getElementById('prod-formatos-rows');
   if(!cont) return;
@@ -2903,45 +2968,179 @@ function renderFormatoRows(formatos) {
   if(formatos && formatos.length) { formatos.forEach(function(f){ addFormatoRow(f); }); }
   else { addFormatoRow(); }
 }
+
 function addFormatoRow(data) {
   var cont = document.getElementById('prod-formatos-rows');
   if(!cont) return;
-  var row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 75px 80px 90px auto;gap:6px;padding:6px 10px;border-top:1px solid var(--border);align-items:center';
+
+  // Normalize legacy price
+  var precios = data ? normalizarPrecios(data) : [];
+
+  var wrapper = document.createElement('div');
+  wrapper.style.cssText = 'border-top:1px solid var(--border)';
+
+  // ── Main row ─────────────────────────────────────────────────────────
+  var mainRow = document.createElement('div');
+  mainRow.style.cssText = 'display:grid;grid-template-columns:1fr 70px 70px auto auto auto;gap:6px;padding:6px 10px;align-items:center';
+
   var units = ['L','kg','ud','saco','t','mL','g'];
+
   var inp1 = document.createElement('input');
-  inp1.type='text'; inp1.className='fmt-nombre'; inp1.placeholder='Ej: Envase 1L';
-  inp1.style.fontSize='13px';
+  inp1.type='text'; inp1.className='fmt-nombre'; inp1.placeholder='Ej: Botella 1L, Garrafa 5L...';
+  inp1.style.cssText='font-size:13px;width:100%;min-width:0';
   if(data&&data.nombre) inp1.value=data.nombre;
+
   var inp2 = document.createElement('input');
   inp2.type='number'; inp2.step='0.001'; inp2.min='0'; inp2.className='fmt-cantidad';
-  inp2.placeholder='1'; inp2.style.fontSize='13px';
+  inp2.placeholder='1'; inp2.style.cssText='font-size:13px;width:100%';
   if(data&&data.cantidad) inp2.value=data.cantidad;
+
   var sel = document.createElement('select');
-  sel.className='fmt-unidad'; sel.style.fontSize='13px';
+  sel.className='fmt-unidad'; sel.style.cssText='font-size:13px;width:100%';
   units.forEach(function(u){ var o=document.createElement('option'); o.value=u; o.textContent=u; if(data&&data.unidad===u) o.selected=true; sel.appendChild(o); });
-  var inp3 = document.createElement('input');
-  inp3.type='number'; inp3.step='0.01'; inp3.min='0'; inp3.className='fmt-precio';
-  inp3.placeholder='0.00'; inp3.style.fontSize='13px';
-  if(data&&data.precio) inp3.value=data.precio;
-  var btn = document.createElement('button');
-  btn.type='button'; btn.className='btn btn-danger btn-sm'; btn.style.cssText='padding:4px 8px';
-  btn.textContent='×';
-  btn.onclick=function(){ this.parentNode.remove(); };
-  row.appendChild(inp1); row.appendChild(inp2); row.appendChild(sel);
-  row.appendChild(inp3); row.appendChild(btn);
-  cont.appendChild(row);
+
+  // Current price display (read-only, updated from history)
+  var precioLabel = document.createElement('span');
+  precioLabel.className='fmt-precio-label';
+  var pa = precios.length ? precioActual({precios:precios}) : 0;
+  precioLabel.style.cssText='font-size:13px;font-weight:700;color:'+(pa?'#7acc4a':'var(--text3)')+';white-space:nowrap;min-width:70px;text-align:right';
+  precioLabel.textContent = pa ? pa.toFixed(2)+' \u20ac' : 'sin precio';
+
+  // Toggle history button
+  var histBtn = document.createElement('button');
+  histBtn.type='button'; histBtn.className='btn btn-secondary btn-sm';
+  histBtn.title='Historial de precios'; histBtn.style.cssText='padding:4px 8px;white-space:nowrap;font-size:11px';
+  histBtn.textContent='\uD83D\uDCC5 '+precios.length;
+
+  var removeBtn = document.createElement('button');
+  removeBtn.type='button'; removeBtn.className='btn btn-danger btn-sm';
+  removeBtn.style.cssText='padding:4px 8px'; removeBtn.textContent='\u00d7';
+  removeBtn.onclick=function(){ wrapper.remove(); };
+
+  mainRow.appendChild(inp1); mainRow.appendChild(inp2); mainRow.appendChild(sel);
+  mainRow.appendChild(precioLabel); mainRow.appendChild(histBtn); mainRow.appendChild(removeBtn);
+
+  // ── History panel (hidden by default) ────────────────────────────────
+  var histPanel = document.createElement('div');
+  histPanel.style.cssText='display:none;padding:8px 12px;background:rgba(74,140,42,.04);border-top:1px solid var(--border)';
+
+  function renderPreciosList() {
+    histPanel.innerHTML = '';
+    // Header
+    var hdr = document.createElement('div');
+    hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px';
+    hdr.textContent='Historial de precios (el m\u00e1s reciente aplica a nuevos tratamientos)';
+    histPanel.appendChild(hdr);
+
+    if(precios.length) {
+      var sorted = precios.slice().sort(function(a,b){return (b.fecha||'').localeCompare(a.fecha||'');});
+      sorted.forEach(function(entry, idx) {
+        var eRow = document.createElement('div');
+        eRow.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)';
+        var fechaInp = document.createElement('input');
+        fechaInp.type='date'; fechaInp.value=entry.fecha||'';
+        fechaInp.style.cssText='font-size:12px;flex:0 0 130px';
+        fechaInp.addEventListener('change', function(){
+          var realIdx = precios.indexOf(entry); if(realIdx>=0) precios[realIdx].fecha=this.value;
+          updatePrecioLabel();
+        });
+        var precioInp = document.createElement('input');
+        precioInp.type='number'; precioInp.step='0.01'; precioInp.min='0'; precioInp.value=entry.precio||'';
+        precioInp.placeholder='0.00'; precioInp.style.cssText='font-size:12px;flex:1;min-width:70px';
+        var euroLbl = document.createElement('span');
+        euroLbl.style.cssText='font-size:12px;color:var(--text2)'; euroLbl.textContent='\u20ac';
+        precioInp.addEventListener('change', function(){
+          var realIdx=precios.indexOf(entry); if(realIdx>=0) precios[realIdx].precio=parseFloat(this.value)||0;
+          updatePrecioLabel();
+        });
+        var delBtn = document.createElement('button');
+        delBtn.type='button'; delBtn.className='btn btn-danger btn-sm'; delBtn.style.cssText='padding:2px 6px;font-size:11px';
+        delBtn.textContent='\u00d7';
+        delBtn.onclick=function(){
+          var ri=precios.indexOf(entry); if(ri>=0) precios.splice(ri,1);
+          renderPreciosList(); updatePrecioLabel();
+        };
+        // Badge for most recent
+        if(idx===0) {
+          var badge=document.createElement('span');
+          badge.className='tag tag-green'; badge.style.cssText='font-size:10px;padding:1px 5px';
+          badge.textContent='Actual'; eRow.appendChild(badge);
+        }
+        eRow.appendChild(fechaInp); eRow.appendChild(precioInp); eRow.appendChild(euroLbl); eRow.appendChild(delBtn);
+        histPanel.appendChild(eRow);
+      });
+    } else {
+      var empty=document.createElement('div');
+      empty.style.cssText='font-size:12px;color:var(--text3);padding:4px 0;margin-bottom:6px';
+      empty.textContent='Sin precios registrados';
+      histPanel.appendChild(empty);
+    }
+
+    // Add new price row
+    var addRow = document.createElement('div');
+    addRow.style.cssText='display:flex;align-items:center;gap:8px;margin-top:8px';
+    var newFecha=document.createElement('input'); newFecha.type='date';
+    newFecha.style.cssText='font-size:12px;flex:0 0 130px';
+    newFecha.value=new Date().toISOString().slice(0,10);
+    var newPrecio=document.createElement('input'); newPrecio.type='number'; newPrecio.step='0.01'; newPrecio.min='0';
+    newPrecio.placeholder='Precio (\u20ac)'; newPrecio.style.cssText='font-size:12px;flex:1;min-width:70px';
+    var addBtn=document.createElement('button'); addBtn.type='button'; addBtn.className='btn btn-primary btn-sm';
+    addBtn.style.cssText='font-size:12px;padding:4px 10px;white-space:nowrap'; addBtn.textContent='\uFE0F\u2795 A\u00f1adir precio';
+    addBtn.onclick=function(){
+      var p=parseFloat(newPrecio.value); if(!p){alert('Introduce un precio v\u00e1lido.');return;}
+      precios.push({fecha:newFecha.value||'',precio:p});
+      newPrecio.value='';
+      renderPreciosList(); updatePrecioLabel();
+    };
+    var euroLbl2=document.createElement('span'); euroLbl2.style.cssText='font-size:12px;color:var(--text2)'; euroLbl2.textContent='\u20ac';
+    addRow.appendChild(newFecha); addRow.appendChild(newPrecio); addRow.appendChild(euroLbl2); addRow.appendChild(addBtn);
+    histPanel.appendChild(addRow);
+  }
+
+  function updatePrecioLabel() {
+    var pa2 = precios.length ? precioActual({precios:precios}) : 0;
+    precioLabel.style.color = pa2 ? '#7acc4a' : 'var(--text3)';
+    precioLabel.textContent = pa2 ? pa2.toFixed(2)+' \u20ac' : 'sin precio';
+    histBtn.textContent = '\uD83D\uDCC5 '+precios.length;
+  }
+
+  histBtn.onclick = function(){
+    var open = histPanel.style.display !== 'none';
+    histPanel.style.display = open ? 'none' : 'block';
+    if(!open) renderPreciosList();
+  };
+
+  // Store prices reference on the row for getFormatosValues
+  wrapper._precios = precios;
+  wrapper.querySelector = function(sel){ return mainRow.querySelector ? mainRow.querySelector(sel) : null; };
+
+  wrapper.appendChild(mainRow);
+  wrapper.appendChild(histPanel);
+  cont.appendChild(wrapper);
 }
 function getFormatosValues() {
-  var rows = document.querySelectorAll('#prod-formatos-rows > div');
+  var cont = document.getElementById('prod-formatos-rows');
+  if(!cont) return [];
   var out = [];
-  rows.forEach(function(row) {
-    var nombre   = (row.querySelector('.fmt-nombre')||{}).value;
-    var cantidad = parseFloat((row.querySelector('.fmt-cantidad')||{}).value)||1;
-    var unidad   = (row.querySelector('.fmt-unidad')||{}).value||'L';
-    var precio   = parseFloat((row.querySelector('.fmt-precio')||{}).value)||0;
-    if(nombre || precio) out.push({nombre: nombre||('Formato '+(out.length+1)), cantidad: cantidad, unidad: unidad, precio: precio});
-  });
+  var wrappers = cont.children;
+  for(var i=0; i<wrappers.length; i++) {
+    var w = wrappers[i];
+    var nombre   = (w.querySelector('.fmt-nombre')||{}).value||'';
+    var cantidad = parseFloat((w.querySelector('.fmt-cantidad')||{}).value)||1;
+    var unidad   = (w.querySelector('.fmt-unidad')||{}).value||'L';
+    var precios  = w._precios || [];
+    if(nombre || precios.length) {
+      // Legacy compat: also expose the current price as `precio`
+      var pa = precios.length ? precioActual({precios:precios}) : 0;
+      out.push({
+        nombre:  nombre || ('Formato '+(i+1)),
+        cantidad: cantidad,
+        unidad:   unidad,
+        precios:  precios.slice(),
+        precio:   pa   // legacy field kept for backwards compat
+      });
+    }
+  }
   return out;
 }
 function saveProducto() {
@@ -3235,8 +3434,12 @@ function renderClientes() {
       '</div>';
   }
 
-  for(var ci = 0; ci < DB.clientes.length; ci++) {
-    var c = DB.clientes[ci];
+  var clientesSorted = DB.clientes.slice().sort(function(a,b){
+    return (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'});
+  });
+
+  for(var ci = 0; ci < clientesSorted.length; ci++) {
+    var c = clientesSorted[ci];
 
     // All campaigns for this client
     var allRecs = DB.recintos.filter(function(r){ return r.clienteId === c.id; });
@@ -6144,69 +6347,137 @@ function openCompraModal(id) {
 }
 
 // Build options for compra row item select
-function buildCompraItemOpts(tipo, selectedId) {
+function buildCompraItemList(tipo) {
   var list = tipo === 'abono'
-    ? (DB.abonos||[]).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
-    : (DB.productos||[]).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
-  var opts = list.map(function(x){
-    return '<option value="'+x.id+'"'+(x.id===selectedId?' selected':'')+'>'+x.nombre+'</option>';
-  }).join('');
-  if(!opts) {
-    opts = '<option value="">— Sin '+(tipo==='abono'?'abonos':'productos')+' —</option>';
-  }
-  opts += '<option value="__nuevo__" style="color:var(--primary);font-weight:700">➕ Crear nuevo '+(tipo==='abono'?'abono':'producto')+'…</option>';
-  return opts;
+    ? (DB.abonos||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
+    : (DB.productos||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  return list;
 }
 
 function addCompraRow(data) {
   var row = document.createElement('div');
   row.className = 'product-row';
-  row.style.gridTemplateColumns = '110px 1fr 90px 90px 85px auto';
+  row.style.padding = '0';
 
-  var tipo    = (data&&data.tipo) || 'producto';
-  var selId   = (data&&data.itemId) || '';
+  var tipo  = (data && data.tipo)   || 'producto';
+  var selId = (data && data.itemId) || '';
+  var list  = buildCompraItemList(tipo);
+  var selItem = selId ? list.find(function(x){return x.id===selId;}) : null;
+  var selLabel = selItem ? selItem.nombre : '';
+  var cbId = 'compracb' + Date.now() + (Math.random()*999|0);
+
   var unidades = ['L','kg','t','mL','g','saco','ud'].map(function(u){
     return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';
   }).join('');
 
-  row.innerHTML =
-    '<select class="compra-row-tipo" onchange="refreshCompraRowItems(this)">' +
-      '<option value="producto"'+(tipo==='producto'?' selected':'')+'>💊 Fitosan.</option>' +
-      '<option value="abono"'+(tipo==='abono'?' selected':'')+'>🧪 Abono</option>' +
-    '</select>' +
-    '<select class="compra-row-item" onchange="onCompraItemChange(this)">' +
-      buildCompraItemOpts(tipo, selId) +
-    '</select>' +
-    '<input type="number" step="0.01" min="0" class="compra-row-cant" placeholder="cant." value="'+(data&&data.cantidad||'')+'" style="width:100%">' +
-    '<select class="compra-row-unidad" style="width:100%">'+unidades+'</select>' +
-    '<input type="number" step="0.01" min="0" class="compra-row-precio" placeholder="€" value="'+(data&&data.precio||'')+'" style="width:100%">' +
-    '<button class="remove-prod-btn" onclick="this.closest(\'.product-row\').remove()">✕</button>';
+  var inner = document.createElement('div');
+  inner.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px 12px';
 
+  // Row 1: tipo selector + combobox + remove
+  var top = document.createElement('div');
+  top.style.cssText = 'display:flex;gap:8px;align-items:center';
+
+  var tipoSel = document.createElement('select');
+  tipoSel.className = 'compra-row-tipo';
+  tipoSel.style.cssText = 'flex-shrink:0;width:100px;font-size:14px';
+  tipoSel.innerHTML = '<option value="producto"'+(tipo==='producto'?' selected':'')+'>&#x1F48A; Fitosan.</option>'
+    +'<option value="abono"'+(tipo==='abono'?' selected':'')+'>&#x1F9EA; Abono</option>';
+  tipoSel.addEventListener('change', function(){ refreshCompraRowItems(this); });
+
+  var wrap = document.createElement('div');
+  wrap.className = 'prod-combo-wrap';
+  wrap.style.flex = '1';
+
+  var inp = document.createElement('input');
+  inp.type='text'; inp.id=cbId; inp.className='prod-combo-input';
+  inp.autocomplete='off'; inp.autocorrect='off'; inp.spellcheck=false;
+  inp.placeholder='&#x1F50D; Buscar '+( tipo==='abono'?'abono':'producto')+'...';
+  inp.value = selLabel;
+  inp.dataset.itemId = selId;
+  inp.dataset.tipo   = tipo;
+  inp.addEventListener('input',  function(){ compraComboFilter(this); });
+  inp.addEventListener('focus',  function(){ compraComboFilter(this); });
+  inp.addEventListener('blur',   function(){ setTimeout(function(){ var d=inp.parentNode&&inp.parentNode.querySelector('.prod-combo-list'); if(d)d.style.display='none'; },200); });
+
+  var drop = document.createElement('div');
+  drop.className = 'prod-combo-list'; drop.style.display = 'none';
+  wrap.appendChild(inp); wrap.appendChild(drop);
+
+  var removeBtn = document.createElement('button');
+  removeBtn.type='button'; removeBtn.className='remove-prod-btn';
+  removeBtn.innerHTML='&#x2715;';
+  removeBtn.onclick=function(){ this.closest('.product-row').remove(); };
+
+  top.appendChild(tipoSel); top.appendChild(wrap); top.appendChild(removeBtn);
+
+  // Row 2: cant, unidad, precio
+  var fields = document.createElement('div');
+  fields.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px;gap:8px;align-items:end';
+  fields.innerHTML = '<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Cantidad</label>'
+    +'<input type="number" step="0.01" min="0" class="compra-row-cant" placeholder="cant." value="'+(data&&data.cantidad||'')+'" style="width:100%"></div>'
+    +'<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Unidad</label>'
+    +'<select class="compra-row-unidad" style="width:100%">'+unidades+'</select></div>'
+    +'<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Precio total (&#x20AC;)</label>'
+    +'<input type="number" step="0.01" min="0" class="compra-row-precio" placeholder="&#x20AC;" value="'+(data&&data.precio||'')+'" style="width:100%"></div>';
+
+  inner.appendChild(top); inner.appendChild(fields);
+  row._compraList = list;
+  row.appendChild(inner);
   document.getElementById('compra-rows').appendChild(row);
 }
 
-function refreshCompraRowItems(tipoSel) {
-  var row    = tipoSel.closest('.product-row');
-  var tipo   = tipoSel.value;
-  var itemSel = row.querySelector('.compra-row-item');
-  itemSel.innerHTML = buildCompraItemOpts(tipo, '');
+function compraComboFilter(inp) {
+  var row  = inp.closest('.product-row'); if(!row) return;
+  var list = row._compraList || [];
+  var drop = inp.parentNode ? inp.parentNode.querySelector('.prod-combo-list') : null; if(!drop) return;
+  var q    = (inp.value||'').trim().toLowerCase();
+  var filtered = q ? list.filter(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0; }) : list;
+  filtered = filtered.slice(0, 80);
+  if(!filtered.length){ drop.innerHTML='<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>'; drop.style.display='block'; return; }
+  drop.innerHTML = filtered.map(function(p){
+    var sel = p.id === inp.dataset.itemId ? ' sel' : '';
+    return '<div class="prod-combo-item'+sel+'" data-id="'+p.id+'" data-label="'+p.nombre.replace(/"/g,'&quot;')+'" onmousedown="compraComboSelect(this)">'+p.nombre+'</div>';
+  }).join('');
+  drop.style.display = 'block';
 }
 
-function onCompraItemChange(itemSel) {
-  if(itemSel.value !== '__nuevo__') return;
-  var row  = itemSel.closest('.product-row');
-  var tipo = row.querySelector('.compra-row-tipo').value;
-  // Store reference so after creation we can select the new item
+function compraComboSelect(item) {
+  var drop = item.closest('.prod-combo-list'); if(!drop) return;
+  var inp  = drop.parentNode ? drop.parentNode.querySelector('.prod-combo-input') : null; if(!inp) return;
+  inp.value = item.dataset.label;
+  inp.dataset.itemId = item.dataset.id;
+  drop.style.display = 'none';
+  onCompraItemChange(inp);
+}
+
+function refreshCompraRowItems(tipoSel) {
+  var row  = tipoSel.closest('.product-row'); if(!row) return;
+  var tipo = tipoSel.value;
+  row._compraList = buildCompraItemList(tipo);
+  var inp = row.querySelector('.prod-combo-input'); if(!inp) return;
+  inp.value = '';
+  inp.dataset.itemId = '';
+  inp.dataset.tipo   = tipo;
+  inp.placeholder = '\uD83D\uDD0D Buscar '+(tipo==='abono'?'abono':'producto')+'...';
+}
+
+function onCompraItemChange(inp) {
+  // inp is either the combobox input or the old select
+  var itemId = inp.dataset ? inp.dataset.itemId : inp.value;
+  if(itemId !== '__nuevo__' && inp.value !== '__nuevo__') return;
+  var row  = inp.closest('.product-row'); if(!row) return;
+  var tipo = (row.querySelector('.compra-row-tipo')||{value:'producto'}).value;
   window._pendingCompraRow = row;
   if(tipo === 'abono') {
-    openAbonoModal();   // opens the abono creation modal
-    // Override save to also refresh compra rows
-    var origSave = window._abonoSaveHook;
+    openAbonoModal();
     window._abonoSaveHook = function(newId) {
       refreshAllCompraRows();
       if(window._pendingCompraRow) {
-        var sel = window._pendingCompraRow.querySelector('.compra-row-item');
-        if(sel) { sel.innerHTML = buildCompraItemOpts('abono', newId); sel.value = newId; }
+        var ci = window._pendingCompraRow.querySelector('.prod-combo-input');
+        if(ci) { var item=(DB.abonos||[]).find(function(a){return a.id===newId;}); if(item){ci.value=item.nombre;ci.dataset.itemId=newId;} }
         window._pendingCompraRow = null;
       }
     };
@@ -6215,8 +6486,8 @@ function onCompraItemChange(itemSel) {
     window._productoSaveHook = function(newId) {
       refreshAllCompraRows();
       if(window._pendingCompraRow) {
-        var sel = window._pendingCompraRow.querySelector('.compra-row-item');
-        if(sel) { sel.innerHTML = buildCompraItemOpts('producto', newId); sel.value = newId; }
+        var ci = window._pendingCompraRow.querySelector('.prod-combo-input');
+        if(ci) { var item=(DB.productos||[]).find(function(p){return p.id===newId;}); if(item){ci.value=item.nombre;ci.dataset.itemId=newId;} }
         window._pendingCompraRow = null;
       }
     };
@@ -6226,14 +6497,17 @@ function onCompraItemChange(itemSel) {
 // Called after saving a product/abono to refresh all open compra rows
 function refreshAllCompraRows() {
   document.querySelectorAll('#compra-rows .product-row').forEach(function(row) {
-    var tipoSel = row.querySelector('.compra-row-tipo');
-    var itemSel = row.querySelector('.compra-row-item');
-    if(!tipoSel || !itemSel) return;
-    var tipo      = tipoSel.value;
-    var currentId = itemSel.value;
-    // Keep selected value, just refresh list
-    itemSel.innerHTML = buildCompraItemOpts(tipo, currentId==='__nuevo__' ? '' : currentId);
-    if(currentId !== '__nuevo__') itemSel.value = currentId;
+    var tipoSel  = row.querySelector('.compra-row-tipo');
+    var comboInp = row.querySelector('.prod-combo-input');
+    if(!tipoSel || !comboInp) return;
+    var tipo    = tipoSel.value;
+    var curId   = comboInp.dataset.itemId||'';
+    row._compraList = buildCompraItemList(tipo);
+    // Keep label up to date if item still exists
+    if(curId) {
+      var item = row._compraList.find(function(x){return x.id===curId;});
+      if(item) comboInp.value = item.nombre;
+    }
   });
 }
 
@@ -6245,8 +6519,9 @@ function saveCompra() {
 
   var items = [];
   document.querySelectorAll('#compra-rows .product-row').forEach(function(row) {
-    var tipo   = row.querySelector('.compra-row-tipo')?.value;
-    var itemId = row.querySelector('.compra-row-item')?.value;
+    var tipo   = (row.querySelector('.compra-row-tipo')||{value:'producto'}).value;
+    var comboInp = row.querySelector('.prod-combo-input');
+    var itemId = comboInp ? (comboInp.dataset.itemId||'') : ((row.querySelector('.compra-row-item')||{value:''}).value);
     var cant   = parseFloat(row.querySelector('.compra-row-cant')?.value)||0;
     var unidad = row.querySelector('.compra-row-unidad')?.value;
     var precio = parseFloat(row.querySelector('.compra-row-precio')?.value)||0;
@@ -6813,14 +7088,6 @@ function exportFertilizacionExcel() {
   abonados.forEach(function(ab){
     var recs=(ab.recintoIds||[]).map(function(id){return recById[id];}).filter(Boolean);
     if(!recs.length) return;
-    var recsSorted=recs.slice().sort(function(a,b){return (parseFloat(a.numOrden)||9999)-(parseFloat(b.numOrden)||9999);});
-    var lbl=recsSorted.map(recLbl).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ');
-    var cvMap={}; recs.forEach(function(r){if(r.especieVariedad){var parts=r.especieVariedad.split('/');cvMap[parts[0].trim()]=parts[1]?parts[1].trim():'';} });
-    var especie=Object.keys(cvMap).join(', ');
-    var variedad=Object.keys(cvMap).map(function(k){return cvMap[k];}).filter(Boolean).join(', ');
-    var zonaN=recs.some(function(r){var v=String(r.nitratos||'').toLowerCase();return v==='si'||v==='s\u00ed'||v==='1'||v==='true';});
-    var hasP3=recs.some(function(r){return (r.ecoregimen||'').indexOf('P3')>=0;});
-    var esReg=recs.some(function(r){return (r.secanoRegadio||'').toLowerCase().indexOf('regad')>=0;});
 
     (ab.abonos||[]).forEach(function(ar){
       var abo=aboById[ar.abonoId||'']; if(!abo) return;
@@ -6828,14 +7095,48 @@ function exportFertilizacionExcel() {
       var dosis=parseFloat(ar.dosis)||0;
       var unidad=ar.unidad||'kg/ha';
       var tipo=modoTipo(ar.modo);
-      // Sheet 6: B=fecha, C=parcelas, D=especie, E=variedad, F=tipo_abono,
-      //          G=albaran, H=N, I=P, J=K, K=dosis, L=tipo_fert, M=obs
-      rows6.push([fmtDate(ab.fecha), lbl, especie, variedad, abo.nombre||'', '', n||null, p||null, k||null, dosis||null, tipo, ab.obs||'', zonaN]);
-      // Sheet 9.1: only ecorégimen P3 AND regadío
-      if(hasP3 && esReg){
-        var riq=(n||p||k)?'N:'+n+'% P:'+p+'% K:'+k+'%':'';
-        rows91.push([fmtDate(ab.fecha), lbl, especie+(variedad?' / '+variedad:''), abo.nombre+(riq?' ('+riq+')':''), abo.fabricante||'', '', dosis+' '+unidad, tipo, modoMetodo(ar.modo), '']);
-      }
+      var riq=(n||p||k)?'N:'+n+'% P:'+p+'% K:'+k+'%':'';
+
+      // ── GROUP recintos by (secanoRegadio, ecoregimen) to make separate rows ──
+      // Each unique combination gets its own row with only its recintos' parcel numbers
+      var groups = {};
+      recs.forEach(function(r){
+        var reg  = (r.secanoRegadio||'Secano');
+        var eco  = (r.ecoregimen||'').trim();
+        var key  = reg + '||' + eco;
+        if(!groups[key]) groups[key]={recs:[], reg:reg, eco:eco};
+        groups[key].recs.push(r);
+      });
+
+      Object.keys(groups).forEach(function(key){
+        var grp = groups[key];
+        var grpRecs = grp.recs.slice().sort(function(a,b){ return (parseFloat(a.numOrden)||9999)-(parseFloat(b.numOrden)||9999); });
+        var lbl = grpRecs.map(recLbl).join(', ');
+
+        // Cultivo / variedad for this group
+        var cvMap={};
+        grpRecs.forEach(function(r){ if(r.especieVariedad){var pts=r.especieVariedad.split('/');cvMap[pts[0].trim()]=pts[1]?pts[1].trim():'';} });
+        var especie  = Object.keys(cvMap).join(', ');
+        var variedad = Object.keys(cvMap).map(function(k2){return cvMap[k2];}).filter(Boolean).join(', ');
+
+        // Zona vulnerable if ANY recinto in this group is in zona N
+        var zonaN = grpRecs.some(function(r){var v=String(r.nitratos||'').toLowerCase();return v==='si'||v==='\x73\xed'||v==='s\u00ed'||v==='1'||v==='true';});
+
+        // Régimen tag for column
+        var esReg = grp.reg.toLowerCase().indexOf('regad')>=0;
+        var regLabel = esReg ? 'Regad\u00edo' : 'Secano';
+
+        // ── Sheet 6: all groups, with regimen column ──────────────────
+        // Cols: B=fecha, C=parcelas, D=especie, E=variedad, F=tipo_abono,
+        //       G=albaran, H=N, I=P, J=K, K=dosis, L=tipo_fert, M=obs, N=regimen (extra)
+        rows6.push([fmtDate(ab.fecha), lbl, especie, variedad, abo.nombre||'', '', n||null, p||null, k||null, dosis||null, tipo, ab.obs||'', zonaN, regLabel, grp.eco||'']);
+
+        // ── Sheet 9.1: only this group if P3 AND regadío ──────────────
+        var isP3  = grp.eco.indexOf('P3') >= 0;
+        if(isP3 && esReg){
+          rows91.push([fmtDate(ab.fecha), lbl, especie+(variedad?' / '+variedad:''), abo.nombre+(riq?' ('+riq+')':''), abo.fabricante||'', '', dosis+' '+unidad, tipo, modoMetodo(ar.modo), '']);
+        }
+      });
     });
   });
 
@@ -6854,18 +7155,18 @@ function exportFertilizacionExcel() {
     [null,null,null,null,null,null,null,null,null,null,null,null,null],
     [null,'6. REGISTRO DE FERTILIZACION (OPCIONAL [EXCEPTO ZONAS VULNERABLES])'],
     [null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [null,'Intervalo de fechas','No de orden de parcelas (1)','Cultivo',null,'Tipo de abono/producto (2)','No de albaran','Riqueza N/P/K',null,null,'Dosis (kg/ha, m3/ha)','Tipo de fertilizacion (3)','Observaciones'],
-    [null,null,null,'Especie','Variedad',null,null,null,null,null,null,null,null],
-    [null,'Columna1','Columna2','Columna3','Columna4','Columna5','Columna6','Columna63','Columna62','Columna7','Columna8','Columna9','Columna10']
+    [null,'Intervalo de fechas','No de orden de parcelas (1)','Cultivo',null,'Tipo de abono/producto (2)','No de albaran','Riqueza N/P/K',null,null,'Dosis (kg/ha, m3/ha)','Tipo de fertilizacion (3)','Observaciones','Regimen riego','Ecoregimen'],
+    [null,null,null,'Especie','Variedad',null,null,null,null,null,null,null,null,null,null],
+    [null,'Columna1','Columna2','Columna3','Columna4','Columna5','Columna6','Columna63','Columna62','Columna7','Columna8','Columna9','Columna10','Columna11','Columna12']
   ];
-  rows6.forEach(function(r){ ws6d.push([null,r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]]); });
+  rows6.forEach(function(r){ ws6d.push([null,r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11],r[13],r[14]]); });
   ws6d.push([]);
   ws6d.push([null,'(1) No de orden segun la relacion en la hoja de identificacion de parcelas.']);
   ws6d.push([null,'(2) En caso de abonos organicos indicar (EB) estiercol bovino, (EO) estiercol ovino, (P) purin, etc.']);
   ws6d.push([null,'(3) Indicar (F) Fertirrigacion, (AF) Abonado de fondo o (AC) Abonado de cobertera.']);
   if(rows6.some(function(r){return r[12];})) ws6d.push([null,'ATENCION: Hay parcelas en ZONA VULNERABLE DE NITROGENO (Orden MAV/398/2022). El registro es OBLIGATORIO para esas parcelas.']);
   var ws6=XLSX.utils.aoa_to_sheet(ws6d);
-  ws6['!cols']=[{wch:1},{wch:18},{wch:22},{wch:20},{wch:14},{wch:32},{wch:12},{wch:6},{wch:6},{wch:6},{wch:12},{wch:24},{wch:22}];
+  ws6['!cols']=[{wch:1},{wch:18},{wch:22},{wch:20},{wch:14},{wch:32},{wch:12},{wch:6},{wch:6},{wch:6},{wch:12},{wch:24},{wch:22},{wch:10},{wch:14}];
   XLSX.utils.book_append_sheet(wb,ws6,'6. REG. FERTILIZ');
 
   // ==== SHEET 9.1 ====
