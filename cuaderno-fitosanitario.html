@@ -1589,6 +1589,23 @@ let DB = JSON.parse(localStorage.getItem('agrotrack_data') || 'null') || JSON.pa
 if(!DB.abonos)   DB.abonos   = [];
 if(!DB.abonados) DB.abonados = [];
 if(!DB.compras)  DB.compras  = [];
+// Migration: fix compras saved with ES6 shorthand bug (clienteId saved as undefined key)
+(function() {
+  var fixed = false;
+  (DB.compras||[]).forEach(function(c) {
+    // If clienteId is missing but there's an undefined key, try to recover
+    if(!c.clienteId && c['undefined'] !== undefined) {
+      delete c['undefined']; fixed = true;
+    }
+    // Fix items saved with shorthand: {tipo, itemId} where both may be undefined keys
+    (c.items||[]).forEach(function(item) {
+      if(!item.tipo && item['undefined'] !== undefined) {
+        delete item['undefined']; fixed = true;
+      }
+    });
+  });
+  if(fixed) localStorage.setItem('agrotrack_data', JSON.stringify(DB));
+})();
 let editingId = {tratamiento:null, producto:null, recinto:null, cliente:null, abono:null, abonado:null, compra:null};
 let map, layerParcels, layerOSM, layerPNOA, layerSIGPAC;
 let parcelPolygons = {};
@@ -2655,16 +2672,19 @@ function saveTratamiento() {
   if(!productos.length) { alert('Añade al menos un producto'); return; }
 
   const data = {
-    fecha, campana: document.getElementById('trt-campana').value,
-    clienteId, recintoIds, productos,
+    fecha:      fecha,
+    campana:    document.getElementById('trt-campana').value,
+    clienteId:  clienteId,
+    recintoIds: recintoIds,
+    productos:  productos,
     maquinaria: document.getElementById('trt-maquinaria').value,
-    aplicador: document.getElementById('trt-aplicador').value,
-    obs: document.getElementById('trt-obs').value
+    aplicador:  document.getElementById('trt-aplicador').value,
+    obs:        document.getElementById('trt-obs').value
   };
 
   if(editingId.tratamiento) {
-    const i = DB.tratamientos.findIndex(t=>t.id===editingId.tratamiento);
-    if(i>=0) DB.tratamientos[i] = {...DB.tratamientos[i],...data};
+    const i = DB.tratamientos.findIndex(function(t){return t.id===editingId.tratamiento;});
+    if(i>=0) DB.tratamientos[i] = Object.assign({}, DB.tratamientos[i], data);
   } else {
     DB.tratamientos.push({id:uid(),...data});
   }
@@ -6024,10 +6044,58 @@ function toggleFincaCheck(cb) {
 }
 
 function getAbonoStock(clienteId) {
-  // Returns {abonoId: {stock, unidad, comprado, usado}} for purchased abonos
+  // Returns {abonoId: {stock, unidad, comprado, usado}} for purchased abonos.
+  // Purchases: all campaigns (abonos bought in any campaign count as available).
+  // Usage: only current campaign (so stock shows what's left this campaign).
   if(!clienteId) return {};
-  var campana = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
-  return calcStock(clienteId, campana).abonos;
+
+  var stockAbonos = {};
+
+  // Helper: normalize units
+  function toBase(qty, unidad) {
+    var u = (unidad||'').toLowerCase();
+    if(u==='l'||u==='l/ha') return {v:qty, u:'L'};
+    if(u==='ml'||u==='ml/ha'||u==='cc') return {v:qty/1000, u:'L'};
+    if(u==='kg'||u==='kg/ha') return {v:qty, u:'kg'};
+    if(u==='g'||u==='g/ha') return {v:qty/1000, u:'kg'};
+    if(u==='t'||u==='t/ha') return {v:qty*1000, u:'kg'};
+    return {v:qty, u:unidad||'u'};
+  }
+
+  // 1. Sum ALL purchases for this client (all campaigns)
+  (DB.compras||[]).forEach(function(c){
+    if(c.clienteId !== clienteId) return;
+    (c.items||[]).forEach(function(item){
+      if(item.tipo !== 'abono' || !item.itemId) return;
+      var base = toBase(parseFloat(item.cantidad)||0, item.unidad);
+      if(!stockAbonos[item.itemId]) stockAbonos[item.itemId]={comprado:0, usado:0, stock:0, unidad:base.u};
+      stockAbonos[item.itemId].comprado += base.v;
+      if(base.u !== stockAbonos[item.itemId].unidad) stockAbonos[item.itemId].unidad = base.u;
+    });
+  });
+
+  if(!Object.keys(stockAbonos).length) return {};
+
+  // 2. Subtract usage from abonados (only current campaign if set)
+  var campana = (document.getElementById('abonado-campana')||{}).value || currentCampana || '';
+  (DB.abonados||[]).forEach(function(ab){
+    if(ab.clienteId !== clienteId) return;
+    if(campana && ab.campana && ab.campana !== campana) return;
+    var recs = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+    var haTotal = recs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
+    (ab.abonos||[]).forEach(function(row){
+      if(!stockAbonos[row.abonoId]) return;
+      var base = toBase((parseFloat(row.dosis)||0)*haTotal, row.unidad);
+      stockAbonos[row.abonoId].usado += base.v;
+    });
+  });
+
+  // 3. Calculate remaining
+  Object.keys(stockAbonos).forEach(function(id){
+    stockAbonos[id].stock = stockAbonos[id].comprado - stockAbonos[id].usado;
+  });
+
+  return stockAbonos;
 }
 
 function calcAbonadoStockPreview() {
@@ -6090,15 +6158,29 @@ function addAbonadoRow(data) {
   row.style.padding = '0';
 
   var clienteId = document.getElementById('abonado-cliente').value;
-  var campana   = (document.getElementById('abonado-campana')||{}).value || currentCampana || undefined;
-  var stockMap  = clienteId ? calcStock(clienteId, campana).abonos : {};
-
-  // Build abono options — only purchased abonos, sorted by name
-  var allAbonos = (DB.abonos||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  var stockMap  = clienteId ? getAbonoStock(clienteId) : {};
   var purchased = Object.keys(stockMap);
-  var list = purchased.length
+  var hasPurchases = purchased.length > 0;
+
+  // Build abono options
+  var allAbonos = (DB.abonos||[]).slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  // Only filter if there are purchases; otherwise show all with a note
+  var list = hasPurchases
     ? allAbonos.filter(function(a){ return stockMap[a.id]; })
-    : allAbonos; // fallback: show all if no purchases
+    : allAbonos;
+
+  var opts = list.map(function(a){
+    var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
+    var s   = stockMap[a.id];
+    var stockTxt = '';
+    if(s) {
+      stockTxt = s.stock > 0
+        ? ' — Stock: '+s.stock.toFixed(1)+' '+s.unidad
+        : ' — SIN STOCK ('+s.comprado.toFixed(1)+' '+s.unidad+' comprado, todo usado)';
+    }
+    return '<option value="'+a.id+'"'+(data&&data.abonoId===a.id?' selected':'')+'>'+a.nombre+(npk?' ('+npk+')':'')+stockTxt+'</option>';
+  }).join('');
+  if(!opts) opts='<option value="">Sin abonos disponibles</option>';
 
   var opts = list.map(function(a){
     var npk = [a.n?'N'+a.n:'',a.p?'P'+a.p:'',a.k?'K'+a.k:''].filter(Boolean).join('-');
@@ -6115,13 +6197,17 @@ function addAbonadoRow(data) {
   var inner = document.createElement('div');
   inner.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:8px 10px';
 
-  // Hint if no purchases
-  if(purchased.length && list.length < allAbonos.length) {
-    var hint = document.createElement('div');
-    hint.style.cssText = 'font-size:11px;color:var(--text3)';
-    hint.textContent = 'Solo abonos comprados por este cliente \u00b7 stock de la campa\u00f1a actual';
-    inner.appendChild(hint);
+  // Hint about filter state
+  var hint = document.createElement('div');
+  hint.style.cssText = 'font-size:11px;padding:2px 0';
+  if(!clienteId) {
+    hint.style.color='var(--text3)'; hint.textContent='Selecciona un cliente para ver sus abonos comprados';
+  } else if(!hasPurchases) {
+    hint.style.color='#d4a017'; hint.textContent='\u26a0 Este cliente no tiene compras de abonos registradas. Mostrando todos los abonos. Registra compras en la pesta\u00f1a Compras para filtrar y ver stock.';
+  } else {
+    hint.style.color='var(--text3)'; hint.textContent='Solo abonos comprados por este cliente \u00b7 el stock se calcula autom\u00e1ticamente';
   }
+  inner.appendChild(hint);
 
   // Main grid
   var grid = document.createElement('div');
@@ -6197,8 +6283,11 @@ function saveAbonado() {
   if(!abonos.length) { alert('Añade al menos un abono'); return; }
 
   var data = {
-    fecha, campana: document.getElementById('abonado-campana').value,
-    clienteId, recintoIds, abonos,
+    fecha:      fecha,
+    campana:    document.getElementById('abonado-campana').value,
+    clienteId:  clienteId,
+    recintoIds: recintoIds,
+    abonos:     abonos,
     maquinaria: document.getElementById('abonado-maquinaria').value,
     aplicador:  document.getElementById('abonado-aplicador').value,
     obs:        document.getElementById('abonado-obs').value
@@ -6653,18 +6742,21 @@ function saveCompra() {
     var tipo   = (row.querySelector('.compra-row-tipo')||{value:'producto'}).value;
     var comboInp = row.querySelector('.prod-combo-input');
     var itemId = comboInp ? (comboInp.dataset.itemId||'') : ((row.querySelector('.compra-row-item')||{value:''}).value);
-    var cant   = parseFloat(row.querySelector('.compra-row-cant')?.value)||0;
-    var unidad = row.querySelector('.compra-row-unidad')?.value;
-    var precio = parseFloat(row.querySelector('.compra-row-precio')?.value)||0;
-    if(itemId && cant > 0) items.push({tipo, itemId, cantidad:cant, unidad, precio});
+    var cant   = parseFloat((row.querySelector('.compra-row-cant')||{}).value)||0;
+    var unidad = (row.querySelector('.compra-row-unidad')||{}).value;
+    var precio = parseFloat((row.querySelector('.compra-row-precio')||{}).value)||0;
+    if(itemId && cant > 0) items.push({tipo:tipo, itemId:itemId, cantidad:cant, unidad:unidad, precio:precio});
   });
   if(!items.length) { alert('Añade al menos un producto'); return; }
 
   var data = {
-    fecha, campana: document.getElementById('compra-campana').value,
-    clienteId, proveedor: document.getElementById('compra-proveedor').value,
-    factura: document.getElementById('compra-factura').value,
-    obs: document.getElementById('compra-obs').value, items
+    fecha:      fecha,
+    campana:    document.getElementById('compra-campana').value,
+    clienteId:  clienteId,
+    proveedor:  document.getElementById('compra-proveedor').value,
+    factura:    document.getElementById('compra-factura').value,
+    obs:        document.getElementById('compra-obs').value,
+    items:      items
   };
   if(!DB.compras) DB.compras = [];
   if(editingId.compra) {
