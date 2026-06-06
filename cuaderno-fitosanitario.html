@@ -3396,14 +3396,14 @@ function saveRecinto() {
   renderClientes();
   populateAllFilters();
   updateBadges();
-  if(document.getElementById('tab-mapa').classList.contains('active')) renderMap();
+  if(document.getElementById('tab-mapa').classList.contains('active')) renderMap(true);
 }
 
 function deleteRecinto(id) {
   if(!confirm('¿Eliminar este recinto?')) return;
-  DB.recintos = DB.recintos.filter(r=>r.id!==id);
+  DB.recintos = DB.recintos.filter(function(r){return r.id!==id;});
   save(); renderRecintos(); renderParcelas(); renderClientes(); updateBadges();
-  if(document.getElementById('tab-mapa').classList.contains('active')) renderMap();
+  if(document.getElementById('tab-mapa').classList.contains('active')) renderMap(true);
 }
 
 function copyRecinto(id) {
@@ -3710,26 +3710,50 @@ function populateClienteSelects() {
 }
 
 function populateAllFilters() {
-  const cliOpts = '<option value="">Todos los clientes</option>' + DB.clientes.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
-  ['trt-filter-cliente','rec-filter-cliente','map-filter-cliente','par-filter-cliente','abonado-filter-cliente','compras-filter-cliente'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.innerHTML = cliOpts;
+  // Save current filter values before rebuilding options
+  var filterIds = ['trt-filter-cliente','trt-filter-campana','rec-filter-cliente','rec-filter-cultivo',
+    'map-filter-cliente','map-filter-cultivo','par-filter-cliente','par-filter-campana',
+    'abonado-filter-cliente','compras-filter-cliente','compras-filter-tipo'];
+  var savedValues = {};
+  filterIds.forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) savedValues[id] = el.value;
   });
 
-  // Campaigns from recintos (not just tratamientos)
-  const campanas = [...new Set([
-    ...DB.tratamientos.map(t=>t.campana),
-    ...DB.recintos.map(r=>r.campana)
-  ].filter(Boolean))].sort();
-  const campOpts = '<option value="">Todas las campañas</option>' + campanas.map(c=>`<option value="${c}">Campaña ${c}</option>`).join('');
-  document.getElementById('trt-filter-campana').innerHTML = campOpts;
-  const parCampEl = document.getElementById('par-filter-campana');
-  if(parCampEl) parCampEl.innerHTML = campOpts;
+  var cliOpts = '<option value="">Todos los clientes</option>'
+    + DB.clientes.slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'','es');}).map(function(c){
+        return '<option value="'+c.id+'">'+c.nombre+'</option>';
+      }).join('');
+  ['trt-filter-cliente','rec-filter-cliente','map-filter-cliente','par-filter-cliente','abonado-filter-cliente','compras-filter-cliente'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.innerHTML = cliOpts;
+  });
+
+  // Campaigns from recintos and tratamientos
+  var campSet = {};
+  DB.tratamientos.forEach(function(t){ if(t.campana) campSet[t.campana]=1; });
+  DB.recintos.forEach(function(r){ if(r.campana) campSet[r.campana]=1; });
+  var campanas = Object.keys(campSet).sort();
+  var campOpts = '<option value="">Todas las camp\u00f1as</option>'
+    + campanas.map(function(c){ return '<option value="'+c+'">Campa\u00f1a '+c+'</option>'; }).join('');
+  var trtCamp = document.getElementById('trt-filter-campana');
+  if(trtCamp) trtCamp.innerHTML = campOpts;
+  var parCamp = document.getElementById('par-filter-campana');
+  if(parCamp) parCamp.innerHTML = campOpts;
 
   // Crops
-  const cultivos = [...new Set(DB.recintos.map(r=>r.especieVariedad?r.especieVariedad.split('/')[0].trim():'').filter(Boolean))].sort();
-  const cultOpts = '<option value="">Todos los cultivos</option>' + cultivos.map(c=>`<option value="${c}">${c}</option>`).join('');
-  ['rec-filter-cultivo','map-filter-cultivo'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.innerHTML = cultOpts;
+  var cultSet = {};
+  DB.recintos.forEach(function(r){ if(r.especieVariedad){var cv=r.especieVariedad.split('/')[0].trim();if(cv)cultSet[cv]=1;} });
+  var cultivos = Object.keys(cultSet).sort();
+  var cultOpts = '<option value="">Todos los cultivos</option>'
+    + cultivos.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+  ['rec-filter-cultivo','map-filter-cultivo'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.innerHTML = cultOpts;
+  });
+
+  // Restore saved filter values
+  filterIds.forEach(function(id){
+    var el = document.getElementById(id);
+    if(el && savedValues[id]) el.value = savedValues[id];
   });
 }
 
@@ -3884,7 +3908,7 @@ function handleExcelFile(input) {
           supCultivada:   parseFloat(rn[C.supCultivada]) || 0,
           especieVariedad:g(r, C.especieVariedad),
           ecoregimen:     g(r, C.ecoregimen),
-          secanoRegadio:  g(r, C.secanoRegadio) || 'Secano',
+          secanoRegadio:  (function(v){ v=(v||'').trim(); var l=v.toLowerCase(); if(l==='r'||l==='regad'||l.indexOf('regad')===0) return 'Regad\u00edo'; if(l==='s'||l==='secano'||l.indexOf('secano')===0) return 'Secano'; return v||'Secano'; })(g(r, C.secanoRegadio)),
           cultivoPrincipal:g(r, C.cultivoPrincipal) || 'Principal',
           fechaInicio:    normalizeDate(g(r, C.fechaInicio)),
           fechaFin:       normalizeDate(g(r, C.fechaFin)),
@@ -4677,8 +4701,12 @@ function setMapView(mode) {
 }
 
 // ── MAP RENDER ──────────────────────────────────────────────
-function renderMap() {
+function renderMap(preserveView) {
   if(!map) initMap();
+  // Save current view before clearing layers
+  var savedCenter = preserveView && map ? map.getCenter() : null;
+  var savedZoom   = preserveView && map ? map.getZoom()   : null;
+
   parcelPolygons = {};
   layerParcels.clearLayers();
   var legendColors = {};
@@ -4706,7 +4734,12 @@ function renderMap() {
   renderMapSidebar();
   updateMapParcelCount();
   if(layerParcels.getLayers().length > 0) {
-    map.fitBounds(layerParcels.getBounds(), {padding:[20,20]});
+    if(savedCenter && savedZoom) {
+      // Restore the view the user had — don't reset zoom/pan
+      map.setView(savedCenter, savedZoom, {animate:false});
+    } else {
+      map.fitBounds(layerParcels.getBounds(), {padding:[20,20]});
+    }
   }
 }
 
