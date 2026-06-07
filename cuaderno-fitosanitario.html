@@ -3907,14 +3907,25 @@ function handleExcelFile(input) {
           supSigpac:      parseFloat(rn[C.supSigpac]) || 0,
           supCultivada:   parseFloat(rn[C.supCultivada]) || 0,
           especieVariedad:g(r, C.especieVariedad),
-          ecoregimen:     g(r, C.ecoregimen),
+          ecoregimen:     (function(v){
+                            v=(v||'').trim();
+                            if(!v) return '';
+                            // If it's just P1, P2, P3... expand to full label
+                            var m=v.match(/^(P[1-9])/i);
+                            if(m) {
+                              var code=m[1].toUpperCase();
+                              var labels={'P1':'P1 \u2014 Agricultura ecol\u00f3gica','P2':'P2 \u2014 No labrar pendientes','P3':'P3 \u2014 Rotaci\u00f3n de cultivos','P4':'P4 \u2014 Siembra directa','P5':'P5 \u2014 Cubiertas vegetales','P6':'P6 \u2014 Mantenimiento de elementos paisaj\u00edsticos','P7':'P7 \u2014 Espacios productivos no subvencionados','P8':'P8 \u2014 Variedades locales','P9':'P9 \u2014 Variedades sin riesgo de resistencias'};
+                              return labels[code]||code;
+                            }
+                            return v;
+                          })(g(r, C.ecoregimen)),
           secanoRegadio:  (function(v){ v=(v||'').trim(); var l=v.toLowerCase(); if(l==='r'||l==='regad'||l.indexOf('regad')===0) return 'Regad\u00edo'; if(l==='s'||l==='secano'||l.indexOf('secano')===0) return 'Secano'; return v||'Secano'; })(g(r, C.secanoRegadio)),
           cultivoPrincipal:g(r, C.cultivoPrincipal) || 'Principal',
           fechaInicio:    normalizeDate(g(r, C.fechaInicio)),
           fechaFin:       normalizeDate(g(r, C.fechaFin)),
           cobertura:      g(r, C.cobertura) || 'Aire libre',
-          gip:            g(r, C.gip),
-          nitratos:       g(r, C.nitratos),
+          gip:            (function(v){ v=(v||'').trim(); return v||'(NO) Sin obligaci\u00f3n GIP'; })(g(r, C.gip)),
+          nitratos:       (function(v){ v=(v||'').trim(); var l=v.toLowerCase(); if(l==='s'||l==='si'||l==='\x73\xed'||l==='1'||l==='true') return 'S\u00ed'; return v||'No'; })(g(r, C.nitratos)),
           obs:            g(r, C.obs),
           _clienteNombre: g(r, C._clienteNombre),
           propietario:    g(r, C.propietario),
@@ -6052,13 +6063,28 @@ function loadAbonadoParcelasPicker(selectedIds, cultivoFilter) {
       var ha      = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(2);
       var cv      = (r.especieVariedad||'Sin cultivo').split('/')[0].trim();
       var orden   = r.numOrden ? '<span style="font-size:10px;color:var(--text3);margin-right:4px">#'+r.numOrden+'</span>' : '';
+
+      // Régimen badge
+      var esReg   = (r.secanoRegadio||'').toLowerCase().indexOf('regad') >= 0;
+      var regBadge = esReg
+        ? '<span style="font-size:10px;font-weight:700;color:#3b9ddd;background:rgba(59,157,221,.12);border:1px solid rgba(59,157,221,.3);border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0">Reg.</span>'
+        : '<span style="font-size:10px;color:var(--text3);background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0">Sec.</span>';
+
+      // Zona vulnerable badge
+      var nit = String(r.nitratos||'').toLowerCase();
+      var esZona = nit==='s\u00ed'||nit==='si'||nit==='s'||nit==='1'||nit==='true';
+      var nitBadge = esZona
+        ? '<span style="font-size:10px;font-weight:700;color:#e74c3c;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0" title="Zona Vulnerable Nitr\u00f3geno">\u26a0 ZV</span>'
+        : '';
+
       html += '<label class="recinto-check" style="padding-left:28px">'
         +'<input type="checkbox" class="abonado-rec-check" value="'+r.id+'" data-ha="'+ha+'" '+checked+' onchange="updateAbonadoHaTotal();calcAbonadoStockPreview()">'
         +'<span class="crop-dot" style="background:'+color+'"></span>'
         +orden
-        +'<span style="flex:1;font-size:12px">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>'
-        +'<span style="font-size:11px;color:var(--text2)">'+cv+'</span>'
-        +'<span style="font-size:11px;color:var(--text3);margin-left:8px;white-space:nowrap">'+ha+' ha</span>'
+        +'<span style="flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.nombreFinca||(r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto))+'</span>'
+        +'<span style="font-size:11px;color:var(--text2);flex-shrink:0;margin-left:4px">'+cv+'</span>'
+        +'<span style="font-size:11px;color:var(--text3);flex-shrink:0;margin-left:6px;white-space:nowrap">'+ha+' ha</span>'
+        +'<span style="display:flex;gap:3px;margin-left:6px;align-items:center">'+regBadge+nitBadge+'</span>'
         +'</label>';
     });
   });
