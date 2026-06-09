@@ -2168,24 +2168,46 @@ function initMap() {
   layerPNOA = L.tileLayer('https://www.ign.es/wmts/pnoa-ma?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=OI.OrthoimageCoverage&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg',{
     attribution:'© IGN España — PNOA', maxZoom:20, opacity:1
   });
-  // SIGPAC WMS — recintos del Registro de Explotaciones Agrícolas (FEGA/MAPA)
-  layerSIGPAC = L.tileLayer.wms('https://sigpac.mapama.gob.es/fega/ServiciosVisualizacion/wms/recintos', {
-    layers: 'recinto',
-    format: 'image/png',
-    transparent: true,
-    version: '1.1.1',
-    attribution: '© FEGA — SIGPAC',
-    opacity: 0.7,
-    minZoom: 14  // SIGPAC only renders at high zoom
-  });
-  // Error handler: show notice if SIGPAC tiles fail
+  // SIGPAC WMS — try multiple URLs, use first that responds
+  var SIGPAC_CANDIDATES = [
+    {url:'https://sigpac.mapama.gob.es/fega/ServiciosVisualizacion/wms', layer:'recinto', ver:'1.3.0'},
+    {url:'https://wms.mapa.gob.es/sig/Agricultura/Recintos/wms.aspx',    layer:'Recintos', ver:'1.1.1'},
+    {url:'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', layer:'Catastro', ver:'1.1.1'},
+    {url:'https://www.ign.es/wms-inspire/catastro',                        layer:'CP.CadastralParcel', ver:'1.3.0'},
+  ];
+  var _sigpacIdx = 0;
+
+  function _buildSigpacLayer(idx) {
+    var c = SIGPAC_CANDIDATES[idx];
+    return L.tileLayer.wms(c.url, {
+      layers:c.layer, format:'image/png', transparent:true, version:c.ver,
+      attribution:'© FEGA/MAPA — SIGPAC', opacity:0.7, minZoom:13
+    });
+  }
+
+  layerSIGPAC = _buildSigpacLayer(0);
+
+  // On tile error, try next candidate automatically
   layerSIGPAC.on('tileerror', function() {
-    var el = document.getElementById('sigpac-notice');
-    if(el) el.style.display = 'block';
+    if(_sigpacIdx < SIGPAC_CANDIDATES.length - 1) {
+      _sigpacIdx++;
+      var wasActive = map.hasLayer(layerSIGPAC);
+      map.removeLayer(layerSIGPAC);
+      layerSIGPAC = _buildSigpacLayer(_sigpacIdx);
+      layerSIGPAC.on('tileerror', arguments.callee);
+      layerSIGPAC.on('tileload', function(){
+        var n=document.getElementById('sigpac-notice'); if(n) n.style.display='none';
+      });
+      if(wasActive) map.addLayer(layerSIGPAC);
+      var n=document.getElementById('sigpac-notice');
+      if(n){n.textContent='Probando servidor SIGPAC '+(_sigpacIdx+1)+'/'+SIGPAC_CANDIDATES.length+'...';n.style.display='block';}
+    } else {
+      var n=document.getElementById('sigpac-notice');
+      if(n){n.textContent='\u26A0 Servidor SIGPAC no disponible. Intente m\u00e1s tarde.';n.style.display='block';}
+    }
   });
-  layerSIGPAC.on('tileload', function() {
-    var el = document.getElementById('sigpac-notice');
-    if(el) el.style.display = 'none';
+  layerSIGPAC.on('tileload', function(){
+    var n=document.getElementById('sigpac-notice'); if(n) n.style.display='none';
   });
 
   layerOSM.addTo(map);
@@ -2310,14 +2332,18 @@ function toggleLayer(layer) {
     if(map.hasLayer(layerSIGPAC)) {
       map.removeLayer(layerSIGPAC);
       document.getElementById('btn-layer-sigpac').classList.remove('active');
-      var n=document.getElementById('sigpac-notice'); if(n)n.style.display='none';
+      var n=document.getElementById('sigpac-notice'); if(n) n.style.display='none';
     } else {
       map.addLayer(layerSIGPAC);
       document.getElementById('btn-layer-sigpac').classList.add('active');
       // Zoom in if below minZoom for SIGPAC
-      if(map.getZoom() < 14) {
+      if(map.getZoom() < 13) {
         map.setZoom(15);
-        var n=document.getElementById('sigpac-notice'); if(n){n.textContent='Acercando para mostrar SIGPAC (zoom 15+)...';n.style.display='block';setTimeout(function(){n.style.display='none';},3000);}
+      }
+      // Show connecting notice
+      var n=document.getElementById('sigpac-notice');
+      if(n){ n.textContent='Cargando capa SIGPAC... (zoom 13+ necesario)'; n.style.display='block';
+        setTimeout(function(){ if(n.style.display!=='none') n.style.display='none'; }, 5000);
       }
     }
   }
