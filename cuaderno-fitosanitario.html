@@ -6325,71 +6325,133 @@ function renderAbonado() {
     return;
   }
 
-  var html = '';
+  // Group by client, sorted alphabetically
+  var cliOrder = []; var byCli = {};
   list.forEach(function(ab) {
-    var cli  = DB.clientes.find(function(c){return c.id===ab.clienteId;});
-    var recs = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
-    var abonosUsados = ab.abonos||[];
-    var comp = calcNitroCompliance(ab);
-
-    // Finca chips
-    var fincas = {};
-    recs.forEach(function(r){ var f=r.nombreFinca||('Pol.'+r.numPoligono); if(!fincas[f]) fincas[f]=[]; fincas[f].push(r); });
-    var fincaChips = Object.keys(fincas).map(function(f){
-      var ha = fincas[f].reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
-      return '<span class="tag tag-green">🏡 '+f+' ('+ha.toFixed(2)+' ha)</span>';
-    }).join(' ');
-
-    // Status badge for header
-    var worstStatus = 'ok';
-    comp.results.forEach(function(r){ if(r.status==='exceeded') worstStatus='exceeded'; else if(r.status==='warning' && worstStatus!=='exceeded') worstStatus='warning'; });
-    var statusBadge = worstStatus==='exceeded' ? '<span class="tag tag-red">🚫 Límite N superado</span>'
-                    : worstStatus==='warning'   ? '<span class="tag tag-yellow">⚠️ Cerca del límite N</span>'
-                    : '<span class="tag tag-green">✅ N correcto</span>';
-
-    // Abono rows with N calculation
-    var abonoRows = abonosUsados.map(function(row){
-      var abo = (DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
-      var npk = abo ? [abo.n?'N'+abo.n+'%':'',abo.p?'P'+abo.p+'%':'',abo.k?'K'+abo.k+'%':''].filter(Boolean).join(' · ') : '';
-      var nKgHa = abo ? calcNKgHa(row.dosis, row.unidad, abo.n) : 0;
-      return '<tr>' +
-        '<td><b>'+(abo?abo.nombre:'—')+'</b>'+(npk?' <span style="color:var(--text3);font-size:11px">'+npk+'</span>':'')+' </td>' +
-        '<td><b>'+row.dosis+' '+(row.unidad||'kg/ha')+'</b></td>' +
-        '<td>'+(row.modo||'—')+'</td>' +
-        '<td><b style="color:#7acc4a">'+nKgHa.toFixed(1)+' kg N/ha</b></td>' +
-        '</tr>';
-    }).join('');
-
-    // N compliance bars
-    var nitroBars = comp.results.map(renderNitroBar).join('');
-
-    html += '<div class="treatment-card">' +
-      '<div class="treatment-card-header" onclick="toggleTrt(\'abonado-body-'+ab.id+'\')">' +
-      '<span class="trt-date">📅 '+formatDate(ab.fecha)+'</span>' +
-      '<span class="trt-client">'+(cli?cli.nombre:'—')+'</span>' +
-      (ab.campana ? '<span class="tag tag-yellow">C.'+ab.campana+'</span>' : '') +
-      statusBadge +
-      '<span class="trt-products-count">⚗️ N total: <b>'+comp.totalNKgHa.toFixed(1)+' kg N/ha</b></span>' +
-      '<div class="trt-actions">' +
-      '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openAbonadoModal(\''+ab.id+'\')">✏️</button>' +
-      '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteAbonado(\''+ab.id+'\')">🗑️</button>' +
-      '</div></div>' +
-      '<div class="treatment-card-body" id="abonado-body-'+ab.id+'">' +
-      '<div class="trt-detail-grid">' +
-      '<div class="trt-detail-item"><div class="k">Parcelas</div><div class="v">'+fincaChips+'</div></div>' +
-      '<div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">'+(ab.maquinaria||'—')+'</div></div>' +
-      '<div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">'+(ab.aplicador||'—')+'</div></div>' +
-      '<div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">'+(ab.obs||'—')+'</div></div>' +
-      '</div>' +
-      '<div class="trt-products-table" style="margin-bottom:12px">' +
-      '<table><thead><tr><th>Abono</th><th>Dosis</th><th>Modo</th><th>N aportado</th></tr></thead>' +
-      '<tbody>'+abonoRows+'</tbody></table></div>' +
-      (nitroBars ? '<div style="margin-top:4px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">🌿 Cumplimiento Zonas Vulnerables CyL — Orden MAV/398/2022</div>'+nitroBars+'<div style="font-size:10px;color:var(--text3);margin-top:4px">Límite general: Tipo 2 (suelo normal). Tipo 1 aplica en suelos ligeros o tras leguminosa. Orgánico máx 170 kg N/ha. +20% con inhibidores de nitrificación.</div></div>' : '') +
-      '</div></div>';
+    var cid = ab.clienteId || '__sin__';
+    if(!byCli[cid]) { byCli[cid]=[]; cliOrder.push(cid); }
+    byCli[cid].push(ab);
   });
+  var seenC = {};
+  cliOrder = cliOrder.filter(function(c){ return seenC[c]?false:(seenC[c]=true); });
+  cliOrder.sort(function(a,b){
+    var na=(DB.clientes.find(function(c){return c.id===a;})||{nombre:''}).nombre;
+    var nb=(DB.clientes.find(function(c){return c.id===b;})||{nombre:''}).nombre;
+    return na.localeCompare(nb,'es');
+  });
+
+  var html = '';
+  cliOrder.forEach(function(cid, ci) {
+    var cliAbs = byCli[cid];
+    var cli = DB.clientes.find(function(c){return c.id===cid;});
+    var cliNom = cli ? cli.nombre : 'Sin cliente';
+    var grpId = 'abgrp_' + ci;
+
+    html += '<div style="margin-bottom:16px">';
+    html += '<div onclick="toggleAbGrp(this)" data-target="' + grpId + '" '
+      + 'style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);'
+      + 'border:1px solid var(--border2);border-radius:8px;cursor:pointer;margin-bottom:6px;user-select:none">'
+      + '<span>&#x1F464;</span>'
+      + '<span style="font-weight:800;font-size:14px;color:var(--white)">' + cliNom + '</span>'
+      + '<span class="tag tag-green">' + cliAbs.length + ' abonado' + (cliAbs.length!==1?'s':'') + '</span>'
+      + '<span id="ico_' + grpId + '" style="margin-left:auto;color:var(--text3);font-size:14px">&#x25BE;</span>'
+      + '</div>';
+    html += '<div id="' + grpId + '">';
+
+    cliAbs.forEach(function(ab) {
+      var recs = (ab.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
+      var abonosUsados = ab.abonos||[];
+      var comp = calcNitroCompliance(ab);
+
+      // Cultivos
+      var cvSet = {};
+      recs.forEach(function(r){ if(r.especieVariedad){var cv=r.especieVariedad.split('/')[0].trim();if(cv)cvSet[cv]=1;} });
+      var cultivos = Object.keys(cvSet);
+
+      // Abono names
+      var abonoNombres = [];
+      abonosUsados.forEach(function(row){
+        var abo=(DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
+        if(abo&&abonoNombres.indexOf(abo.nombre)<0) abonoNombres.push(abo.nombre);
+      });
+
+      // Finca chips
+      var fincas = {};
+      recs.forEach(function(r){ var f=r.nombreFinca||('Pol.'+r.numPoligono); if(!fincas[f]) fincas[f]=[]; fincas[f].push(r); });
+      var fincaChips = Object.keys(fincas).map(function(f){
+        var ha = fincas[f].reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
+        return '<span class="tag tag-green">&#x1F3E1; '+f+' ('+ha.toFixed(2)+' ha)</span>';
+      }).join(' ');
+
+      // Status badge
+      var worstStatus='ok';
+      comp.results.forEach(function(r){ if(r.status==='exceeded') worstStatus='exceeded'; else if(r.status==='warning'&&worstStatus!=='exceeded') worstStatus='warning'; });
+      var statusBadge = worstStatus==='exceeded' ? '<span class="tag tag-red">&#x1F6AB; L&iacute;mite N superado</span>'
+                      : worstStatus==='warning'   ? '<span class="tag tag-yellow">&#x26A0; Cerca del l&iacute;mite N</span>'
+                      : '<span class="tag tag-green">&#x2705; N OK</span>';
+
+      // Abono rows
+      var abonoRows = abonosUsados.map(function(row){
+        var abo=(DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
+        var npk=abo?[abo.n?'N'+abo.n+'%':'',abo.p?'P'+abo.p+'%':'',abo.k?'K'+abo.k+'%':''].filter(Boolean).join(' &middot; '):'';
+        var nKgHa=abo?calcNKgHa(row.dosis,row.unidad,abo.n):0;
+        return '<tr><td><b>'+(abo?abo.nombre:'&mdash;')+'</b>'+(npk?' <span style="color:var(--text3);font-size:11px">'+npk+'</span>':'')+' </td>'
+          +'<td><b>'+row.dosis+' '+(row.unidad||'kg/ha')+'</b></td>'
+          +'<td>'+(row.modo||'&mdash;')+'</td>'
+          +'<td><b style="color:#7acc4a">'+nKgHa.toFixed(1)+' kg N/ha</b></td></tr>';
+      }).join('');
+
+      var nitroBars = comp.results.map(renderNitroBar).join('');
+
+      html += '<div class="treatment-card">'
+        + '<div class="treatment-card-header" onclick="toggleTrt(\'abonado-body-'+ab.id+'\')">'
+        + '<span class="trt-date">&#x1F4C5; '+formatDate(ab.fecha)+'</span>'
+        // Cultivo pills
+        + (cultivos.length ? '<span style="display:flex;gap:3px;flex-wrap:wrap">'
+            + cultivos.map(function(cv){
+                return '<span style="font-size:11px;font-weight:600;color:var(--primary);background:rgba(74,140,42,.12);border-radius:4px;padding:1px 6px">'+cv+'</span>';
+              }).join('') + '</span>' : '')
+        // Abono pills
+        + (abonoNombres.length ? '<span style="display:flex;gap:3px;flex-wrap:wrap">'
+            + abonoNombres.map(function(n){
+                return '<span style="font-size:11px;font-weight:600;color:#7acc4a;background:rgba(122,204,74,.1);border-radius:4px;padding:1px 6px">&#x26—; '+n+'</span>';
+              }).join('') + '</span>' : '')
+        + (ab.campana ? '<span class="tag tag-yellow">C.'+ab.campana+'</span>' : '')
+        + statusBadge
+        + '<span class="trt-products-count"><b>'+comp.totalNKgHa.toFixed(1)+' kg N/ha</b></span>'
+        + '<div class="trt-actions">'
+        + '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openAbonadoModal(\''+ab.id+'\')">&#x270F;</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteAbonado(\''+ab.id+'\')">&#x1F5D1;</button>'
+        + '</div></div>'
+        + '<div class="treatment-card-body" id="abonado-body-'+ab.id+'">'
+        + '<div class="trt-detail-grid">'
+        + '<div class="trt-detail-item"><div class="k">Parcelas</div><div class="v">'+fincaChips+'</div></div>'
+        + '<div class="trt-detail-item"><div class="k">Maquinaria</div><div class="v">'+(ab.maquinaria||'&mdash;')+'</div></div>'
+        + '<div class="trt-detail-item"><div class="k">Aplicador</div><div class="v">'+(ab.aplicador||'&mdash;')+'</div></div>'
+        + '<div class="trt-detail-item"><div class="k">Observaciones</div><div class="v">'+(ab.obs||'&mdash;')+'</div></div>'
+        + '</div>'
+        + '<div class="trt-products-table" style="margin-bottom:12px">'
+        + '<table><thead><tr><th>Abono</th><th>Dosis</th><th>Modo</th><th>N aportado</th></tr></thead>'
+        + '<tbody>'+abonoRows+'</tbody></table></div>'
+        + (nitroBars ? '<div style="margin-top:4px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">&#x1F33F; Cumplimiento Zonas Vulnerables CyL</div>'+nitroBars+'</div>' : '')
+        + '</div></div>';
+    });
+
+    html += '</div></div>'; // close group body + group wrapper
+  });
+
   cont.innerHTML = html;
 }
 
+function toggleAbGrp(btn) {
+  var id  = btn.dataset.target;
+  var el  = document.getElementById(id);
+  var ico = document.getElementById('ico_'+id);
+  if(!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if(ico) ico.innerHTML = open ? '&#x25B8;' : '&#x25BE;';
+}
 
 function openAbonadoModal(id) {
   editingId.abonado = id||null;
