@@ -647,6 +647,20 @@ textarea { resize: vertical; min-height: 72px; }
           <button class="btn btn-primary" onclick="openProductoModal()">＋ Nuevo producto</button>
         </div>
       </div>
+
+      <!-- Submenu: Mi catálogo / MAGRAMA -->
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border2);margin-bottom:16px">
+        <button id="prod-sub-catalogo" onclick="setProdSubtab('catalogo')"
+          style="padding:9px 22px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid var(--primary);margin-bottom:-2px;background:transparent;color:var(--white);cursor:pointer">
+          &#x1F4CB; Mi Cat&aacute;logo <span id="prod-count-catalogo" style="font-size:11px;font-weight:400;color:var(--text3);margin-left:4px"></span>
+        </button>
+        <button id="prod-sub-magrama" onclick="setProdSubtab('magrama')"
+          style="padding:9px 22px;font-size:13px;font-weight:700;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;background:transparent;color:var(--text3);cursor:pointer">
+          &#x1F4D7; MAGRAMA <span id="prod-count-magrama" style="font-size:11px;font-weight:400;color:var(--text3);margin-left:4px"></span>
+        </button>
+      </div>
+      <input type="hidden" id="prod-subtab" value="catalogo">
+
       <div id="prod-mapa-warnings"></div>
       <div id="productos-list"></div>
     </div>
@@ -1038,8 +1052,15 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
     </div>
     <div class="modal-footer">
+      <div id="prod-catalogo-wrap" style="display:flex;align-items:center;gap:10px;flex:1">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="prod-en-catalogo" style="width:18px;height:18px;accent-color:var(--primary)">
+          <span style="font-size:13px;font-weight:600;color:var(--white)">&#x1F4CB; Incluir en Mi Cat&aacute;logo</span>
+        </label>
+        <span id="prod-catalogo-hint" style="font-size:11px;color:var(--text3)">El producto aparecer&aacute; en el selector de tratamientos</span>
+      </div>
       <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveProducto()">💾 Guardar producto</button>
+      <button class="btn btn-primary" onclick="saveProducto()">&#x1F4BE; Guardar producto</button>
     </div>
   </div>
 </div>
@@ -2674,19 +2695,25 @@ function addProductRow(data) {
   var cvKeys=Object.keys(cvSet);
   var tipoFilter = getTrtTipoFilter ? getTrtTipoFilter() : '';
 
-  var authorized=[]; var others=[];
+  var authorized=[]; var others=[]; var nonCatalog=[];
   (DB.productos||[]).forEach(function(p){
-    // Apply tipo filter
+    var isMapa = p.id && p.id.indexOf('mapa_') === 0;
+    var inCatalog = !isMapa || p.enCatalogo;
     if(tipoFilter && (p.tipo||'') !== tipoFilter) return;
     var isAuth=false;
     if(cvKeys.length&&p.cultivosAutorizados&&p.cultivosAutorizados.length){
       isAuth=p.cultivosAutorizados.some(function(cv){return cvKeys.some(function(cp){return cp.indexOf(cv.toUpperCase())>=0||cv.toUpperCase().indexOf(cp.split('/')[0].trim())>=0;});});
     }
-    if(isAuth) authorized.push(p); else others.push(p);
+    if(inCatalog) {
+      if(isAuth) authorized.push(p); else others.push(p);
+    } else if(isAuth) {
+      nonCatalog.push(p); // authorized for crop but not in user's catalog
+    }
   });
   var allProds=[];
   authorized.forEach(function(p){allProds.push({id:p.id,nombre:p.nombre,tipo:p.tipo||'',group:'auth'});});
   others.forEach(function(p){allProds.push({id:p.id,nombre:p.nombre,tipo:p.tipo||'',group:'other'});});
+  nonCatalog.forEach(function(p){allProds.push({id:p.id,nombre:p.nombre,tipo:p.tipo||'',group:'nocatalog'});});
   var selId=(data&&data.productoId)?data.productoId:'';
   var selProd=selId?allProds.find(function(p){return p.id===selId;}):null;
   var selLabel=selProd?selProd.nombre+(selProd.tipo?' ('+selProd.tipo+')':''):'';
@@ -2731,10 +2758,18 @@ function prodComboFilter(inp) {
   if(!filtered.length){drop.innerHTML='<div style="padding:8px 12px;color:var(--text3);font-size:12px">Sin resultados</div>';drop.style.display='block';return;}
   var html=''; var lastGroup='';
   filtered.forEach(function(p){
-    if(p.group!==lastGroup){html+='<div class="prod-combo-group">'+(p.group==='auth'?'&#x2705; Autorizados':'&mdash; Otros productos')+'</div>';lastGroup=p.group;}
-    var label=p.nombre+(p.tipo?' <span style="font-size:10px;color:var(--text3)">'+p.tipo+'</span>':'');
+    if(p.group!==lastGroup){
+      var groupLabel = p.group==='auth' ? '&#x2705; Autorizados (Mi Cat\u00e1logo)'
+                     : p.group==='other' ? '&mdash; Otros (Mi Cat\u00e1logo)'
+                     : '&#x1F4D7; No est\u00e1 en tu cat\u00e1logo &mdash; pulse para a\u00f1adir';
+      html+='<div class="prod-combo-group">'+groupLabel+'</div>';
+      lastGroup=p.group;
+    }
+    var suffix = p.group==='nocatalog' ? ' <span style="font-size:10px;color:var(--accent)">+Cat\u00e1logo</span>' : '';
+    var label=p.nombre+(p.tipo?' <span style="font-size:10px;color:var(--text3)">'+p.tipo+'</span>':'')+suffix;
     var sel=p.id===inp.dataset.prodId?' sel':'';
-    html+='<div class="prod-combo-item'+sel+'" data-id="'+p.id+'" data-label="'+p.nombre.replace(/"/g,'&quot;')+(p.tipo?' ('+p.tipo+')':'')+'" onmousedown="prodComboSelect(this)">'+label+'</div>';
+    var extraAction = p.group==='nocatalog' ? ' data-nocatalog="1"' : '';
+    html+='<div class="prod-combo-item'+sel+'" data-id="'+p.id+'"'+extraAction+' data-label="'+p.nombre.replace(/"/g,'&quot;')+(p.tipo?' ('+p.tipo+')':'')+'" onmousedown="prodComboSelect(this)">'+label+'</div>';
   });
   drop.innerHTML=html; drop.style.display='block';
 }
@@ -2743,6 +2778,15 @@ function prodComboSelect(item) {
   var inp=drop.parentNode?drop.parentNode.querySelector('.prod-combo-input'):null; if(!inp) return;
   inp.value=item.dataset.label; inp.dataset.prodId=item.dataset.id;
   drop.style.display='none';
+
+  // If product is not in catalog, ask to add it
+  if(item.dataset.nocatalog) {
+    var prod = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
+    if(prod && confirm('"\u200b' + prod.nombre + '" no est\u00e1 en tu cat\u00e1logo.\n\n\u00bFQuieres a\u00f1adirlo a Mi Cat\u00e1logo para que aparezca directamente en tratamientos?')) {
+      prod.enCatalogo = true;
+      save();
+    }
+  }
 
   var row  = inp.closest('.product-row'); if(!row) return;
   var prod = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
@@ -2975,6 +3019,23 @@ function prodCultivoSelect(cv) {
   renderProductos();
 }
 
+function addToCatalogo(id) {
+  var p = (DB.productos||[]).find(function(x){return x.id===id;});
+  if(!p) return;
+  p.enCatalogo = !p.enCatalogo;
+  save(); renderProductos();
+}
+
+function setProdSubtab(tab) {
+  var hid = document.getElementById('prod-subtab');
+  if(hid) hid.value = tab;
+  var bC = document.getElementById('prod-sub-catalogo');
+  var bM = document.getElementById('prod-sub-magrama');
+  if(bC) { bC.style.color = tab==='catalogo'?'var(--white)':'var(--text3)'; bC.style.borderBottomColor = tab==='catalogo'?'var(--primary)':'transparent'; }
+  if(bM) { bM.style.color = tab==='magrama' ?'var(--white)':'var(--text3)'; bM.style.borderBottomColor = tab==='magrama' ?'var(--primary)':'transparent'; }
+  renderProductos();
+}
+
 function renderProductos() {
   var search  = document.getElementById('prod-search').value.toLowerCase().trim();
   var tipo    = document.getElementById('prod-filter-tipo').value;
@@ -2996,21 +3057,39 @@ function renderProductos() {
     cultiFilter.value = curVal;
   }
 
+  var subtab = (document.getElementById('prod-subtab')||{}).value || 'catalogo';
+
   var list = DB.productos.filter(function(p) {
+    // Subtab split: Mi Catálogo = user products OR mapa products with enCatalogo:true
+    var isMapa = p.id && p.id.indexOf('mapa_') === 0;
+    if(subtab === 'catalogo') {
+      if(isMapa && !p.enCatalogo) return false;
+    }
+    if(subtab === 'magrama' && !isMapa) return false;
     if(tipo && p.tipo !== tipo) return false;
-    if(search &&
-       !p.nombre.toLowerCase().includes(search) &&
-       !(p.materiaActiva||'').toLowerCase().includes(search) &&
-       !(p.numRegistro||'').toLowerCase().includes(search) &&
-       !(p.titular||'').toLowerCase().includes(search)) return false;
+    if(search) {
+      var s = search;
+      if(p.nombre.toLowerCase().indexOf(s) < 0 &&
+         (p.materiaActiva||'').toLowerCase().indexOf(s) < 0 &&
+         (p.numRegistro||'').toLowerCase().indexOf(s) < 0 &&
+         (p.titular||'').toLowerCase().indexOf(s) < 0) return false;
+    }
     if(cultivo) {
       var matchCultivo = (p.cultivosAutorizados||[]).some(function(cv){
-        return cv.toLowerCase().includes(cultivo) || cultivo.includes(cv.toLowerCase());
-      }) || (p.usos||'').toLowerCase().includes(cultivo);
+        return cv.toLowerCase().indexOf(cultivo) >= 0 || cultivo.indexOf(cv.toLowerCase()) >= 0;
+      }) || (p.usos||'').toLowerCase().indexOf(cultivo) >= 0;
       if(!matchCultivo) return false;
     }
     return true;
   });
+
+  // Update counts in subtab buttons
+  var nCat = DB.productos.filter(function(p){ var isMapa=p.id&&p.id.indexOf('mapa_')===0; return !isMapa || p.enCatalogo; }).length;
+  var nMag = DB.productos.filter(function(p){ return p.id && p.id.indexOf('mapa_') === 0; }).length;
+  var ccEl = document.getElementById('prod-count-catalogo');
+  var cmEl = document.getElementById('prod-count-magrama');
+  if(ccEl) ccEl.textContent = '(' + nCat + ')';
+  if(cmEl) cmEl.textContent = '(' + nMag + ')';
 
   // Sort alphabetically by nombre
   list.sort(function(a,b){ return a.nombre.localeCompare(b.nombre, 'es', {sensitivity:'base'}); });
@@ -3145,8 +3224,13 @@ function renderProductos() {
       '</div>' +
       '<div class="product-card-actions">' +
       fichaBtn(p) +
-      '<button class="btn btn-secondary btn-sm" onclick="openProductoModal(\''+p.id+'\')">✏️ Editar</button>' +
-      '<button class="btn btn-danger btn-sm" onclick="deleteProducto(\''+p.id+'\')">🗑️</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="openProductoModal(\''+p.id+'\')">&#x270F; Editar</button>' +
+      (p.id && p.id.indexOf('mapa_')===0 && !p.enCatalogo ?
+        '<button class="btn btn-accent btn-sm" onclick="addToCatalogo(\''+p.id+'\')" title="A\u00f1adir a Mi Cat\u00e1logo">&#x1F4CB; A\u00f1adir al cat\u00e1logo</button>' :
+        (p.id && p.id.indexOf('mapa_')===0 && p.enCatalogo ?
+          '<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" onclick="addToCatalogo(\''+p.id+'\')" title="Ya en Mi Cat\u00e1logo">&#x2705; En cat\u00e1logo</button>' : '')
+      ) +
+      '<button class="btn btn-danger btn-sm" onclick="deleteProducto(\''+p.id+'\')">&#x1F5D1;</button>' +
       '</div>' +
       '</div>';
   });
@@ -3186,12 +3270,21 @@ function openProductoModal(id=null) {
   document.getElementById('prod-formulacion').value = p ? p.formulacion||'' : '';
   document.getElementById('prod-dosis').value = p ? p.dosis||'' : '';
   document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
-  // formats loaded below
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
   renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
+
+  // enCatalogo toggle
+  var isMapa = p && p.id && p.id.indexOf('mapa_') === 0;
+  var chk = document.getElementById('prod-en-catalogo');
+  // Non-MAPA products are always in catalog; MAPA products use the flag
+  if(chk) chk.checked = !isMapa || (p && p.enCatalogo);
+  // Hide toggle for user's own products (always in catalog)
+  var wrap = document.getElementById('prod-catalogo-wrap');
+  if(wrap) wrap.style.display = isMapa ? 'flex' : 'none';
+
   openModal('modal-producto');
 }
 
@@ -3473,6 +3566,8 @@ function saveProducto() {
   var formatos = getFormatosValues();
   var legacyCoste  = formatos.length ? (formatos[0].precio||0) : 0;
   var legacyUnidad = formatos.length ? (formatos[0].unidad||'L') : 'L';
+  var chkCat = document.getElementById('prod-en-catalogo');
+  var enCatalogo = chkCat ? chkCat.checked : true;
   var data = {
     nombre: nombre,
     numRegistro: document.getElementById('prod-registro').value.trim(),
@@ -3487,7 +3582,8 @@ function saveProducto() {
     unidadCoste: legacyUnidad,
     usos:        document.getElementById('prod-usos').value.trim(),
     obs:         document.getElementById('prod-obs').value.trim(),
-    cultivosAutorizados: getCultivoTagsValues()
+    cultivosAutorizados: getCultivoTagsValues(),
+    enCatalogo:  enCatalogo
   };
   if(editingId.producto) {
     var i = DB.productos.findIndex(function(p){return p.id===editingId.producto;});
