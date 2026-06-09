@@ -2792,14 +2792,20 @@ function prodComboSelect(item) {
       var unidSel  = row.querySelector('.prod-row-unidad');
 
       matchedUsos.slice(0,6).forEach(function(u,idx){
+        // Support compact keys (a,d,ap,pl) from embedded catalog AND full keys
+        var ag    = u.agente || u.a  || '—';
+        var dos   = u.dosis  || u.d  || '';
+        var plazo = u.plazo  || u.pl || '';
+        var aplic = u.aplicaciones || u.ap || '';
+
         var uRow = document.createElement('div');
         uRow.style.cssText='display:flex;align-items:center;gap:8px;padding:5px 10px;border-top:1px solid var(--border);cursor:pointer;transition:background .15s';
         uRow.onmouseover = function(){this.style.background='rgba(74,140,42,.12)';};
         uRow.onmouseout  = function(){this.style.background='';};
         uRow.onclick     = function(){
-          if(u.dosis && dosisInp) {
-            var dosisMatch = u.dosis.match(/^[\d.]+/);
-            var unitMatch  = u.dosis.match(/[^\d.\s\-][^\s]*$/);
+          if(dos && dosisInp) {
+            var dosisMatch = dos.match(/^[\d.]+/);
+            var unitMatch  = dos.match(/[^\d.\s\-][^\s]*$/);
             if(dosisMatch) dosisInp.value = dosisMatch[0];
             if(unitMatch && unidSel) {
               var unitVal = unitMatch[0].replace(/\//,'');
@@ -2819,19 +2825,19 @@ function prodComboSelect(item) {
 
         var agente = document.createElement('span');
         agente.style.cssText='flex:1;font-size:12px;color:var(--text2)';
-        agente.textContent = u.agente || '—';
+        agente.textContent = ag;
 
         var dosisSpan = document.createElement('span');
         dosisSpan.style.cssText='font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0';
-        dosisSpan.textContent = u.dosis || '—';
+        dosisSpan.textContent = dos || '—';
 
         var plazoSpan = document.createElement('span');
         plazoSpan.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0';
-        plazoSpan.textContent = u.plazo && u.plazo!=='NP' ? 'PS: '+u.plazo : '';
+        plazoSpan.textContent = plazo && plazo!=='NP' ? 'PS: '+plazo : '';
 
         var aplicSpan = document.createElement('span');
         aplicSpan.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0';
-        aplicSpan.textContent = u.aplicaciones ? u.aplicaciones+' aplic.' : '';
+        aplicSpan.textContent = aplic ? aplic+' aplic.' : '';
 
         uRow.appendChild(agente); uRow.appendChild(dosisSpan); uRow.appendChild(plazoSpan); uRow.appendChild(aplicSpan);
         panel.appendChild(uRow);
@@ -3111,10 +3117,12 @@ function renderProductos() {
           var usos = p.usosDetalle[cv];
           var color = getCropColor(cv);
           var usoRows = (usos||[]).slice(0,8).map(function(u){
-            return '<tr><td style="padding:3px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+u.agente+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+u.dosis+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+u.aplicaciones+(u.aplicaciones?' aplic.':'')+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.plazo&&u.plazo!=='NP'?'PS: '+u.plazo:'')+'</td></tr>';
+            var ag  = u.agente||u.a||''; var dos=u.dosis||u.d||'';
+            var apli=u.aplicaciones||u.ap||''; var pl=u.plazo||u.pl||'';
+            return '<tr><td style="padding:3px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+ag+'</td>'
+              +'<td style="padding:3px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+dos+'</td>'
+              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+apli+(apli?' aplic.':'')+'</td>'
+              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(pl&&pl!=='NP'?'PS: '+pl:'')+'</td></tr>';
           }).join('');
           var more = usos.length > 8 ? '<tr><td colspan="4" style="padding:3px 8px;font-size:11px;color:var(--text3)">... y '+( usos.length-8)+' agentes más</td></tr>' : '';
           return '<div style="margin-bottom:6px">'
