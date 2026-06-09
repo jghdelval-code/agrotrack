@@ -2784,8 +2784,8 @@ function prodComboSelect(item) {
       panel.style.cssText='margin-top:5px;background:rgba(74,140,42,.07);border:1px solid var(--border2);border-radius:6px;overflow:hidden';
 
       var head = document.createElement('div');
-      head.style.cssText='padding:5px 10px;font-size:11px;font-weight:700;color:var(--text3);background:var(--surface);text-transform:uppercase;letter-spacing:.3px';
-      head.innerHTML='Usos registrados para <b style="color:var(--white)">'+matchedCv+'</b>';
+      head.style.cssText='padding:8px 12px;font-size:12px;font-weight:700;color:var(--text3);background:var(--surface);text-transform:uppercase;letter-spacing:.3px';
+      head.innerHTML='Usos registrados para <b style="color:var(--white)">'+matchedCv+'</b> &mdash; <span style="font-weight:400;color:var(--primary)">toca una fila para aplicar la dosis</span>';
       panel.appendChild(head);
 
       var dosisInp = row.querySelector('.prod-row-dosis');
@@ -2799,7 +2799,7 @@ function prodComboSelect(item) {
         var aplic = u.aplicaciones || u.ap || '';
 
         var uRow = document.createElement('div');
-        uRow.style.cssText='display:flex;align-items:center;gap:8px;padding:5px 10px;border-top:1px solid var(--border);cursor:pointer;transition:background .15s';
+        uRow.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--border);cursor:pointer;min-height:44px';
         uRow.onmouseover = function(){this.style.background='rgba(74,140,42,.12)';};
         uRow.onmouseout  = function(){this.style.background='';};
         uRow.onclick     = function(){
@@ -2824,19 +2824,19 @@ function prodComboSelect(item) {
         uRow.dataset.idx = idx;
 
         var agente = document.createElement('span');
-        agente.style.cssText='flex:1;font-size:12px;color:var(--text2)';
+        agente.style.cssText='flex:1;font-size:13px;color:var(--text2)';
         agente.textContent = ag;
 
         var dosisSpan = document.createElement('span');
-        dosisSpan.style.cssText='font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0';
+        dosisSpan.style.cssText='font-size:14px;font-weight:700;color:var(--primary);white-space:nowrap;flex-shrink:0';
         dosisSpan.textContent = dos || '—';
 
         var plazoSpan = document.createElement('span');
-        plazoSpan.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0';
+        plazoSpan.style.cssText='font-size:12px;color:var(--text3);white-space:nowrap;flex-shrink:0';
         plazoSpan.textContent = plazo && plazo!=='NP' ? 'PS: '+plazo : '';
 
         var aplicSpan = document.createElement('span');
-        aplicSpan.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0';
+        aplicSpan.style.cssText='font-size:12px;color:var(--text3);white-space:nowrap;flex-shrink:0';
         aplicSpan.textContent = aplic ? aplic+' aplic.' : '';
 
         uRow.appendChild(agente); uRow.appendChild(dosisSpan); uRow.appendChild(plazoSpan); uRow.appendChild(aplicSpan);
@@ -2857,6 +2857,11 @@ function prodComboSelect(item) {
 
       var fieldsDiv = row.querySelector('.prod-row-fields');
       if(fieldsDiv && fieldsDiv.parentNode) fieldsDiv.parentNode.insertBefore(panel, fieldsDiv.nextSibling);
+
+      // Scroll panel into view on mobile
+      setTimeout(function(){
+        try { panel.scrollIntoView({behavior:'smooth', block:'nearest'}); } catch(e){}
+      }, 100);
     }
   }
   calcProdRowPVP(inp);
