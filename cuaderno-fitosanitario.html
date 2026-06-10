@@ -945,6 +945,10 @@ textarea { resize: vertical; min-height: 72px; }
         <button class="add-product-btn" onclick="addProductRow()">＋ Añadir producto</button>
       </div>
       <div class="form-grid">
+        <div class="form-group span-2">
+          <label>Problema fitosanitario / Plaga</label>
+          <input type="text" id="trt-problema" placeholder="ej: Septoriosis, Oídio, Pulgón...">
+        </div>
         <div class="form-group">
           <label>Maquinaria / Equipo</label>
           <input type="text" id="trt-maquinaria" placeholder="ej: Pulverizador 2000L">
@@ -952,6 +956,24 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="form-group">
           <label>Aplicador / Técnico</label>
           <input type="text" id="trt-aplicador">
+        </div>
+        <!-- 3.1 bis fields (GIP asesoramiento) -->
+        <div class="form-group span-2" id="trt-gip-wrap">
+          <label>Justificación de la actuación <span style="font-size:11px;color:var(--text3)">(3.1 bis — parcelas con asesor GIP)</span></label>
+          <input type="text" id="trt-justificacion" placeholder="Superación de umbral, condiciones meteorológicas...">
+        </div>
+        <div class="form-group" id="trt-alt-quim-wrap">
+          <label>Alternativas no químicas consideradas</label>
+          <input type="text" id="trt-alt-no-quim" placeholder="Control biológico, variedad resistente...">
+        </div>
+        <div class="form-group" id="trt-eficacia-wrap">
+          <label>Eficacia de la intervención</label>
+          <select id="trt-eficacia">
+            <option value="">—</option>
+            <option>Buena</option>
+            <option>Regular</option>
+            <option>Mala</option>
+          </select>
         </div>
         <div class="form-group span-2">
           <label>Observaciones</label>
@@ -1232,47 +1254,215 @@ textarea { resize: vertical; min-height: 72px; }
 
 <!-- MODAL CLIENTE -->
 <div class="modal-overlay" id="modal-cliente">
-  <div class="modal">
+  <div class="modal" style="max-width:720px">
     <div class="modal-header">
       <h3 id="modal-cli-title">Nuevo cliente</h3>
       <button class="modal-close" onclick="closeModal('modal-cliente')">✕</button>
     </div>
     <div class="modal-body">
+      <!-- 1.1 Datos generales -->
+      <div class="form-section-title">1.1 Datos generales de la explotación</div>
       <div class="form-grid">
         <div class="form-group span-2">
           <label>Nombre completo / Razón social *</label>
           <input type="text" id="cli-nombre">
         </div>
         <div class="form-group">
-          <label>NIF / DNI</label>
-          <input type="text" id="cli-nif">
+          <label>NIF / CIF</label>
+          <input type="text" id="cli-nif" placeholder="ej: 12345678A">
         </div>
         <div class="form-group">
-          <label>Teléfono</label>
-          <input type="tel" id="cli-tel">
+          <label>Nº Registro Explotaciones Nacional</label>
+          <input type="text" id="cli-reg-nacional" placeholder="ej: ES-VA-00123">
         </div>
         <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="cli-email">
+          <label>Nº Registro Explotaciones Autonómico</label>
+          <input type="text" id="cli-reg-autonomico" placeholder="ej: VA-0012">
         </div>
         <div class="form-group">
           <label>Municipio</label>
           <input type="text" id="cli-municipio">
         </div>
         <div class="form-group span-2">
-          <label>Observaciones</label>
-          <textarea id="cli-obs" rows="2"></textarea>
+          <label>Dirección</label>
+          <input type="text" id="cli-direccion" placeholder="Calle, nº, piso...">
         </div>
+        <div class="form-group">
+          <label>Localidad</label>
+          <input type="text" id="cli-localidad">
+        </div>
+        <div class="form-group">
+          <label>Código postal</label>
+          <input type="text" id="cli-cp" placeholder="ej: 47001">
+        </div>
+        <div class="form-group">
+          <label>Provincia</label>
+          <input type="text" id="cli-provincia" placeholder="ej: Valladolid">
+        </div>
+        <div class="form-group">
+          <label>Teléfono fijo</label>
+          <input type="tel" id="cli-tel-fijo" placeholder="983...">
+        </div>
+        <div class="form-group">
+          <label>Teléfono móvil</label>
+          <input type="tel" id="cli-tel" placeholder="6xx...">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="cli-email">
+        </div>
+      </div>
+
+      <!-- Titular / representante -->
+      <div class="form-section-title" style="margin-top:14px">Titular o representante de la explotación</div>
+      <div class="form-grid">
+        <div class="form-group span-2">
+          <label>Nombre y apellidos del titular/representante</label>
+          <input type="text" id="cli-tit-nombre" placeholder="Si es distinto de la razón social">
+        </div>
+        <div class="form-group">
+          <label>NIF del titular</label>
+          <input type="text" id="cli-tit-nif">
+        </div>
+        <div class="form-group">
+          <label>Tipo de representación</label>
+          <select id="cli-tit-tipo">
+            <option value="">— Propietario titular —</option>
+            <option>Representante legal</option>
+            <option>Apoderado</option>
+            <option>Arrendatario</option>
+            <option>Usufructuario</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Teléfono titular</label>
+          <input type="tel" id="cli-tit-tel">
+        </div>
+        <div class="form-group">
+          <label>Email titular</label>
+          <input type="email" id="cli-tit-email">
+        </div>
+        <div class="form-group">
+          <label>Dirección titular</label>
+          <input type="text" id="cli-tit-dir">
+        </div>
+        <div class="form-group">
+          <label>Localidad titular</label>
+          <input type="text" id="cli-tit-loc">
+        </div>
+        <div class="form-group">
+          <label>C.P. titular</label>
+          <input type="text" id="cli-tit-cp">
+        </div>
+      </div>
+
+      <!-- 1.4 Asesor -->
+      <div class="form-section-title" style="margin-top:14px">1.4 Asesor / Agrupación de asesoramiento</div>
+      <div class="form-grid">
+        <div class="form-group span-2">
+          <label>Nombre o razón social del asesor</label>
+          <input type="text" id="cli-asesor-nombre">
+        </div>
+        <div class="form-group">
+          <label>NIF asesor</label>
+          <input type="text" id="cli-asesor-nif">
+        </div>
+        <div class="form-group">
+          <label>Nº de identificación</label>
+          <input type="text" id="cli-asesor-id">
+        </div>
+        <div class="form-group">
+          <label>Tipo de explotación</label>
+          <select id="cli-asesor-tipo">
+            <option value="">—</option>
+            <option>GIP obligatoria</option>
+            <option>GIP voluntaria</option>
+            <option>Producción Integrada</option>
+            <option>Producción Ecológica</option>
+            <option>Convencional</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:8px">
+        <label>Observaciones</label>
+        <textarea id="cli-obs" rows="2"></textarea>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveCliente()">💾 Guardar cliente</button>
+      <button class="btn btn-primary" onclick="saveCliente()">&#x1F4BE; Guardar cliente</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL IMPORTAR EXCEL -->
+<!-- MODAL CUADERNO DE EXPLOTACIÓN -->
+<div class="modal-overlay" id="modal-cuaderno">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h3>&#x1F4D3; Cuaderno de Explotación</h3>
+      <button class="modal-close" onclick="closeModal('modal-cuaderno')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cuaderno-cli-info" style="padding:10px 14px;background:var(--surface);border-radius:8px;margin-bottom:14px;font-size:13px"></div>
+
+      <div class="form-grid">
+        <div class="form-group span-2">
+          <label>Campaña a exportar</label>
+          <select id="cuaderno-campana"></select>
+        </div>
+        <div class="form-group span-2">
+          <label>Año del cuaderno</label>
+          <input type="number" id="cuaderno-anio" min="2020" max="2035" style="width:120px">
+        </div>
+      </div>
+
+      <div style="margin-top:12px;background:var(--surface);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--text2)">
+        <div style="font-weight:700;color:var(--white);margin-bottom:8px">Hojas que se generarán:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div>&#x2705; 1.1 Datos generales</div>
+          <div>&#x2705; 1.2 Aplicadores (ROPO)</div>
+          <div>&#x2705; 1.3 Equipos de aplicación</div>
+          <div>&#x2705; 1.4 Asesor GIP</div>
+          <div>&#x2705; 2.1 Datos parcelas</div>
+          <div>&#x2705; 2.2 Datos medioambientales</div>
+          <div>&#x2705; 3.1 Reg. fitosanitario</div>
+          <div>&#x2705; 3.1bis Reg. fit. (GIP asesor)</div>
+          <div>&#x2705; 6. Registro fertilización</div>
+          <div>&#x2705; 7. Datos agroambientales CyL</div>
+        </div>
+        <div style="margin-top:8px;color:var(--text3)">
+          Incluye todos los tratamientos y abonados registrados para la campaña seleccionada
+        </div>
+      </div>
+
+      <!-- 1.2 Aplicadores -->
+      <div style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="form-section-title" style="margin:0">1.2 Aplicadores / Empresas de servicio</div>
+          <button class="btn btn-primary btn-sm" onclick="addAplicadorRow()">+ Añadir</button>
+        </div>
+        <div id="aplicadores-table" style="font-size:12px"></div>
+      </div>
+
+      <!-- 1.3 Equipos -->
+      <div style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="form-section-title" style="margin:0">1.3 Equipos de aplicación</div>
+          <button class="btn btn-primary btn-sm" onclick="addEquipoRow()">+ Añadir</button>
+        </div>
+        <div id="equipos-table" style="font-size:12px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-cuaderno')">Cancelar</button>
+      <button class="btn btn-primary" onclick="exportarCuaderno()">&#x1F4E5; Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- MODAL ABONO -->
 <div class="modal-overlay" id="modal-abono">
   <div class="modal">
@@ -2645,9 +2835,14 @@ function openTratamientoModal(id=null) {
   document.getElementById('trt-fecha').value = t?.fecha||new Date().toISOString().slice(0,10);
   document.getElementById('trt-campana').value = t?.campana||'26';
   document.getElementById('trt-cliente').value = t?.clienteId||'';
-  document.getElementById('trt-maquinaria').value = t?.maquinaria||'';
-  document.getElementById('trt-aplicador').value = t?.aplicador||'';
-  document.getElementById('trt-obs').value = t?.obs||'';
+  document.getElementById('trt-maquinaria').value = t ? t.maquinaria||'' : '';
+  document.getElementById('trt-aplicador').value  = t ? t.aplicador||''  : '';
+  document.getElementById('trt-problema').value   = t ? t.problema||''   : '';
+  document.getElementById('trt-justificacion').value = t ? t.justificacion||'' : '';
+  document.getElementById('trt-alt-no-quim').value   = t ? t.altNoQuim||''    : '';
+  var efEl = document.getElementById('trt-eficacia');
+  if(efEl) efEl.value = t ? t.eficacia||'' : '';
+  document.getElementById('trt-obs').value = t ? t.obs||'' : '';
 
   loadRecintosPicker(t?.recintoIds||[]);
 
@@ -3064,9 +3259,13 @@ function saveTratamiento() {
     clienteId:  clienteId,
     recintoIds: recintoIds,
     productos:  productos,
-    maquinaria: document.getElementById('trt-maquinaria').value,
-    aplicador:  document.getElementById('trt-aplicador').value,
-    obs:        document.getElementById('trt-obs').value
+    maquinaria:    document.getElementById('trt-maquinaria').value,
+    aplicador:     document.getElementById('trt-aplicador').value,
+    problema:      document.getElementById('trt-problema').value,
+    justificacion: document.getElementById('trt-justificacion').value,
+    altNoQuim:     document.getElementById('trt-alt-no-quim').value,
+    eficacia:      (document.getElementById('trt-eficacia')||{value:''}).value,
+    obs:           document.getElementById('trt-obs').value
   };
 
   if(editingId.tratamiento) {
@@ -4117,8 +4316,9 @@ function renderClientes() {
 
     var actions = '';
     if(allRecs.length) actions += '<button class="btn btn-accent btn-sm" onclick="openNuevaCampanaModal(\''+c.id+'\')">🔄 Campaña</button> ';
-    actions += '<button class="btn btn-secondary btn-sm" onclick="openClienteModal(\''+c.id+'\')">✏️</button> ';
-    actions += '<button class="btn btn-danger btn-sm" onclick="deleteCliente(\''+c.id+'\')">🗑️</button>';
+    actions += '<button class="btn btn-secondary btn-sm" onclick="openClienteModal(\''+c.id+'\')">&#x270F;</button> ';
+    actions += '<button class="btn btn-accent btn-sm" onclick="openCuadernoModal(\''+c.id+'\')" title="Cuaderno de Explotaci\u00f3n">&#x1F4D3; Cuaderno</button> ';
+    actions += '<button class="btn btn-danger btn-sm" onclick="deleteCliente(\''+c.id+'\')">&#x1F5D1;</button>';
 
     html += '<div class="cliente-card">';
     html += '<div class="cliente-card-header">';
@@ -4189,37 +4389,300 @@ function renderClientes() {
   cont.innerHTML = html;
 }
 
-function openClienteModal(id=null) {
-  editingId.cliente = id;
+function openClienteModal(id) {
+  editingId.cliente = id||null;
   document.getElementById('modal-cli-title').textContent = id ? 'Editar cliente' : 'Nuevo cliente';
   var c = id ? DB.clientes.find(function(cl){ return cl.id===id; }) : null;
-  document.getElementById('cli-nombre').value = c?.nombre||'';
-  document.getElementById('cli-nif').value = c?.nif||'';
-  document.getElementById('cli-tel').value = c?.telefono||'';
-  document.getElementById('cli-email').value = c?.email||'';
-  document.getElementById('cli-municipio').value = c?.municipio||'';
-  document.getElementById('cli-obs').value = c?.obs||'';
+  var gv = function(fid, key) { var el=document.getElementById(fid); if(el) el.value=(c&&c[key])||''; };
+  gv('cli-nombre','nombre'); gv('cli-nif','nif');
+  gv('cli-reg-nacional','regNacional'); gv('cli-reg-autonomico','regAutonomico');
+  gv('cli-municipio','municipio'); gv('cli-direccion','direccion');
+  gv('cli-localidad','localidad'); gv('cli-cp','codPostal'); gv('cli-provincia','provincia');
+  gv('cli-tel-fijo','telefonoFijo'); gv('cli-tel','telefono'); gv('cli-email','email');
+  gv('cli-tit-nombre','titNombre'); gv('cli-tit-nif','titNif');
+  gv('cli-tit-tipo','titTipo'); gv('cli-tit-tel','titTelefono');
+  gv('cli-tit-email','titEmail'); gv('cli-tit-dir','titDireccion');
+  gv('cli-tit-loc','titLocalidad'); gv('cli-tit-cp','titCodPostal');
+  gv('cli-asesor-nombre','asesorNombre'); gv('cli-asesor-nif','asesorNif');
+  gv('cli-asesor-id','asesorId'); gv('cli-asesor-tipo','asesorTipo');
+  gv('cli-obs','obs');
   openModal('modal-cliente');
 }
 
 function saveCliente() {
   var nombre = document.getElementById('cli-nombre').value.trim();
   if(!nombre) { alert('Introduce el nombre del cliente'); return; }
+  var gv = function(fid) { var el=document.getElementById(fid); return el?el.value.trim():''; };
   var data = {
-    nombre, nif:document.getElementById('cli-nif').value.trim(),
-    telefono:document.getElementById('cli-tel').value.trim(),
-    email:document.getElementById('cli-email').value.trim(),
-    municipio:document.getElementById('cli-municipio').value.trim(),
-    obs:document.getElementById('cli-obs').value.trim()
+    nombre:       nombre,
+    nif:          gv('cli-nif'),
+    regNacional:  gv('cli-reg-nacional'),
+    regAutonomico:gv('cli-reg-autonomico'),
+    municipio:    gv('cli-municipio'),
+    direccion:    gv('cli-direccion'),
+    localidad:    gv('cli-localidad'),
+    codPostal:    gv('cli-cp'),
+    provincia:    gv('cli-provincia'),
+    telefonoFijo: gv('cli-tel-fijo'),
+    telefono:     gv('cli-tel'),
+    email:        gv('cli-email'),
+    titNombre:    gv('cli-tit-nombre'),
+    titNif:       gv('cli-tit-nif'),
+    titTipo:      gv('cli-tit-tipo'),
+    titTelefono:  gv('cli-tit-tel'),
+    titEmail:     gv('cli-tit-email'),
+    titDireccion: gv('cli-tit-dir'),
+    titLocalidad: gv('cli-tit-loc'),
+    titCodPostal: gv('cli-tit-cp'),
+    asesorNombre: gv('cli-asesor-nombre'),
+    asesorNif:    gv('cli-asesor-nif'),
+    asesorId:     gv('cli-asesor-id'),
+    asesorTipo:   gv('cli-asesor-tipo'),
+    obs:          gv('cli-obs')
   };
   if(editingId.cliente) {
     var i = DB.clientes.findIndex(function(c){ return c.id===editingId.cliente; });
-    if(i>=0) DB.clientes[i] = {...DB.clientes[i],...data};
+    if(i>=0) Object.assign(DB.clientes[i], data);
   } else {
-    DB.clientes.push({id:uid(),...data});
+    DB.clientes.push(Object.assign({id:uid(), aplicadores:[], equipos:[]}, data));
   }
   save(); closeModal('modal-cliente'); renderClientes();
   populateAllFilters();
+}
+
+// ============================================================
+// CUADERNO DE EXPLOTACIÓN — EXPORT
+// ============================================================
+
+var _cuadernoClienteId = null;
+
+function openCuadernoModal(clienteId) {
+  _cuadernoClienteId = clienteId;
+  var c = DB.clientes.find(function(x){return x.id===clienteId;});
+  if(!c) return;
+  var infoEl = document.getElementById('cuaderno-cli-info');
+  if(infoEl) infoEl.innerHTML = '<b>'+c.nombre+'</b>'+(c.nif?' &nbsp;&middot;&nbsp; NIF: '+c.nif:'')+(c.municipio?' &nbsp;&middot;&nbsp; '+c.municipio:'');
+  var campanas = []; var campSeen = {};
+  (DB.recintos||[]).filter(function(r){return r.clienteId===clienteId;}).forEach(function(r){
+    if(r.campana&&!campSeen[r.campana]){campSeen[r.campana]=1;campanas.push(r.campana);}
+  });
+  campanas.sort().reverse();
+  var campEl = document.getElementById('cuaderno-campana');
+  if(campEl) campEl.innerHTML = campanas.length
+    ? campanas.map(function(camp){return '<option value="'+camp+'">Campa&ntilde;a '+camp+'</option>';}).join('')
+    : '<option value="">— Sin campa&ntilde;as —</option>';
+  if(campEl && currentCampana && campSeen[currentCampana]) campEl.value = currentCampana;
+  var anioEl = document.getElementById('cuaderno-anio');
+  if(anioEl) anioEl.value = campanas[0]||new Date().getFullYear();
+  if(!c.aplicadores) c.aplicadores = [];
+  if(!c.equipos) c.equipos = [];
+  renderAplicadoresTable(c);
+  renderEquiposTable(c);
+  openModal('modal-cuaderno');
+}
+
+function renderAplicadoresTable(c) {
+  var el = document.getElementById('aplicadores-table'); if(!el) return;
+  if(!(c.aplicadores||[]).length){el.innerHTML='<div style="color:var(--text3);padding:8px 0">Sin aplicadores. Pulse + A&ntilde;adir</div>';return;}
+  var html = '<table style="width:100%;border-collapse:collapse"><tr style="font-size:11px;font-weight:700;color:var(--text3)">'
+    + '<th style="padding:3px 6px;text-align:left">Nombre</th><th>NIF</th><th>ROPO</th><th>Carn&eacute;</th><th>Asesor</th><th></th></tr>';
+  c.aplicadores.forEach(function(a,i){
+    html+='<tr style="border-top:1px solid var(--border)">'
+      +'<td style="padding:4px 6px;font-size:12px">'+a.nombre+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(a.nif||'—')+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(a.ropo||'—')+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(a.carne||'—')+'</td>'
+      +'<td style="padding:4px 6px;text-align:center;font-size:12px">'+(a.esAsesor?'&#x2713;':'')+'</td>'
+      +'<td style="padding:4px 6px"><button class="btn btn-danger btn-sm" style="padding:2px 5px;font-size:10px" onclick="deleteAplicador(\''+c.id+'\','+i+')">&#x2715;</button></td>'
+      +'</tr>';
+  });
+  el.innerHTML = html+'</table>';
+}
+
+function renderEquiposTable(c) {
+  var el = document.getElementById('equipos-table'); if(!el) return;
+  if(!(c.equipos||[]).length){el.innerHTML='<div style="color:var(--text3);padding:8px 0">Sin equipos. Pulse + A&ntilde;adir</div>';return;}
+  var html = '<table style="width:100%;border-collapse:collapse"><tr style="font-size:11px;font-weight:700;color:var(--text3)">'
+    + '<th style="padding:3px 6px;text-align:left">Descripci&oacute;n</th><th>Nº ROMA</th><th>Adquisici&oacute;n</th><th>&Uacute;lt. inspecci&oacute;n</th><th></th></tr>';
+  c.equipos.forEach(function(e,i){
+    html+='<tr style="border-top:1px solid var(--border)">'
+      +'<td style="padding:4px 6px;font-size:12px">'+e.descripcion+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(e.roma||'—')+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(e.fechaAdq||'—')+'</td>'
+      +'<td style="padding:4px 6px;color:var(--text3);font-size:12px">'+(e.fechaInsp||'—')+'</td>'
+      +'<td style="padding:4px 6px"><button class="btn btn-danger btn-sm" style="padding:2px 5px;font-size:10px" onclick="deleteEquipo(\''+c.id+'\','+i+')">&#x2715;</button></td>'
+      +'</tr>';
+  });
+  el.innerHTML = html+'</table>';
+}
+
+function addAplicadorRow() {
+  var nombre=prompt('Nombre y apellidos / Empresa de servicios:'); if(!nombre) return;
+  var nif=prompt('NIF (opcional):')||'';
+  var ropo=prompt('N\u00ba Inscripci\u00f3n ROPO (opcional):')||'';
+  var carne=prompt('Tipo de carn\u00e9 (B\u00e1sico / Cualificado / Fumigaci\u00f3n / Piloto):')||'';
+  var esAses=confirm('\u00bfEs el asesor fitosanitario?');
+  var c=DB.clientes.find(function(x){return x.id===_cuadernoClienteId;});if(!c)return;
+  if(!c.aplicadores)c.aplicadores=[];
+  c.aplicadores.push({nombre:nombre,nif:nif,ropo:ropo,carne:carne,esAsesor:esAses});
+  save();renderAplicadoresTable(c);
+}
+
+function addEquipoRow() {
+  var desc=prompt('Descripci\u00f3n del equipo (ej: Pulverizador hidr\u00e1ulico 2000L):');if(!desc)return;
+  var roma=prompt('N\u00ba inscripci\u00f3n ROMA (opcional):')||'';
+  var adq=prompt('Fecha de adquisici\u00f3n (dd/mm/aaaa, opcional):')||'';
+  var insp=prompt('Fecha \u00faltima inspecci\u00f3n (dd/mm/aaaa, opcional):')||'';
+  var c=DB.clientes.find(function(x){return x.id===_cuadernoClienteId;});if(!c)return;
+  if(!c.equipos)c.equipos=[];
+  c.equipos.push({descripcion:desc,roma:roma,fechaAdq:adq,fechaInsp:insp});
+  save();renderEquiposTable(c);
+}
+
+function deleteAplicador(clienteId,idx){
+  var c=DB.clientes.find(function(x){return x.id===clienteId;});if(!c)return;
+  c.aplicadores.splice(idx,1);save();renderAplicadoresTable(c);
+}
+
+function deleteEquipo(clienteId,idx){
+  var c=DB.clientes.find(function(x){return x.id===clienteId;});if(!c)return;
+  c.equipos.splice(idx,1);save();renderEquiposTable(c);
+}
+
+function exportarCuaderno() {
+  var c=DB.clientes.find(function(x){return x.id===_cuadernoClienteId;});if(!c)return;
+  var campana=document.getElementById('cuaderno-campana').value;
+  var anio=document.getElementById('cuaderno-anio').value||new Date().getFullYear();
+  if(!campana){alert('Selecciona una campa\u00f1a');return;}
+  var recs=(DB.recintos||[]).filter(function(r){return r.clienteId===c.id&&r.campana===campana;});
+  recs.sort(function(a,b){return (parseFloat(a.numOrden)||999)-(parseFloat(b.numOrden)||999);});
+  var trts=(DB.tratamientos||[]).filter(function(t){return t.clienteId===c.id&&t.campana===campana;});
+  trts.sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');});
+  var abonados=(DB.abonados||[]).filter(function(a){return a.clienteId===c.id&&a.campana===campana;});
+  abonados.sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'');});
+  var wb=XLSX.utils.book_new();
+  var titular=c.titNombre||c.nombre;
+  function addSheet(wb,name,rows){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),name.substring(0,31));}
+
+  // 1.1
+  addSheet(wb,'1.1. INF. GRAL',[
+    ['CUADERNO DE EXPLOTACI\u00d3N - '+c.nombre,'','','A\u00d1O: '+anio],
+    [],[' 1.1 DATOS GENERALES DE LA EXPLOTACI\u00d3N'],
+    ['NOMBRE Y APELLIDOS O RAZ\u00d3N SOCIAL:',c.nombre,'','NIF:',c.nif||''],
+    ['N\u00ba Registro Explot. Nacional:',c.regNacional||'','','N\u00ba Registro Auton\u00f3mico:',c.regAutonomico||''],
+    ['Direcci\u00f3n:',c.direccion||'','Localidad:',c.localidad||'','C.Postal:',c.codPostal||'','Provincia:',c.provincia||''],
+    ['Tel\u00e9fono fijo:',c.telefonoFijo||'','Tel\u00e9fono m\u00f3vil:',c.telefono||'','e-mail:',c.email||''],
+    [],
+    ['TITULAR O REPRESENTANTE DE LA EXPLOTACI\u00d3N'],
+    ['Nombre y apellidos:',titular,'','NIF:',c.titNif||''],
+    ['Direcci\u00f3n:',c.titDireccion||'','Localidad:',c.titLocalidad||'','C.Postal:',c.titCodPostal||''],
+    ['Tipo representaci\u00f3n:',c.titTipo||'Titular propietario','','Tel\u00e9fono:',c.titTelefono||'','e-mail:',c.titEmail||'']
+  ]);
+
+  // 1.2-1.4
+  var r124=[
+    [c.nombre,'','A\u00d1O: '+anio],[],[' 1.2 PERSONAS O EMPRESAS QUE INTERVIENEN EN TRATAMIENTOS'],
+    ['N\u00ba','Nombre/Empresa','NIF','N\u00ba ROPO','Tipo carn\u00e9','Asesor']
+  ];
+  (c.aplicadores||[]).forEach(function(a,i){r124.push([i+1,a.nombre,a.nif||'',a.ropo||'',a.carne||'',a.esAsesor?'S\u00cd':'NO']);});
+  r124.push([],[' 1.3 EQUIPOS DE APLICACI\u00d3N'],
+    ['N\u00ba','Descripci\u00f3n del equipo','N\u00ba ROMA','Fecha adquisici\u00f3n','Fecha \u00faltima inspecci\u00f3n']);
+  (c.equipos||[]).forEach(function(e,i){r124.push([i+1,e.descripcion,e.roma||'',e.fechaAdq||'',e.fechaInsp||'']);});
+  r124.push([],[' 1.4 ASESOR / AGRUPACI\u00d3N DE ASESORAMIENTO'],
+    ['Nombre o raz\u00f3n social','NIF','N\u00ba de identificaci\u00f3n','Tipo de explotaci\u00f3n']);
+  if(c.asesorNombre)r124.push([c.asesorNombre,c.asesorNif||'',c.asesorId||'',c.asesorTipo||'']);
+  addSheet(wb,'1.2-1.3-1.4. INF. GRAL',r124);
+
+  // 2.1
+  var r21=[[c.nombre,'','A\u00d1O: '+anio],[],[' 2.1 DATOS IDENTIFICATIVOS Y AGRON\u00d3MICOS DE LAS PARCELAS'],
+    ['N\u00ba Orden','C\u00f3d.Prov.','T\u00e9rmino Municipal','C\u00f3d.Agr.','Zona','N\u00ba Pol\u00edgono','N\u00ba Parcela','N\u00ba Recinto',
+     'Uso SIGPAC','Sup.SIGPAC(ha)','Sup.Cultivada(ha)','Especie','Variedad','R\u00e9gimen','Sistema GIP','Zona Nitratos','Nombre Finca']];
+  recs.forEach(function(r){
+    var ev=(r.especieVariedad||'').split('/');
+    r21.push([r.numOrden||'',r.codProvincia||'',r.termMunicipal||'',r.codigoAgregado||'',r.zona||'',
+      r.numPoligono||'',r.numParcela||'',r.numRecinto||'',
+      r.usoSigpac||'',parseFloat(r.supSigpac)||'',parseFloat(r.supCultivada)||'',
+      ev[0].trim()||'',(ev.slice(1).join('/')).trim()||'',
+      r.secanoRegadio||'',r.sistemaGip||'',r.zonaVulnerableNitratos?'S\u00cd':'NO',r.nombreFinca||'']);
+  });
+  addSheet(wb,'2.1. DATOS PARCELAS',r21);
+
+  // 2.2
+  var evGrps={};
+  recs.forEach(function(r){var k=(r.especieVariedad||'Sin cultivo');if(!evGrps[k]){var ev=k.split('/');evGrps[k]={esp:ev[0].trim(),var:(ev.slice(1).join('/')).trim(),ords:[],ha:0};}evGrps[k].ords.push(r.numOrden||'?');evGrps[k].ha+=parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0;});
+  var r22=[[c.nombre,'','A\u00d1O: '+anio],[],[' 2.2 DATOS IDENTIFICATIVOS MEDIOAMBIENTALES - RESUMEN POR ESPECIE/VARIEDAD'],
+    ['Especie','Variedad','N\u00ba de orden de parcelas','Superficie total (ha)']];
+  Object.keys(evGrps).sort().forEach(function(k){var g=evGrps[k];r22.push([g.esp,g.var,g.ords.join(', '),g.ha.toFixed(2)]);});
+  addSheet(wb,'2.2. DATOS IDEN. MEDIAMB.',r22);
+
+  // 3.1
+  var r31=[[c.nombre,'','A\u00d1O: '+anio],[],[' 3.1 REGISTRO DE ACTUACIONES FITOSANITARIAS (SIN ASESOR GIP)'],
+    ['Id.Parcela','Especie','Variedad','Fecha inicio','Fecha fin','Sup.tratada(ha)',
+     'Problema fitosanitario','Aplicador','Equipo','Nombre comercial','N\u00ba Registro','Dosis','Observaciones']];
+  trts.forEach(function(t){
+    var tRecs=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&!r.sistemaGip;});
+    if(!tRecs.length)tRecs=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0;});
+    if(!tRecs.length)return;
+    var ords=tRecs.map(function(r){return r.numOrden||'?';}).join(', ');
+    var ev=(tRecs[0].especieVariedad||'').split('/');
+    var ha=tRecs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
+    (t.productos||[]).forEach(function(p){
+      var prod=(DB.productos||[]).find(function(x){return x.id===p.productoId;});
+      r31.push([ords,ev[0].trim(),(ev.slice(1).join('/')).trim(),
+        formatDate(t.fechaInicio||t.fecha),formatDate(t.fechaFin||t.fecha),ha.toFixed(2),
+        t.problema||'',t.aplicador||'',t.maquinaria||'',
+        prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),t.obs||'']);
+    });
+  });
+  addSheet(wb,'3.1. REG. FIT. x P.',r31);
+
+  // 3.1 bis
+  var r31b=[[c.nombre,'','A\u00d1O: '+anio],[],[' 3.1 bis REGISTRO DE ACTUACIONES FITOSANITARIAS (CON ASESOR GIP)'],
+    ['Especie','Variedad','Id.Parcela','Sup.cultivada(ha)','Sup.tratada(ha)',
+     'Plaga/Problema','Justificaci\u00f3n','Alt.no qu\u00edmicas',
+     'Nombre comercial','N\u00ba Registro','Dosis','Aplicador','Equipo','Eficacia','Observaciones']];
+  trts.forEach(function(t){
+    var tRecs=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&r.sistemaGip;});
+    if(!tRecs.length)return;
+    tRecs.forEach(function(r){
+      var ev=(r.especieVariedad||'').split('/');
+      (t.productos||[]).forEach(function(p){
+        var prod=(DB.productos||[]).find(function(x){return x.id===p.productoId;});
+        r31b.push([ev[0].trim(),(ev.slice(1).join('/')).trim(),r.numOrden||'',
+          parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',
+          t.problema||'',t.justificacion||'',t.altNoQuim||'',
+          prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),
+          t.aplicador||'',t.maquinaria||'',t.eficacia||'',t.obs||'']);
+      });
+    });
+  });
+  addSheet(wb,'3.1. bis REG. FIT. (ASESOR)',r31b);
+
+  // 6. Fertilización
+  var r6=[[c.nombre,'','A\u00d1O: '+anio],[],[' 6. REGISTRO DE FERTILIZACI\u00d3N'],
+    ['Fecha','N\u00ba Orden parcelas','Especie','Variedad','Tipo abono','N\u00ba albar\u00e1n','N%','P%','K%','Dosis','Tipo fertilizaci\u00f3n']];
+  abonados.forEach(function(ab){
+    var abRecs=recs.filter(function(r){return (ab.recintoIds||[]).indexOf(r.id)>=0;});
+    var ords=abRecs.map(function(r){return r.numOrden||'?';}).join(', ');
+    var ev=abRecs.length?(abRecs[0].especieVariedad||'').split('/'):['',''];
+    (ab.abonos||[]).forEach(function(row){
+      var abo=(DB.abonos||[]).find(function(a){return a.id===row.abonoId;});
+      r6.push([formatDate(ab.fecha),ords,ev[0].trim(),(ev.slice(1).join('/')).trim(),
+        abo?abo.nombre:'','',abo?abo.n||'':'',abo?abo.p||'':'',abo?abo.k||'':'',
+        row.dosis+(row.unidad?' '+row.unidad:''),row.modo||'']);
+    });
+  });
+  addSheet(wb,'6. REG. FERTILIZ.',r6);
+
+  // 7. Agroambiental CyL
+  var r7=[[c.nombre,'','A\u00d1O: '+anio],[],[' 7. DATOS AGROAMBIENTALES PARA CASTILLA Y LE\u00d3N'],
+    ['N\u00ba Orden','Especie','Variedad','Tipo labor previa','Fecha labor','Fecha siembra','Dosis semilla(kg/ha)','Fecha recolecci\u00f3n','Observaciones']];
+  recs.forEach(function(r){var ev=(r.especieVariedad||'').split('/');r7.push([r.numOrden||'',ev[0].trim(),(ev.slice(1).join('/')).trim(),'','','','','','']);});
+  addSheet(wb,'7. DAT. AGROAMB.',r7);
+
+  var fname='Cuaderno_'+c.nombre.replace(/[^a-zA-Z0-9]/g,'_')+'_'+campana+'.xlsx';
+  XLSX.writeFile(wb,fname);
+  closeModal('modal-cuaderno');
 }
 
 function deleteCliente(id) {
