@@ -738,7 +738,7 @@ textarea { resize: vertical; min-height: 72px; }
           <thead>
             <tr>
               <th class="col-hide-mobile">Nº</th><th>Cliente</th><th>Finca</th><th>Referencia SIGPAC</th>
-              <th>Cultivo</th><th>Sup. SIGPAC</th><th class="col-hide-mobile">Sup. Cultiv.</th>
+              <th>Especie</th><th class="col-hide-mobile">Variedad</th><th>Sup. SIGPAC</th><th class="col-hide-mobile">Sup. Cultiv.</th>
               <th class="col-hide-mobile">Régimen</th><th class="col-hide-mobile">Zona N</th><th class="col-hide-mobile">WKT</th><th>Acciones</th>
             </tr>
           </thead>
@@ -1057,7 +1057,7 @@ textarea { resize: vertical; min-height: 72px; }
           <input type="checkbox" id="prod-en-catalogo" style="width:18px;height:18px;accent-color:var(--primary)">
           <span style="font-size:13px;font-weight:600;color:var(--white)">&#x1F4CB; Incluir en Mi Cat&aacute;logo</span>
         </label>
-        <span id="prod-catalogo-hint" style="font-size:11px;color:var(--text3)">El producto aparecer&aacute; en el selector de tratamientos</span>
+        <span id="prod-catalogo-hint" style="font-size:11px;color:var(--text3)">Marca para que aparezca en tratamientos &mdash; desmarca para devolver al MAGRAMA</span>
       </div>
       <button class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveProducto()">&#x1F4BE; Guardar producto</button>
@@ -1138,10 +1138,15 @@ textarea { resize: vertical; min-height: 72px; }
             <option>Secano</option><option>Regadío</option>
           </select>
         </div>
-        <div class="form-group span-3">
-          <label>Especie / Variedad</label>
-          <input type="text" id="rec-especie" placeholder="ej: TRIGO / RIMBAUD">
+        <div class="form-group">
+          <label>Especie / Cultivo</label>
+          <input type="text" id="rec-especie" placeholder="ej: TRIGO" oninput="syncEspecieVariedad()">
         </div>
+        <div class="form-group">
+          <label>Variedad</label>
+          <input type="text" id="rec-variedad" placeholder="ej: RIMBAUD" oninput="syncEspecieVariedad()">
+        </div>
+        <input type="hidden" id="rec-especie-variedad-combined">
         <div class="form-group span-3">
           <label>Ecoregimen / Práctica</label>
           <select id="rec-eco">
@@ -3293,7 +3298,7 @@ function renderProductos() {
       (p.id && p.id.indexOf('mapa_')===0 && !p.enCatalogo ?
         '<button class="btn btn-accent btn-sm" onclick="addToCatalogo(\''+p.id+'\')" title="A\u00f1adir a Mi Cat\u00e1logo">&#x1F4CB; A\u00f1adir al cat\u00e1logo</button>' :
         (p.id && p.id.indexOf('mapa_')===0 && p.enCatalogo ?
-          '<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" onclick="addToCatalogo(\''+p.id+'\')" title="Ya en Mi Cat\u00e1logo">&#x2705; En cat\u00e1logo</button>' : '')
+          '<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" onclick="addToCatalogo(\''+p.id+'\')" title="Est\u00e1 en Mi Cat\u00e1logo. Pulsa para quitarlo.">&#x2705; En Mi Cat\u00e1logo &nbsp;&middot;&nbsp; <span style=\'font-size:11px;opacity:.7\'>&#x2715; quitar</span></button>' : '')
       ) +
       '<button class="btn btn-danger btn-sm" onclick="deleteProducto(\''+p.id+'\')">&#x1F5D1;</button>' +
       '</div>' +
@@ -3770,7 +3775,13 @@ function renderRecintos() {
         + '<td class="col-hide-mobile" style="color:var(--text3);padding-left:24px">' + (r.numOrden||'&mdash;') + '</td>'
         + '<td style="padding-left:24px">' + (r.nombreFinca||'') + (r.campana ? ' <span style="font-size:11px;color:var(--text3)">C.' + r.campana + '</span>' : '') + (isEmpty ? ' <span class="tag tag-yellow" style="font-size:10px">&#x26A0; Pendiente</span>' : '') + '</td>'
         + '<td><code style="font-size:11px;color:var(--accent)">' + sigRef + '</code></td>'
-        + '<td>' + getCropTag(r.especieVariedad) + '</td>'
+        + (function(){
+            var ev = (r.especieVariedad||'').split('/');
+            var esp  = ev[0].trim();
+            var vari = ev.slice(1).join('/').trim();
+            return '<td>' + getCropTag(esp||r.especieVariedad) + '</td>'
+              + '<td class="col-hide-mobile" style="color:var(--text3);font-size:12px">' + (vari||'&mdash;') + '</td>';
+          })()
         + '<td>' + (r.supSigpac||'&mdash;') + ' ha</td>'
         + '<td class="col-hide-mobile">' + (r.supCultivada||'&mdash;') + ' ha</td>'
         + '<td class="col-hide-mobile"><span class="tag ' + (r.secanoRegadio===('Regad\u00edo') ? 'tag-blue' : 'tag-gray') + '">' + (r.secanoRegadio||'&mdash;') + '</span></td>'
@@ -3799,6 +3810,32 @@ function toggleRecGrp2(grpId) {
 }
 function toggleRecGrp(id){} // stub, replaced by onclick above
 
+function syncEspecieVariedad() {
+  var esp = (document.getElementById('rec-especie')||{value:''}).value.trim();
+  var vari = (document.getElementById('rec-variedad')||{value:''}).value.trim();
+  var combined = esp + (vari ? ' / ' + vari : '');
+  var hid = document.getElementById('rec-especie-variedad-combined');
+  if(hid) hid.value = combined;
+}
+
+function getEspecieVariedad() {
+  syncEspecieVariedad();
+  var hid = document.getElementById('rec-especie-variedad-combined');
+  return hid ? hid.value : '';
+}
+
+function setEspecieVariedad(val) {
+  val = val || '';
+  var parts = val.split('/');
+  var esp  = parts[0].trim();
+  var vari = parts.slice(1).join('/').trim();
+  var espEl  = document.getElementById('rec-especie');
+  var varEl  = document.getElementById('rec-variedad');
+  if(espEl)  espEl.value  = esp;
+  if(varEl)  varEl.value  = vari;
+  syncEspecieVariedad();
+}
+
 function openRecintoModal(id=null) {
   editingId.recinto = id;
   document.getElementById('modal-rec-title').textContent = id ? 'Editar recinto SIGPAC' : 'Nuevo recinto SIGPAC';
@@ -3809,13 +3846,14 @@ function openRecintoModal(id=null) {
     'rec-prov':r?.codProvincia||'','rec-mun':r?.termMunicipal||'','rec-agr':r?.codAgregado||'0',
     'rec-zona':r?.zona||'0','rec-pol':r?.numPoligono||'','rec-par':r?.numParcela||'','rec-rec':r?.numRecinto||'',
     'rec-uso':r?.usoSigpac||'TA','rec-sup-sigpac':r?.supSigpac||'','rec-sup-cult':r?.supCultivada||'',
-    'rec-regimen':r?.secanoRegadio||'Secano','rec-especie':r?.especieVariedad||'','rec-eco':r?.ecoregimen||'',
+    'rec-regimen':r?.secanoRegadio||'Secano','rec-eco':r?.ecoregimen||'',
     'rec-cultivo-tipo':r?.cultivoPrincipal||'Principal','rec-finicio':r?.fechaInicio||'','rec-ffin':r?.fechaFin||'',
     'rec-cobertura':r?.cobertura||'Aire libre','rec-gip':r?.gip||'(AS) Asistida de un asesor',
     'rec-nitratos':r?.nitratos||'Sí','rec-propietario':r?.propietario||'','rec-finca':r?.nombreFinca||'',
     'rec-pac':r?.pac||'SI','rec-obs':r?.obs||'','rec-wkt':r?.wkt||''
   };
   Object.entries(fields).forEach(function([id,val]) { var el=document.getElementById(id); if(el) el.value=val; });
+  setEspecieVariedad(r ? r.especieVariedad||'' : '');
   openModal('modal-recinto');
 }
 
@@ -3834,7 +3872,7 @@ function saveRecinto() {
     supSigpac:parseFloat(document.getElementById('rec-sup-sigpac').value)||0,
     supCultivada:parseFloat(document.getElementById('rec-sup-cult').value)||0,
     secanoRegadio:document.getElementById('rec-regimen').value,
-    especieVariedad:document.getElementById('rec-especie').value.trim(),
+    especieVariedad:getEspecieVariedad(),
     ecoregimen:document.getElementById('rec-eco').value,
     cultivoPrincipal:document.getElementById('rec-cultivo-tipo').value,
     fechaInicio:document.getElementById('rec-finicio').value,
