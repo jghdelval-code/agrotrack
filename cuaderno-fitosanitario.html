@@ -1728,13 +1728,14 @@ var gDrive = {
   // ── Login ──
   login: function() {
     var cid = (document.getElementById('gdrive-client-id')||{value:''}).value.trim() || this.CLIENT_ID;
-    if(!cid) { alert('Introduce tu Client ID de Google Cloud primero.\n\nSigue las instrucciones en el panel de configuración.'); return; }
+    if(!cid) { alert('Introduce tu Client ID de Google Cloud primero.'); return; }
     if(window.location.protocol === 'file:') {
-      alert('⚠️ Google Drive no funciona con file://\n\nNecesitas abrirlo en localhost o GitHub Pages.\nVer instrucciones en el panel de configuración.');
+      alert('Google Drive no funciona con file://\n\nNecesitas abrirlo en GitHub Pages.');
       return;
     }
     localStorage.setItem('agrotrack_client_id', cid);
     this.CLIENT_ID = cid;
+    var self = this;
     var redirect = window.location.href.split('?')[0].split('#')[0];
     var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
       '?client_id='    + encodeURIComponent(cid) +
@@ -1742,8 +1743,72 @@ var gDrive = {
       '&response_type=token' +
       '&scope='        + encodeURIComponent(this.SCOPES) +
       '&prompt=select_account';
-    window.location.href = url;
+
+    // Open popup window for OAuth (works on desktop + mobile)
+    var popup = null;
+    try {
+      popup = window.open(url, 'gdrive_oauth',
+        'width=500,height=620,left=' + Math.round((screen.width-500)/2) +
+        ',top=' + Math.round((screen.height-620)/2));
+    } catch(e) {}
+
+    if(popup && !popup.closed) {
+      updateSyncStatus('connecting');
+      var pollTimer = setInterval(function() {
+        try {
+          if(popup.closed) { throw new Error('closed'); }
+          var loc = popup.location.href || '';
+          if(loc.indexOf('#') >= 0) {
+            var hash = loc.split('#')[1] || '';
+            var params = {};
+            hash.split('&').forEach(function(p){ var kv=p.split('='); if(kv[0]) params[decodeURIComponent(kv[0])]=decodeURIComponent(kv[1]||''); });
+            if(params.access_token) {
+              clearInterval(pollTimer);
+              try { popup.close(); } catch(e2) {}
+              self.token  = params.access_token;
+              self.fileId = null;
+              localStorage.setItem('agrotrack_gdrive_token', self.token);
+              localStorage.removeItem('agrotrack_gdrive_fileid');
+              localStorage.removeItem('agrotrack_gdrive_lastmod');
+              self._lastModified = null;
+              updateSyncStatus('connected');
+              self.downloadDB();
+              self.startAutoSync();
+              return;
+            }
+            if(params.error) {
+              clearInterval(pollTimer);
+              try { popup.close(); } catch(e2) {}
+              updateSyncStatus('disconnected');
+              alert('Error Google: ' + (params.error_description || params.error));
+              return;
+            }
+          }
+        } catch(ex) {
+          if(popup && popup.closed) {
+            clearInterval(pollTimer);
+            // Popup closed — check if token arrived via full-page redirect fallback
+            if(window.location.hash.indexOf('access_token') >= 0) {
+              self.handleRedirect();
+            } else {
+              updateSyncStatus(self.token ? 'connected' : 'disconnected');
+            }
+          }
+          // Otherwise cross-origin exception while on Google page — keep polling
+        }
+      }, 600);
+      setTimeout(function() {
+        clearInterval(pollTimer);
+        try { if(popup && !popup.closed) popup.close(); } catch(e) {}
+        if(!self.token) updateSyncStatus('disconnected');
+      }, 180000);
+
+    } else {
+      // Popup blocked — fall back to full-page redirect
+      window.location.href = url;
+    }
   },
+
 
   // ── Handle OAuth redirect ──
   handleRedirect: function() {
