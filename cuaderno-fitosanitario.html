@@ -1691,9 +1691,23 @@ var gDrive = {
     this.token         = localStorage.getItem('agrotrack_gdrive_token')||null;
     this.fileId        = localStorage.getItem('agrotrack_gdrive_fileid')||null;
     this._lastModified = localStorage.getItem('agrotrack_gdrive_lastmod')||null;
-    updateSyncStatus(this.token ? 'connected' : 'disconnected');
-    if(this.token) { this.verifyToken(); this.startAutoSync(); }
-    else if(this.CLIENT_ID && window.location.protocol !== 'file:') { this.silentLogin(); }
+    if(this.token) {
+      // Check token age — Google tokens last 1 hour (3600s)
+      var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
+      var age = (Date.now() - savedAt) / 1000;
+      if(savedAt > 0 && age > 3500) {
+        // Token almost certainly expired — clear immediately
+        this.logout(true);
+      } else {
+        // Show checking status while we verify (not green yet)
+        updateSyncStatus('connecting');
+        this.verifyToken();
+        this.startAutoSync();
+      }
+    } else {
+      updateSyncStatus('disconnected');
+      if(this.CLIENT_ID && window.location.protocol !== 'file:') { this.silentLogin(); }
+    }
   },
   silentLogin: function() {
     var self=this; if(!this.CLIENT_ID) return;
@@ -1725,9 +1739,22 @@ var gDrive = {
     fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token='+this.token)
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if(d.error) { self.logout(true); }
-        else { updateSyncStatus('connected'); }
-      }).catch(function(){ /* network error — keep token */ });
+        if(d.error || d.error_description) {
+          self.logout(true); // Token invalid/expired
+        } else {
+          updateSyncStatus('connected');
+        }
+      })
+      .catch(function(){
+        // Network error — can't verify. If token is under 1h old assume ok, otherwise clear
+        var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
+        var age = (Date.now() - savedAt) / 1000;
+        if(savedAt > 0 && age > 3500) {
+          self.logout(true);
+        } else {
+          updateSyncStatus('connected'); // Network down but token probably still valid
+        }
+      });
   },
 
   // ── Login ──
@@ -1819,6 +1846,7 @@ var gDrive = {
     this.token  = token;
     this.fileId = null;
     localStorage.setItem('agrotrack_gdrive_token', token);
+    localStorage.setItem('agrotrack_gdrive_token_at', Date.now().toString());
     localStorage.removeItem('agrotrack_gdrive_fileid');
     localStorage.removeItem('agrotrack_gdrive_lastmod');
     localStorage.removeItem('agrotrack_oauth_pending');
@@ -1849,6 +1877,7 @@ var gDrive = {
     this.stopAutoSync();
     this.token = null; this.fileId = null; this._lastModified = null;
     localStorage.removeItem('agrotrack_gdrive_token');
+    localStorage.removeItem('agrotrack_gdrive_token_at');
     localStorage.removeItem('agrotrack_gdrive_fileid');
     localStorage.removeItem('agrotrack_gdrive_lastmod');
     updateSyncStatus('disconnected');
