@@ -1882,25 +1882,14 @@ var gDrive = {
     this.fileId        = localStorage.getItem('agrotrack_gdrive_fileid')||null;
     this._lastModified = localStorage.getItem('agrotrack_gdrive_lastmod')||null;
     if(this.token) {
-      var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
-      var age = (Date.now() - savedAt) / 1000;
-      if(savedAt > 0 && age > 3500) {
-        // Token certainly expired
-        this.logout(true);
-      } else if(savedAt > 0 && age < 30) {
-        // Token obtained in the last 30 seconds (e.g. just came back from OAuth redirect)
-        // Skip verify — it's fresh. Go straight to connected.
-        updateSyncStatus('connected');
-        this.startAutoSync();
-      } else {
-        // Token exists but age unknown or moderate — verify
-        updateSyncStatus('connecting');
-        this.verifyToken();
-        this.startAutoSync();
-      }
+      updateSyncStatus('connected');      // Show green immediately
+      this.verifyToken();                 // Verify in background (calls silentLogin if expired)
+      this.startAutoSync();
     } else {
       updateSyncStatus('disconnected');
-      if(this.CLIENT_ID && window.location.protocol !== 'file:') { this.silentLogin(); }
+      if(this.CLIENT_ID && window.location.protocol !== 'file:') {
+        this.silentLogin();               // Try silent re-auth on startup
+      }
     }
   },
   silentLogin: function() {
@@ -1934,19 +1923,24 @@ var gDrive = {
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d.error || d.error_description) {
-          self.logout(true); // Token invalid/expired
+          // Token expired — try silent refresh before giving up
+          self.token = null;
+          localStorage.removeItem('agrotrack_gdrive_token');
+          updateSyncStatus('disconnected');
+          self.silentLogin(); // attempt automatic silent re-auth via iframe
         } else {
           updateSyncStatus('connected');
         }
       })
       .catch(function(){
-        // Network error — can't verify. If token is under 1h old assume ok, otherwise clear
+        // Network error — keep token if recent, else try silent login
         var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
         var age = (Date.now() - savedAt) / 1000;
         if(savedAt > 0 && age > 3500) {
-          self.logout(true);
+          updateSyncStatus('disconnected');
+          self.silentLogin();
         } else {
-          updateSyncStatus('connected'); // Network down but token probably still valid
+          updateSyncStatus('connected'); // Probably just offline
         }
       });
   },
