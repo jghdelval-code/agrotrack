@@ -1882,14 +1882,18 @@ var gDrive = {
     this.fileId        = localStorage.getItem('agrotrack_gdrive_fileid')||null;
     this._lastModified = localStorage.getItem('agrotrack_gdrive_lastmod')||null;
     if(this.token) {
-      // Check token age — Google tokens last 1 hour (3600s)
       var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
       var age = (Date.now() - savedAt) / 1000;
       if(savedAt > 0 && age > 3500) {
-        // Token almost certainly expired — clear immediately
+        // Token certainly expired
         this.logout(true);
+      } else if(savedAt > 0 && age < 30) {
+        // Token obtained in the last 30 seconds (e.g. just came back from OAuth redirect)
+        // Skip verify — it's fresh. Go straight to connected.
+        updateSyncStatus('connected');
+        this.startAutoSync();
       } else {
-        // Show checking status while we verify (not green yet)
+        // Token exists but age unknown or moderate — verify
         updateSyncStatus('connecting');
         this.verifyToken();
         this.startAutoSync();
@@ -1966,16 +1970,13 @@ var gDrive = {
       + '&scope='        + encodeURIComponent(this.SCOPES)
       + '&prompt=select_account';
 
-    // Mark that we're waiting for auth (cross-tab communication)
-    localStorage.setItem('agrotrack_oauth_pending', Date.now().toString());
-    updateSyncStatus('connecting');
-
     var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if(isIOS) {
-      // iOS Safari: window.open opens a new full-screen tab, not a popup.
-      // The token will arrive via the storage event listener below.
-      window.open(url, '_blank');
+      // iOS: use full-page redirect — same tab, most reliable approach.
+      // handleRedirect() will catch the token on reload.
+      updateSyncStatus('connecting');
+      window.location.href = url;
     } else {
       // Desktop: try popup with polling
       var popup = null;
@@ -1986,6 +1987,7 @@ var gDrive = {
       } catch(e) {}
 
       if(popup && !popup.closed) {
+        updateSyncStatus('connecting');
         var pollTimer = setInterval(function() {
           try {
             if(popup.closed) { throw new Error('closed'); }
@@ -2025,7 +2027,7 @@ var gDrive = {
           if(!self.token) updateSyncStatus('disconnected');
         }, 180000);
       } else {
-        // Popup blocked — use full page redirect
+        // Popup blocked — full page redirect
         window.location.href = url;
       }
     }
@@ -2054,7 +2056,7 @@ var gDrive = {
     hash.split('&').forEach(function(p){ var kv=p.split('='); if(kv[0]) params[kv[0]]=decodeURIComponent(kv[1]||''); });
     if(params.access_token) {
       window.history.replaceState(null, '', window.location.pathname);
-      this._applyToken(params.access_token);
+      this._applyToken(params.access_token);  // sets token + timestamp
     }
     if(params.error) {
       alert('Error al conectar con Google Drive: '+params.error);
