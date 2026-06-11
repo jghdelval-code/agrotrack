@@ -8886,6 +8886,29 @@ window.addEventListener('load', function() {
   renderClientes();
 });
 
+// ── iOS BFCache fix ───────────────────────────────────────────────────
+// iOS Safari restores pages from BFCache without re-running the load event.
+// When Google OAuth redirects back with #access_token in the URL,
+// iOS restores the old page state and the token is never processed.
+// pageshow fires even on BFCache restores.
+window.addEventListener('pageshow', function(e) {
+  if(!e.persisted) return; // Normal load handled by 'load' event above
+  var hash = window.location.hash || '';
+  if(hash.indexOf('access_token') >= 0 || hash.indexOf('error') >= 0) {
+    // BFCache restore WITH token in URL — force reload so load event fires cleanly
+    window.location.reload();
+  } else {
+    // BFCache restore WITHOUT token — check if token was saved while away
+    var t = localStorage.getItem('agrotrack_gdrive_token');
+    if(t && !gDrive.token) {
+      gDrive.token = t;
+      gDrive.fileId = localStorage.getItem('agrotrack_gdrive_fileid')||null;
+      updateSyncStatus('connected');
+      gDrive.startAutoSync();
+    }
+  }
+});
+
 </script>
 <!-- SYNC TOAST -->
 <div id="sync-toast" style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--card);border:1px solid var(--border2);color:var(--text);padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow)"></div>
