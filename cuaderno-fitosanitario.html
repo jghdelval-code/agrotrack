@@ -3324,6 +3324,46 @@ function addToCatalogo(id) {
   save(); renderProductos();
 }
 
+function crearProductoDesdeDC(refId, dcNombre, empresa) {
+  var ref = (DB.productos||[]).find(function(p){ return p.id === refId; });
+  if(!ref) { alert('Producto de referencia no encontrado'); return; }
+  var nombre = dcNombre.replace(/&#39;/g,"'");
+  var emp    = empresa.replace(/&#39;/g,"'");
+  // Check if product with this name already exists
+  var existe = (DB.productos||[]).find(function(p){
+    return p.nombre.toLowerCase() === nombre.toLowerCase();
+  });
+  if(existe) {
+    alert('Ya existe un producto con el nombre "' + nombre + '"');
+    return;
+  }
+  var nuevo = {
+    id:                  uid(),
+    nombre:              nombre,
+    numRegistro:         ref.numRegistro||'',
+    tipo:                ref.tipo||'Fitosanitario',
+    materiaActiva:       ref.materiaActiva||'',
+    titular:             emp || ref.titular||'',
+    formulacion:         ref.formulacion||'',
+    dosis:               ref.dosis||'',
+    plazo:               ref.plazo||'',
+    cultivosAutorizados: (ref.cultivosAutorizados||[]).slice(),
+    usosDetalle:         ref.usosDetalle||null,
+    formatos:            [],
+    coste:               0,
+    unidadCoste:         ref.unidadCoste||'L',
+    usos:                ref.usos||'',
+    obs:                 'Denominaci\u00f3n com\u00fan de: ' + ref.nombre + (emp ? ' (' + emp + ')' : ''),
+    productoReferencia:  ref.nombre,
+    denominacionesComunes: []
+  };
+  if(!DB.productos) DB.productos = [];
+  DB.productos.push(nuevo);
+  save();
+  renderProductos();
+  alert('\u2705 Creado: "' + nombre + '"\n\nCon los datos de: ' + ref.nombre + '\nPuedes editarlo para ajustar precio, formatos u obs.');
+}
+
 function repararCatalogoMapa() {
   // Build a set of numRegistros from the embedded catalog
   var mapaRegs = {};
@@ -3483,7 +3523,13 @@ function renderProductos() {
       var shownDCs = dcs.slice(0, 6);
       var moreDCs  = dcs.length - shownDCs.length;
       var dcPills  = shownDCs.map(function(d){
-        return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text2)" title="'+d.empresa+'">'+d.nombre+'</span>';
+        var dcN = (d.nombre||'').replace(/'/g,"&#39;");
+        var emp = (d.empresa||'').replace(/'/g,"&#39;");
+        return '<span onclick="crearProductoDesdeDC(\''+p.id+'\',\''+dcN+'\',\''+emp+'\')" '
+          + 'style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);'
+          + 'color:var(--text2);cursor:pointer" '
+          + 'title="Pincha para crear producto: '+dcN+'">'
+          + d.nombre+'</span>';
       }).join('');
       if(moreDCs > 0) dcPills += '<span style="font-size:10px;color:var(--text3);padding:2px 5px">+'+moreDCs+' más</span>';
       dcBlock = '<div style="margin-top:6px;padding:7px 9px;background:rgba(74,140,42,.06);border-left:3px solid var(--primary);border-radius:0 5px 5px 0">' +
