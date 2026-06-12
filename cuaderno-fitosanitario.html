@@ -8055,11 +8055,12 @@ function renderCompras() {
       var name = item.tipo==='producto'
         ? ((DB.productos||[]).find(function(p){return p.id===item.itemId;})||{}).nombre||'—'
         : ((DB.abonos||[]).find(function(a){return a.id===item.itemId;})||{}).nombre||'—';
-      var icon = item.tipo==='producto' ? '💊' : '🧪';
-      return '<tr>' +
-        '<td>'+icon+' <b>'+name+'</b></td>' +
-        '<td style="white-space:nowrap"><b>'+item.cantidad+' '+item.unidad+'</b></td>' +
-        '<td>'+(item.precio?item.precio+' €':'—')+'</td>' +
+      var icon = item.tipo==='producto' ? '&#x1F48A;' : '&#x1F9EA;';
+      var esDev = parseFloat(item.cantidad) < 0;
+      return '<tr style="'+(esDev?'background:rgba(192,57,43,.07)':'')+'">' +
+        '<td>'+icon+' <b style="'+(esDev?'color:#e74c3c':'')+'">'+name+'</b>'+(esDev?' <span style="font-size:10px;background:#e74c3c;color:#fff;padding:1px 6px;border-radius:8px;vertical-align:middle">devolución</span>':'')+'</td>' +
+        '<td style="white-space:nowrap"><b style="'+(esDev?'color:#e74c3c':'')+'">'+item.cantidad+' '+item.unidad+'</b></td>' +
+        '<td>'+(item.precio?item.precio+' \u20ac':'&mdash;')+'</td>' +
         '</tr>';
     }).join('');
 
@@ -8176,13 +8177,13 @@ function addCompraRow(data) {
   fields.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px;gap:8px;align-items:end';
   fields.innerHTML = '<div style="display:flex;flex-direction:column;gap:3px">'
     +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Cantidad</label>'
-    +'<input type="number" step="0.01" min="0" class="compra-row-cant" placeholder="cant." value="'+(data&&data.cantidad||'')+'" style="width:100%"></div>'
+    +'<input type="number" step="0.01" class="compra-row-cant" placeholder="cant. (neg.=devolución)" value="'+(data&&data.cantidad||'')+'" style="width:100%"></div>'
     +'<div style="display:flex;flex-direction:column;gap:3px">'
     +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Unidad</label>'
     +'<select class="compra-row-unidad" style="width:100%">'+unidades+'</select></div>'
     +'<div style="display:flex;flex-direction:column;gap:3px">'
     +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Precio total (&#x20AC;)</label>'
-    +'<input type="number" step="0.01" min="0" class="compra-row-precio" placeholder="&#x20AC;" value="'+(data&&data.precio||'')+'" style="width:100%"></div>';
+    +'<input type="number" step="0.01" class="compra-row-precio" placeholder="&#x20AC;" value="'+(data&&data.precio||'')+'" style="width:100%"></div>';
 
   inner.appendChild(top); inner.appendChild(fields);
   row._compraList = list;
