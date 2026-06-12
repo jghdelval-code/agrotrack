@@ -621,8 +621,8 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="section-header">
         <h2>Catálogo de productos</h2>
         <div class="actions">
-          <input class="search-input" placeholder="🔍 Nombre, materia activa, nº reg..." id="prod-search" oninput="renderProductos()">
-          <select class="filter-select" id="prod-filter-tipo" onchange="renderProductos()">
+          <input class="search-input" placeholder="🔍 Nombre, materia activa, nº reg..." id="prod-search" oninput="debounceProd()">
+          <select class="filter-select" id="prod-filter-tipo" onchange="_prodPage=0;renderProductos()">
             <option value="">Todos los tipos</option>
             <option>Herbicida</option>
             <option>Fungicida</option>
@@ -663,7 +663,9 @@ textarea { resize: vertical; min-height: 72px; }
       <input type="hidden" id="prod-subtab" value="catalogo">
 
       <div id="prod-mapa-warnings"></div>
+      <div id="prod-paginacion-top" style="display:none;margin-bottom:8px"></div>
       <div id="productos-list"></div>
+      <div id="prod-paginacion-bot" style="display:none;margin-top:12px"></div>
     </div>
   </div>
 
@@ -3405,6 +3407,7 @@ function repararCatalogoMapa() {
 function setProdSubtab(tab) {
   var hid = document.getElementById('prod-subtab');
   if(hid) hid.value = tab;
+  _prodPage = 0;
   var bC = document.getElementById('prod-sub-catalogo');
   var bM = document.getElementById('prod-sub-magrama');
   if(bC) { bC.style.color = tab==='catalogo'?'var(--white)':'var(--text3)'; bC.style.borderBottomColor = tab==='catalogo'?'var(--primary)':'transparent'; }
@@ -3412,212 +3415,203 @@ function setProdSubtab(tab) {
   renderProductos();
 }
 
+var _prodPage = 0;
+var _prodPageSize = 25;
+var _prodDebounceTimer = null;
+
+function debounceProd() {
+  clearTimeout(_prodDebounceTimer);
+  _prodDebounceTimer = setTimeout(function() { _prodPage=0; renderProductos(); }, 280);
+}
+
 function renderProductos() {
-  var search  = document.getElementById('prod-search').value.toLowerCase().trim();
+  var search  = (document.getElementById('prod-search').value||'').toLowerCase().trim();
   var tipo    = document.getElementById('prod-filter-tipo').value;
-  var cultivo = ((document.getElementById('prod-filter-cultivo')||{}).value || '').toLowerCase().trim();
+  var cultivo = ((document.getElementById('prod-filter-cultivo')||{}).value||'').toLowerCase().trim();
+  var subtab  = (document.getElementById('prod-subtab')||{}).value||'catalogo';
 
-  // Refresh cultivo dropdown from all products that have cultivos
-  var allCultivos = new Set();
-  DB.productos.forEach(function(p){
-    (p.cultivosAutorizados||[]).forEach(function(cv){ allCultivos.add(cv.trim()); });
-  });
-  var cultiFilter = document.getElementById('prod-filter-cultivo');
-  if(cultiFilter) {
-    var curVal = cultiFilter.value;
-    var sortedCultivos = Object.keys(allCultivos).sort();
-    cultiFilter.innerHTML = '<option value="">Todos los cultivos</option>' +
-      sortedCultivos.map(function(cv){
-        return '<option value="'+cv.toLowerCase()+'"'+(curVal.toLowerCase()===cv.toLowerCase()?' selected':'')+'>'+cv+'</option>';
-      }).join('');
-    cultiFilter.value = curVal;
-  }
-
-  var subtab = (document.getElementById('prod-subtab')||{}).value || 'catalogo';
-
-  var list = DB.productos.filter(function(p) {
-    // Subtab split: Mi Catálogo = user products OR mapa products with enCatalogo:true
-    var isMapa = p.id && p.id.indexOf('mapa_') === 0;
-    if(subtab === 'catalogo') {
-      if(isMapa && !p.enCatalogo) return false;
-    }
-    if(subtab === 'magrama' && !isMapa) return false;
-    if(tipo && p.tipo !== tipo) return false;
+  // Build filtered + sorted list
+  var list = (DB.productos||[]).filter(function(p) {
+    var isMapa = p.id && p.id.indexOf('mapa_')===0;
+    if(subtab==='catalogo' && isMapa && !p.enCatalogo) return false;
+    if(subtab==='magrama'  && !isMapa) return false;
+    if(tipo && p.tipo!==tipo) return false;
     if(search) {
-      var s = search;
-      if(p.nombre.toLowerCase().indexOf(s) < 0 &&
-         (p.materiaActiva||'').toLowerCase().indexOf(s) < 0 &&
-         (p.numRegistro||'').toLowerCase().indexOf(s) < 0 &&
-         (p.titular||'').toLowerCase().indexOf(s) < 0) return false;
+      var s=search;
+      if(p.nombre.toLowerCase().indexOf(s)<0 &&
+         (p.materiaActiva||'').toLowerCase().indexOf(s)<0 &&
+         (p.numRegistro||'').toLowerCase().indexOf(s)<0 &&
+         (p.titular||'').toLowerCase().indexOf(s)<0) return false;
     }
     if(cultivo) {
-      var matchCultivo = (p.cultivosAutorizados||[]).some(function(cv){
-        return cv.toLowerCase().indexOf(cultivo) >= 0 || cultivo.indexOf(cv.toLowerCase()) >= 0;
-      }) || (p.usos||'').toLowerCase().indexOf(cultivo) >= 0;
-      if(!matchCultivo) return false;
+      var m=(p.cultivosAutorizados||[]).some(function(cv){return cv.toLowerCase().indexOf(cultivo)>=0;})
+             ||(p.usos||'').toLowerCase().indexOf(cultivo)>=0;
+      if(!m) return false;
     }
     return true;
   });
+  list.sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'});});
 
-  // Update counts in subtab buttons
-  var nCat = DB.productos.filter(function(p){ var isMapa=p.id&&p.id.indexOf('mapa_')===0; return !isMapa || p.enCatalogo; }).length;
-  var nMag = DB.productos.filter(function(p){ return p.id && p.id.indexOf('mapa_') === 0; }).length;
-  var ccEl = document.getElementById('prod-count-catalogo');
-  var cmEl = document.getElementById('prod-count-magrama');
-  if(ccEl) ccEl.textContent = '(' + nCat + ')';
-  if(cmEl) cmEl.textContent = '(' + nMag + ')';
+  // Update subtab counts
+  var nCat=(DB.productos||[]).filter(function(p){var isMapa=p.id&&p.id.indexOf('mapa_')===0;return !isMapa||p.enCatalogo;}).length;
+  var nMag=(DB.productos||[]).filter(function(p){return p.id&&p.id.indexOf('mapa_')===0;}).length;
+  var ccEl=document.getElementById('prod-count-catalogo'),cmEl=document.getElementById('prod-count-magrama');
+  if(ccEl) ccEl.textContent='('+nCat+')';
+  if(cmEl) cmEl.textContent='('+nMag+')';
 
-  // Sort alphabetically by nombre
-  list.sort(function(a,b){ return a.nombre.localeCompare(b.nombre, 'es', {sensitivity:'base'}); });
+  // Cancelled warning
+  var cancelled=list.filter(function(p){return p._cancelado;});
+  var warnEl=document.getElementById('prod-mapa-warnings');
+  if(warnEl) warnEl.innerHTML=cancelled.length
+    ?'<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(192,57,43,.08);border:1px solid var(--danger);border-radius:8px;margin-bottom:14px;font-size:13px"><span style="font-size:18px">&#x26D4;</span><span style="color:#e74c3c;font-weight:700">'+cancelled.length+' producto'+(cancelled.length!==1?'s':'')+' cancelado'+(cancelled.length!==1?'s':'')+' en el MAPA</span></div>':'';
 
-  // Cancelled warning banner
-  var cancelled = list.filter(function(p){ return p._cancelado; });
-  var warnEl = document.getElementById('prod-mapa-warnings');
-  if(warnEl) {
-    if(cancelled.length) {
-      warnEl.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--danger-light);border:1px solid var(--danger);border-radius:8px;margin-bottom:14px;font-size:13px;">' +
-        '<span style="font-size:18px">⛔</span>' +
-        '<span style="color:#e74c3c;font-weight:700">'+cancelled.length+' producto'+( cancelled.length!==1?'s':'')+' cancelado'+( cancelled.length!==1?'s':'')+' o no encontrado'+( cancelled.length!==1?'s':'')+' en el listado del MAPA</span>' +
-        '<span style="color:var(--text2);font-size:12px">— aparecen en rojo abajo</span>' +
-        '</div>';
-    } else {
-      warnEl.innerHTML = '';
-    }
+  var cont=document.getElementById('productos-list');
+  if(!list.length){
+    cont.innerHTML='<div class="empty-state"><div class="icon">&#x1F33F;</div><div>No hay productos'+(search||tipo||cultivo?' que coincidan con los filtros':'')+'</div></div>';
+    renderProdPaginacion(0,0,0); return;
   }
 
-  var cont = document.getElementById('productos-list');
-  if(!list.length) {
-    cont.innerHTML = '<div class="empty-state"><div class="icon">🌿</div><div>No hay productos'+(search?' que coincidan':'')+'</div></div>';
-    return;
-  }
+  // Paginate
+  var total=list.length;
+  var nPages=Math.ceil(total/_prodPageSize);
+  if(_prodPage>=nPages) _prodPage=nPages-1;
+  if(_prodPage<0) _prodPage=0;
+  var pageItems=list.slice(_prodPage*_prodPageSize, (_prodPage+1)*_prodPageSize);
 
-  var html = '';
-  list.forEach(function(p) {
-    var isCancelado = !!p._cancelado;
-    var cardStyle = isCancelado
-      ? 'background:rgba(192,57,43,.08);border-color:var(--danger);'
-      : '';
-    var nameExtra = isCancelado
-      ? '<span class="tag tag-red" style="font-size:11px;margin-left:6px">⛔ Cancelado / No en MAPA</span>'
-      : (p._vigente ? '<span class="tag tag-green" style="font-size:10px;margin-left:6px">✓ MAPA</span>' : '');
-
-    // Cultivos autorizados pills
-    var cultivosPills = '';
-    if(p.cultivosAutorizados && p.cultivosAutorizados.length) {
-      var shown = p.cultivosAutorizados.slice(0, 8);
-      var more  = p.cultivosAutorizados.length - shown.length;
-      cultivosPills = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">' +
-        '<span style="font-size:11px;color:var(--text3);margin-right:2px;align-self:center">🌱 Cultivos:</span>' +
-        shown.map(function(cv){
-          var col = getCropColor(cv);
-          return '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:'+col+'22;border:1px solid '+col+'66;color:var(--text)">'+cv+'</span>';
-        }).join('') +
-        (more ? '<span style="font-size:10px;color:var(--text3);padding:2px 5px">+'+more+' más</span>' : '') +
-        '</div>';
-    }
-
-    // Denominaciones comunes block
-    var dcBlock = '';
-    if(p.productoReferencia || (p.denominacionesComunes && p.denominacionesComunes.length)) {
-      var dcs = p.denominacionesComunes || [];
-      var shownDCs = dcs.slice(0, 6);
-      var moreDCs  = dcs.length - shownDCs.length;
-      var dcPills  = shownDCs.map(function(d){
-        var dcN = (d.nombre||'').replace(/'/g,"&#39;");
-        var emp = (d.empresa||'').replace(/'/g,"&#39;");
-        return '<span onclick="crearProductoDesdeDC(\''+p.id+'\',\''+dcN+'\',\''+emp+'\')" '
-          + 'style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);'
-          + 'color:var(--text2);cursor:pointer" '
-          + 'title="Pincha para crear producto: '+dcN+'">'
-          + d.nombre+'</span>';
-      }).join('');
-      if(moreDCs > 0) dcPills += '<span style="font-size:10px;color:var(--text3);padding:2px 5px">+'+moreDCs+' más</span>';
-      dcBlock = '<div style="margin-top:6px;padding:7px 9px;background:rgba(74,140,42,.06);border-left:3px solid var(--primary);border-radius:0 5px 5px 0">' +
-        (p.productoReferencia ? '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">📋 Producto de referencia: <span style="color:var(--white)">'+p.productoReferencia+'</span></div>' : '') +
-        (dcs.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center"><span style="font-size:11px;color:var(--text3)">🏷️ Denominaciones:</span>'+dcPills+'</div>' : '') +
-        '</div>';
-    }
-
-    html += '<div class="product-card" style="'+cardStyle+'">' +
-      '<div style="flex-shrink:0;font-size:24px">'+tipoEmoji(p.tipo)+'</div>' +
-      '<div class="product-card-info">' +
-      '<div class="product-card-name">'+p.nombre+nameExtra+' <span class="tag '+tipoBadge(p.tipo)+'" style="font-size:11px">'+p.tipo+'</span></div>' +
-      '<div class="product-card-meta">' +
-      '<span>&#x1F52C; '+(p.materiaActiva||'&mdash;')+'</span>' +
-      '<span>&#x1F4C4; Reg: '+(p.numRegistro||'&mdash;')+'</span>' +
-      '<span>&#x1F3ED; '+(p.titular||'&mdash;')+'</span>' +
-      '<span>&#x1F48A; Form: '+(p.formulacion||'&mdash;')+'</span>' +
-      '<span>&#x1F4CF; Dosis: '+(p.dosis||'&mdash;')+'</span>' +
-      '<span>&#x23F1; Plazo: '+(p.plazo||'&mdash;')+'</span>' +
-      '</div>' +
-      // Formats/prices block
-      (function(){
-        var fmts = (p.formatos && p.formatos.length) ? p.formatos
-          : (p.coste ? [{nombre:'Est\u00e1ndar', cantidad:1, unidad:p.unidadCoste||'L', precio:p.coste}] : []);
-        if(!fmts.length) return '';
-        var pills = fmts.map(function(f){
-          var label = f.nombre || (f.cantidad+' '+f.unidad);
-          var price = f.precio ? f.precio.toFixed(2)+' \u20ac' : 'sin precio';
-          return '<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(74,140,42,.08);border-radius:6px;border:1px solid var(--border2)">'
-            +'<span style="font-size:12px;font-weight:700;color:var(--white)">'+label+'</span>'
-            +'<span style="font-size:11px;color:var(--text3)">'+(f.cantidad?f.cantidad+' '+f.unidad:'')+'</span>'
-            +'<span style="margin-left:auto;font-size:13px;font-weight:700;color:#7acc4a">'+price+'</span>'
-            +'</div>';
-        }).join('');
-        return '<div style="margin-top:7px">'
-          +'<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">&#x1F4E6; Formatos disponibles</div>'
-          +'<div style="display:flex;flex-direction:column;gap:4px">'+pills+'</div>'
-          +'</div>';
-      })() +
-      (p.usos ? '<div style="font-size:12px;color:var(--text3);margin-top:4px">&#x1F4CB; '+p.usos+'</div>' : '') +
-      // usosDetalle accordion for crops with full detail
-      (function(){
-        if(!p.usosDetalle || !Object.keys(p.usosDetalle).length) return '';
-        var cvList = Object.keys(p.usosDetalle).sort();
-        var togId = 'ud_'+p.id;
-        var rows = cvList.map(function(cv){
-          var usos = p.usosDetalle[cv];
-          var color = getCropColor(cv);
-          var usoRows = (usos||[]).slice(0,8).map(function(u){
-            var ag  = u.agente||u.a||''; var dos=u.dosis||u.d||'';
-            var apli=u.aplicaciones||u.ap||''; var pl=u.plazo||u.pl||'';
-            return '<tr><td style="padding:3px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+ag+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+dos+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+apli+(apli?' aplic.':'')+'</td>'
-              +'<td style="padding:3px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(pl&&pl!=='NP'?'PS: '+pl:'')+'</td></tr>';
-          }).join('');
-          var more = usos.length > 8 ? '<tr><td colspan="4" style="padding:3px 8px;font-size:11px;color:var(--text3)">... y '+( usos.length-8)+' agentes más</td></tr>' : '';
-          return '<div style="margin-bottom:6px">'
-            +'<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:'+color+'22;border-left:3px solid '+color+';border-radius:0 4px 4px 0;margin-bottom:2px">'
-            +'<span style="font-size:11px;font-weight:700;color:var(--white)">'+cv+'</span>'
-            +'<span style="font-size:10px;color:var(--text3)">'+(usos.length)+' uso'+(usos.length!==1?'s':'')+'</span></div>'
-            +'<table style="width:100%;border-collapse:collapse"><thead><tr>'
-            +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left;font-weight:700;text-transform:uppercase">Agente / Plaga</th>'
-            +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left;font-weight:700;text-transform:uppercase;white-space:nowrap">Dosis</th>'
-            +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left;font-weight:700;text-transform:uppercase">Aplic.</th>'
-            +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left;font-weight:700;text-transform:uppercase">Plazo seg.</th>'
-            +'</tr></thead><tbody>'+usoRows+more+'</tbody></table></div>';
-        }).join('');
-        return '<div id="'+togId+'" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px;max-height:280px;overflow-y:auto">'+rows+'</div>'
-          +'<button type="button" onclick="var el=document.getElementById(\''+togId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.textContent=el.style.display===\'none\'?\'&#x1F50D; Ver usos registrados ('+cvList.length+' cultivos)\':\'&#x25B4; Ocultar usos\'" style="margin-top:5px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos registrados ('+cvList.length+' cultivos)</button>';
-      })() +
-      cultivosPills +
-      dcBlock +
-      '</div>' +
-      '<div class="product-card-actions">' +
-      fichaBtn(p) +
-      '<button class="btn btn-secondary btn-sm" onclick="openProductoModal(\''+p.id+'\')">&#x270F; Editar</button>' +
-      (p.id && p.id.indexOf('mapa_')===0 && !p.enCatalogo ?
-        '<button class="btn btn-accent btn-sm" onclick="addToCatalogo(\''+p.id+'\')" title="A\u00f1adir a Mi Cat\u00e1logo">&#x1F4CB; A\u00f1adir al cat\u00e1logo</button>' :
-        (p.id && p.id.indexOf('mapa_')===0 && p.enCatalogo ?
-          '<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" onclick="addToCatalogo(\''+p.id+'\')" title="Est\u00e1 en Mi Cat\u00e1logo. Pulsa para quitarlo.">&#x2705; En Mi Cat\u00e1logo &nbsp;&middot;&nbsp; <span style=\'font-size:11px;opacity:.7\'>&#x2715; quitar</span></button>' : '')
-      ) +
-      '<button class="btn btn-danger btn-sm" onclick="deleteProducto(\''+p.id+'\')">&#x1F5D1;</button>' +
-      '</div>' +
-      '</div>';
+  // Render only the current page
+  var html='';
+  pageItems.forEach(function(p) {
+    html += buildProductCard(p);
   });
+
   cont.innerHTML = html;
+  renderProdPaginacion(_prodPage, nPages, total);
 }
+
+function renderProdPaginacion(page, nPages, total) {
+  var topEl=document.getElementById('prod-paginacion-top');
+  var botEl=document.getElementById('prod-paginacion-bot');
+  if(!topEl||!botEl) return;
+  if(nPages<=1){topEl.style.display='none';botEl.style.display='none';return;}
+  var from=page*_prodPageSize+1, to=Math.min((page+1)*_prodPageSize,total);
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:12px;color:var(--text3)">Mostrando <b style="color:var(--white)">'+from+'–'+to+'</b> de <b style="color:var(--white)">'+total+'</b> productos</span>'
+    +'<div style="display:flex;gap:6px;align-items:center">';
+  if(page>0) html+='<button class="btn btn-secondary btn-sm" onclick="_prodPage=0;renderProductos()">&#x21E4; Primera</button>'
+    +'<button class="btn btn-secondary btn-sm" onclick="_prodPage--;renderProductos()">&#x2190; Anterior</button>';
+  html+='<span style="font-size:12px;font-weight:700;color:var(--white);padding:4px 10px;background:var(--primary);border-radius:6px">'+( page+1)+' / '+nPages+'</span>';
+  if(page<nPages-1) html+='<button class="btn btn-secondary btn-sm" onclick="_prodPage++;renderProductos()">Siguiente &#x2192;</button>'
+    +'<button class="btn btn-secondary btn-sm" onclick="_prodPage='+( nPages-1)+';renderProductos()">&#xC3;ltima &#x21E5;</button>';
+  html+='</div></div>';
+  topEl.innerHTML=html; topEl.style.display='';
+  botEl.innerHTML=html; botEl.style.display='';
+}
+
+function buildProductCard(p) {
+  var isCancelado=!!p._cancelado;
+  var isMapa=p.id&&p.id.indexOf('mapa_')===0;
+  var cardStyle=isCancelado?'background:rgba(192,57,43,.08);border-color:var(--danger);':'';
+  var nameExtra=isCancelado
+    ?'<span class="tag tag-red" style="font-size:11px;margin-left:6px">&#x26D4; Cancelado</span>'
+    :(p._vigente?'<span class="tag tag-green" style="font-size:10px;margin-left:6px">&#x2713; MAPA</span>':'');
+
+  // Formatos/precios (compact)
+  var fmtHtml='';
+  var fmts=(p.formatos&&p.formatos.length)?p.formatos:(p.coste?[{nombre:'Est\u00e1ndar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}]:[]);
+  if(fmts.length){
+    fmtHtml='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'
+      +fmts.slice(0,4).map(function(f){
+        return '<span style="font-size:11px;padding:2px 8px;background:rgba(74,140,42,.08);border:1px solid var(--border2);border-radius:6px">'
+          +(f.nombre||f.cantidad+' '+f.unidad)
+          +(f.precio?' &mdash; <b style="color:#7acc4a">'+f.precio.toFixed(2)+' \u20ac</b>':'')+'</span>';
+      }).join('')
+      +(fmts.length>4?'<span style="font-size:11px;color:var(--text3);padding:2px 5px">+' +(fmts.length-4)+' m\u00e1s</span>':'')
+      +'</div>';
+  }
+
+  // Cultivos pills (lazy: only 6 shown)
+  var cpHtml='';
+  if((p.cultivosAutorizados||[]).length){
+    var shown=p.cultivosAutorizados.slice(0,6);
+    var more=p.cultivosAutorizados.length-shown.length;
+    cpHtml='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'
+      +'<span style="font-size:11px;color:var(--text3);align-self:center;margin-right:2px">&#x1F331;</span>'
+      +shown.map(function(cv){
+        var col=getCropColor(cv);
+        return '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:'+col+'22;border:1px solid '+col+'55;color:var(--text)">'+cv+'</span>';
+      }).join('')
+      +(more?'<span style="font-size:10px;color:var(--text3);padding:1px 5px">+'+more+'</span>':'')
+      +'</div>';
+  }
+
+  // DC pills (denominaciones comunes)
+  var dcHtml='';
+  if((p.denominacionesComunes||[]).length||p.productoReferencia){
+    var dcs=p.denominacionesComunes||[];
+    dcHtml='<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">'
+      +'<span style="font-size:10px;color:var(--text3);align-self:center;margin-right:2px">&#x1F3F7;</span>'
+      +dcs.slice(0,5).map(function(d){
+        var dcN=(d.nombre||'').replace(/'/g,"&#39;");
+        var emp=(d.empresa||'').replace(/'/g,"&#39;");
+        return '<span onclick="crearProductoDesdeDC(\''+p.id+'\',\''+dcN+'\',\''+emp+'\')" '
+          +'style="font-size:10px;padding:1px 7px;border-radius:8px;background:var(--surface);border:1px solid var(--border2);color:var(--text2);cursor:pointer" '
+          +'title="Crear producto: '+d.nombre+'">'+d.nombre+'</span>';
+      }).join('')
+      +(dcs.length>5?'<span style="font-size:10px;color:var(--text3)">+' +(dcs.length-5)+'</span>':'')
+      +'</div>';
+  }
+
+  // Usos detalle toggle (only if has data)
+  var udHtml='';
+  if(p.usosDetalle&&Object.keys(p.usosDetalle).length){
+    var cvList=Object.keys(p.usosDetalle).sort();
+    var togId='ud_'+p.id;
+    var rows=cvList.map(function(cv){
+      var usos=p.usosDetalle[cv];
+      var color=getCropColor(cv);
+      var usoRows=(usos||[]).slice(0,6).map(function(u){
+        return '<tr><td style="padding:2px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+(u.agente||u.a||'')+'</td>'
+          +'<td style="padding:2px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.dosis||u.d||'')+'</td>'
+          +'<td style="padding:2px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.plazo||u.pl||'')+'</td></tr>';
+      }).join('');
+      return '<div style="margin-bottom:5px">'
+        +'<div style="padding:2px 8px;background:'+color+'22;border-left:3px solid '+color+';font-size:11px;font-weight:700;color:var(--white)">'+cv+'</div>'
+        +'<table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Agente/Plaga</th>'
+        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Dosis</th>'
+        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Plazo</th>'
+        +'</tr></thead><tbody>'+usoRows+'</tbody></table></div>';
+    }).join('');
+    udHtml='<div id="'+togId+'" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px;max-height:260px;overflow-y:auto">'+rows+'</div>'
+      +'<button type="button" onclick="var el=document.getElementById(\''+togId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.textContent=el.style.display===\'none\'?\'&#x1F50D; Ver usos ('+cvList.length+' cultivos)\':\'&#x25B4; Ocultar\'" style="margin-top:4px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos ('+cvList.length+' cultivos)</button>';
+  }
+
+  var mapaBtn=isMapa&&!p.enCatalogo
+    ?'<button class="btn btn-accent btn-sm" onclick="addToCatalogo(\''+p.id+'\')">&#x1F4CB; A\u00f1adir</button>'
+    :(isMapa&&p.enCatalogo
+      ?'<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" onclick="addToCatalogo(\''+p.id+'\')">&#x2705; En cat&aacute;logo &middot; <span style="font-size:10px;opacity:.7">&#x2715;</span></button>':'');
+
+  return '<div class="product-card" style="'+cardStyle+'">'
+    +'<div style="flex-shrink:0;font-size:22px">'+tipoEmoji(p.tipo)+'</div>'
+    +'<div class="product-card-info">'
+    +'<div class="product-card-name">'+p.nombre+nameExtra+' <span class="tag '+tipoBadge(p.tipo)+'" style="font-size:10px">'+p.tipo+'</span></div>'
+    +'<div class="product-card-meta">'
+    +'<span>&#x1F52C; '+(p.materiaActiva||'&mdash;')+'</span>'
+    +'<span>&#x1F4C4; '+(p.numRegistro||'&mdash;')+'</span>'
+    +'<span>&#x1F3ED; '+(p.titular||'&mdash;')+'</span>'
+    +(p.dosis?'<span>Dosis: '+p.dosis+'</span>':'')
+    +(p.plazo?'<span>Plazo: '+p.plazo+'</span>':'')
+    +'</div>'
+    +fmtHtml+cpHtml+dcHtml+udHtml
+    +'</div>'
+    +'<div class="product-card-actions">'
+    +fichaBtn(p)
+    +'<button class="btn btn-secondary btn-sm" onclick="openProductoModal(\''+p.id+'\')">&#x270F; Editar</button>'
+    +mapaBtn
+    +'<button class="btn btn-danger btn-sm" onclick="deleteProducto(\''+p.id+'\')">&#x1F5D1;</button>'
+    +'</div></div>';
+}
+
 
 function tipoEmoji(tipo) {
   var m = {'Herbicida':'🌱','Fungicida':'🍄','Insecticida':'🐛','Acaricida':'🕷️','Nematicida':'🪱','Fitorregulador':'🧬','Fertilizante foliar':'🌿'};
