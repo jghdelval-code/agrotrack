@@ -7891,54 +7891,103 @@ function stockStatusClass(stock) {
 }
 
 function renderStockSummary(clienteId) {
-  var campana = document.getElementById('compras-filter-cliente') ? '' : currentCampana;
   var stock = calcStock(clienteId, currentCampana||undefined);
-  var pKeys = Object.keys(stock.productos);
-  var aKeys = Object.keys(stock.abonos);
+  var pKeys = Object.keys(stock.productos).sort(function(a,b){
+    var pa=(DB.productos||[]).find(function(x){return x.id===a;})||{nombre:''};
+    var pb=(DB.productos||[]).find(function(x){return x.id===b;})||{nombre:''};
+    return pa.nombre.localeCompare(pb.nombre,'es');
+  });
+  var aKeys = Object.keys(stock.abonos).sort(function(a,b){
+    var aa=(DB.abonos||[]).find(function(x){return x.id===a;})||{nombre:''};
+    var ab=(DB.abonos||[]).find(function(x){return x.id===b;})||{nombre:''};
+    return aa.nombre.localeCompare(ab.nombre,'es');
+  });
   if(!pKeys.length && !aKeys.length) return '<div style="color:var(--text3);font-size:13px;padding:10px 0">Sin compras registradas para este cliente</div>';
 
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px">';
+  var TH = 'style="padding:7px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text3);background:var(--surface);border-bottom:1px solid var(--border2);white-space:nowrap"';
+  var TH_R = 'style="padding:7px 10px;text-align:right;font-size:11px;font-weight:700;color:var(--text3);background:var(--surface);border-bottom:1px solid var(--border2)"';
+  function td(v,extra){return '<td style="padding:6px 10px;font-size:12px;border-bottom:1px solid var(--border);'+(extra||'')+'">'+v+'</td>';}
+  function tdR(v,col){return '<td style="padding:6px 10px;font-size:12px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;color:'+(col||'var(--white)')+'">'+v+'</td>';}
 
-  pKeys.forEach(function(pid) {
-    var s   = stock.productos[pid];
-    var p   = (DB.productos||[]).find(function(x){return x.id===pid;});
-    var st  = stockStatusClass(s.stock);
-    var pct = s.comprado > 0 ? Math.max(0, Math.min(s.stock/s.comprado*100, 100)) : 0;
-    html += '<div style="background:'+st.bg+';border:1px solid var(--border2);border-left:4px solid '+st.color+';border-radius:var(--radius);padding:10px 12px">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
-      '<span style="font-size:16px">💊</span>' +
-      '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:12px;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(p?p.nombre:'Producto eliminado')+'</div>' +
-      '<div style="font-size:10px;color:var(--text3)">'+(p?p.tipo:'')+'</div></div>' +
-      '<span style="font-size:13px">'+st.icon+'</span></div>' +
-      '<div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:6px"><div style="width:'+pct.toFixed(0)+'%;height:100%;background:'+st.color+';border-radius:4px;transition:width .4s"></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11px;text-align:center">' +
-      '<div><div style="color:var(--text3)">Comprado</div><div style="font-weight:700;color:var(--white)">'+formatStockQty(s.comprado, s.unidad)+'</div></div>' +
-      '<div><div style="color:var(--text3)">Usado</div><div style="font-weight:700;color:var(--accent)">'+formatStockQty(s.usado, s.unidad)+'</div></div>' +
-      '<div><div style="color:var(--text3)">Stock</div><div style="font-weight:700;color:'+st.color+'">'+formatStockQty(s.stock, s.unidad)+'</div></div>' +
-      '</div></div>';
-  });
+  var html = '';
 
-  aKeys.forEach(function(aid) {
-    var s   = stock.abonos[aid];
-    var a   = (DB.abonos||[]).find(function(x){return x.id===aid;});
-    var st  = stockStatusClass(s.stock);
-    var pct = s.comprado > 0 ? Math.max(0, Math.min(s.stock/s.comprado*100, 100)) : 0;
-    html += '<div style="background:'+st.bg+';border:1px solid var(--border2);border-left:4px solid '+st.color+';border-radius:var(--radius);padding:10px 12px">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
-      '<span style="font-size:16px">🧪</span>' +
-      '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:12px;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(a?a.nombre:'Abono eliminado')+'</div>' +
-      '<div style="font-size:10px;color:var(--text3)">'+(a?a.tipo:'')+'</div></div>' +
-      '<span style="font-size:13px">'+st.icon+'</span></div>' +
-      '<div style="background:var(--border);border-radius:4px;height:6px;margin-bottom:6px"><div style="width:'+pct.toFixed(0)+'%;height:100%;background:'+st.color+';border-radius:4px;transition:width .4s"></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11px;text-align:center">' +
-      '<div><div style="color:var(--text3)">Comprado</div><div style="font-weight:700;color:var(--white)">'+formatStockQty(s.comprado, s.unidad)+'</div></div>' +
-      '<div><div style="color:var(--text3)">Usado</div><div style="font-weight:700;color:var(--accent)">'+formatStockQty(s.usado, s.unidad)+'</div></div>' +
-      '<div><div style="color:var(--text3)">Stock</div><div style="font-weight:700;color:'+st.color+'">'+formatStockQty(s.stock, s.unidad)+'</div></div>' +
-      '</div></div>';
-  });
+  // ── FITOSANITARIOS ──────────────────────────────────────────────
+  if(pKeys.length) {
+    html += '<div style="margin-bottom:18px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      + '<span style="font-size:14px">&#x1F48A;</span>'
+      + '<span style="font-weight:800;font-size:13px;color:var(--white)">Productos fitosanitarios</span>'
+      + '<span class="tag tag-green">'+pKeys.length+' producto'+(pKeys.length!==1?'s':'')+'</span>'
+      + '</div>'
+      + '<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border2)">'
+      + '<table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr>'
+      + '<th '+TH+'>Producto</th>'
+      + '<th '+TH+'>Tipo</th>'
+      + '<th '+TH_R+'>Comprado</th>'
+      + '<th '+TH_R+'>Usado</th>'
+      + '<th '+TH_R+'>Stock</th>'
+      + '<th '+TH+' style="padding:7px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--text3);background:var(--surface);border-bottom:1px solid var(--border2)">Estado</th>'
+      + '</tr></thead><tbody>';
 
-  return html + '</div>';
+    pKeys.forEach(function(pid, ri) {
+      var s  = stock.productos[pid];
+      var p  = (DB.productos||[]).find(function(x){return x.id===pid;});
+      var st = stockStatusClass(s.stock);
+      var rowBg = ri%2===0 ? '' : 'background:rgba(255,255,255,.02)';
+      html += '<tr style="'+rowBg+'">'
+        + td('<b style="color:var(--white)">'+(p?p.nombre:'<i style=\'color:var(--text3)\'>Eliminado</i>')+'</b>')
+        + td('<span style="font-size:10px;color:var(--text3)">'+(p?p.tipo:'')+'</span>')
+        + tdR(formatStockQty(s.comprado, s.unidad))
+        + tdR(formatStockQty(s.usado, s.unidad), 'var(--accent)')
+        + tdR(formatStockQty(s.stock, s.unidad), st.color)
+        + '<td style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">'
+        + '<span style="font-size:14px" title="'+st.label+'">'+st.icon+'</span></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // ── ABONOS ──────────────────────────────────────────────────────
+  if(aKeys.length) {
+    html += '<div style="margin-bottom:18px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      + '<span style="font-size:14px">&#x1F9EA;</span>'
+      + '<span style="font-weight:800;font-size:13px;color:var(--white)">Abonos y fertilizantes</span>'
+      + '<span class="tag tag-blue">'+aKeys.length+' producto'+(aKeys.length!==1?'s':'')+'</span>'
+      + '</div>'
+      + '<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border2)">'
+      + '<table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr>'
+      + '<th '+TH+'>Abono</th>'
+      + '<th '+TH+'>Tipo</th>'
+      + '<th '+TH_R+'>Comprado</th>'
+      + '<th '+TH_R+'>Usado</th>'
+      + '<th '+TH_R+'>Stock</th>'
+      + '<th '+TH+' style="padding:7px 10px;text-align:center;font-size:11px;font-weight:700;color:var(--text3);background:var(--surface);border-bottom:1px solid var(--border2)">Estado</th>'
+      + '</tr></thead><tbody>';
+
+    aKeys.forEach(function(aid, ri) {
+      var s  = stock.abonos[aid];
+      var a  = (DB.abonos||[]).find(function(x){return x.id===aid;});
+      var st = stockStatusClass(s.stock);
+      var rowBg = ri%2===0 ? '' : 'background:rgba(255,255,255,.02)';
+      html += '<tr style="'+rowBg+'">'
+        + td('<b style="color:var(--white)">'+(a?a.nombre:'<i style=\'color:var(--text3)\'>Eliminado</i>')+'</b>')
+        + td('<span style="font-size:10px;color:var(--text3)">'+(a?a.tipo:'')+'</span>')
+        + tdR(formatStockQty(s.comprado, s.unidad))
+        + tdR(formatStockQty(s.usado, s.unidad), 'var(--accent)')
+        + tdR(formatStockQty(s.stock, s.unidad), st.color)
+        + '<td style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)">'
+        + '<span style="font-size:14px" title="'+st.label+'">'+st.icon+'</span></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  return html;
 }
+
 
 function renderCompras() {
   var fCli  = document.getElementById('compras-filter-cliente')?.value||'';
