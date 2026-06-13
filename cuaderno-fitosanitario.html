@@ -3323,7 +3323,12 @@ function addToCatalogo(id) {
   var p = (DB.productos||[]).find(function(x){return x.id===id;});
   if(!p) return;
   p.enCatalogo = !p.enCatalogo;
-  save(); renderProductos();
+  save();
+  // Re-render current page without resetting to 0
+  var savedPage = _prodPage;
+  renderProductos();
+  _prodPage = savedPage;
+  renderProductos();
 }
 
 function crearProductoDesdeDC(refId, dcNombre, empresa) {
@@ -3336,7 +3341,21 @@ function crearProductoDesdeDC(refId, dcNombre, empresa) {
     return p.nombre.toLowerCase() === nombre.toLowerCase();
   });
   if(existe) {
-    alert('Ya existe un producto con el nombre "' + nombre + '"');
+    var isMapa = existe.id && existe.id.indexOf('mapa_') === 0;
+    if(isMapa && !existe.enCatalogo) {
+      // It's a MAPA product not yet in catalog — offer to add it
+      existe.enCatalogo = true;
+      save();
+      var savedPage = _prodPage;
+      renderProductos();
+      _prodPage = savedPage;
+      renderProductos();
+      alert('\u2705 "' + nombre + '" a\u00f1adido a Mi Cat\u00e1logo.\nPuedes editarlo para ajustar precio y formatos.');
+    } else if(isMapa && existe.enCatalogo) {
+      alert('"' + nombre + '" ya est\u00e1 en Mi Cat\u00e1logo.');
+    } else {
+      alert('Ya tienes un producto personalizado con el nombre "' + nombre + '".');
+    }
     return;
   }
   var nuevo = {
@@ -3362,8 +3381,9 @@ function crearProductoDesdeDC(refId, dcNombre, empresa) {
   if(!DB.productos) DB.productos = [];
   DB.productos.push(nuevo);
   save();
+  _prodPage = 0;
   renderProductos();
-  alert('\u2705 Creado: "' + nombre + '"\n\nCon los datos de: ' + ref.nombre + '\nPuedes editarlo para ajustar precio, formatos u obs.');
+  alert('\u2705 Creado: "' + nombre + '"\n\nCon los datos de: ' + ref.nombre + '\nPuedes editarlo para ajustar precio y formatos.');
 }
 
 function repararCatalogoMapa() {
@@ -3969,7 +3989,11 @@ function saveProducto() {
     DB.productos.push(newProd);
     if(typeof window._productoSaveHook === 'function') { window._productoSaveHook(newProd.id); window._productoSaveHook = null; }
   }
-  save(); closeModal('modal-producto'); renderProductos();
+  var savedPage = _prodPage;
+  save(); closeModal('modal-producto');
+  renderProductos();
+  _prodPage = savedPage;
+  renderProductos();
 }
 
 // ── Custom confirm dialog (replaces window.confirm which iOS blocks when iframe is active) ──
