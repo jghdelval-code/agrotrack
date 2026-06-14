@@ -5706,6 +5706,110 @@ function renderParcelaCard(g) {
       '<span style="color:var(--accent);font-weight:600">⚠️ Pendiente asignar: <b>'+supLibre.toFixed(2)+' ha</b> ('+pctLibre+'%)</span></span>';
   }
 
+  // ── Labour history: treatments + fertilization on this parcel ───────
+  var recintoIds = g.recintos.map(function(r){ return r.id; });
+  var multiCrop  = Object.keys(cultivoHaMap).length > 1;
+
+  // Gather treatments
+  var labores = [];
+  (DB.tratamientos||[]).forEach(function(t) {
+    var tRecs = g.recintos.filter(function(r){ return (t.recintoIds||[]).indexOf(r.id) >= 0; });
+    if(!tRecs.length) return;
+    tRecs.forEach(function(r) {
+      (t.productos||[]).forEach(function(p) {
+        var prod = (DB.productos||[]).find(function(x){ return x.id===p.productoId; });
+        labores.push({
+          fecha:   t.fecha||t.fechaInicio||'',
+          tipo:    'tratamiento',
+          cultivo: r.especieVariedad||'',
+          recinto: r,
+          detalle: prod ? prod.nombre : 'Producto no encontrado',
+          extra:   p.dosis + (p.unidad?' '+p.unidad:'') + (t.problema?' &mdash; '+t.problema:''),
+          maquinaria: t.maquinaria||'',
+          aplicador:  t.aplicador||''
+        });
+      });
+    });
+  });
+
+  // Gather fertilizations
+  (DB.abonados||[]).forEach(function(ab) {
+    var abRecs = g.recintos.filter(function(r){ return (ab.recintoIds||[]).indexOf(r.id) >= 0; });
+    if(!abRecs.length) return;
+    abRecs.forEach(function(r) {
+      (ab.abonos||[]).forEach(function(row) {
+        var abo = (DB.abonos||[]).find(function(a){ return a.id===row.abonoId; });
+        labores.push({
+          fecha:   ab.fecha||'',
+          tipo:    'abonado',
+          cultivo: r.especieVariedad||'',
+          recinto: r,
+          detalle: abo ? abo.nombre : 'Abono no encontrado',
+          extra:   row.dosis + (row.unidad?' '+row.unidad:'') + (row.modo?' &mdash; '+row.modo:'')
+        });
+      });
+    });
+  });
+
+  var laborHtml = '';
+  if(labores.length) {
+    labores.sort(function(a,b){ return b.fecha.localeCompare(a.fecha); });
+
+    // Group by crop if multi-crop, otherwise flat list
+    var renderLabores = function(items) {
+      return items.map(function(lb) {
+        var isTrt = lb.tipo === 'tratamiento';
+        var icon  = isTrt ? '&#x1F48A;' : '&#x1F9EA;';
+        var color = isTrt ? '#4a8c2a' : '#2980b9';
+        var label = isTrt ? 'Tratamiento' : 'Abonado';
+        return '<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">'
+          + '<div style="flex-shrink:0;text-align:center;min-width:60px">'
+          + '<div style="font-size:10px;font-weight:700;color:var(--text3)">'+(lb.fecha?formatDate(lb.fecha):'—')+'</div>'
+          + '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:'+color+'22;color:'+color+';border:1px solid '+color+'44;white-space:nowrap">'+icon+' '+label+'</span>'
+          + '</div>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-weight:700;font-size:12px;color:var(--white)">'+lb.detalle+'</div>'
+          + '<div style="font-size:11px;color:var(--text2)">'+lb.extra+'</div>'
+          + (lb.aplicador||lb.maquinaria ? '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+(lb.aplicador?'&#x1F464; '+lb.aplicador:'')+(lb.maquinaria?' &middot; &#x1F69C; '+lb.maquinaria:'')+'</div>' : '')
+          + '</div></div>';
+      }).join('');
+    };
+
+    var parcelaId = g.recintos[0].id;
+
+    if(multiCrop) {
+      var byCV = {};
+      labores.forEach(function(lb) {
+        var k = lb.cultivo || 'Sin cultivo';
+        if(!byCV[k]) byCV[k] = [];
+        byCV[k].push(lb);
+      });
+      var cvSections = Object.keys(byCV).sort().map(function(cv) {
+        var col = getCropColor(cv !== 'Sin cultivo' ? cv : '');
+        return '<div style="margin-bottom:8px">'
+          + '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;margin-bottom:4px">'
+          + '<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0;display:inline-block"></span>'
+          + '<span style="font-weight:700;font-size:11px;color:var(--white)">'+cv+'</span>'
+          + '<span style="font-size:10px;color:var(--text3)">('+byCV[cv].length+' labor'+(byCV[cv].length!==1?'es':'')+')</span>'
+          + '</div>'
+          + renderLabores(byCV[cv])
+          + '</div>';
+      }).join('');
+      laborHtml = cvSections;
+    } else {
+      laborHtml = renderLabores(labores);
+    }
+
+    laborHtml = '<div style="margin-top:14px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;border-top:1px solid var(--border2)" onclick="var el=document.getElementById(\'lab-'+parcelaId+'\');var ic=document.getElementById(\'labico-'+parcelaId+'\');if(el){el.style.display=el.style.display===\'none\'?\'block\':\'none\';ic.innerHTML=el.style.display===\'none\'?\'&#x25B8;\':\'&#x25BE;\';}">'
+      + '<span style="font-weight:700;font-size:12px;color:var(--text2)">&#x1F4CB; Historial de labores &nbsp;<span style="font-size:11px;font-weight:400;color:var(--text3)">('+labores.length+' registros)</span></span>'
+      + '<span id="labico-'+parcelaId+'" style="color:var(--text3);font-size:14px">&#x25B8;</span>'
+      + '</div>'
+      + '<div id="lab-'+parcelaId+'" style="display:none;max-height:320px;overflow-y:auto;padding-right:4px">'
+      + laborHtml
+      + '</div></div>';
+  }
+
   var supBar = '<div class="sup-bar-wrap">' +
     '<div class="sup-bar">'+barSegments+'</div>' +
     '<div class="sup-bar-legend">'+legendItems+'</div>' +
@@ -5714,7 +5818,7 @@ function renderParcelaCard(g) {
   return '<div class="parcela-card">' +
     '<div class="parcela-card-left">' +
     '<div class="parcela-title">' +
-    '<div class="parcela-title-name">🏡 '+nombre+'</div>' +
+    '<div class="parcela-title-name">&#x1F3E1; '+nombre+'</div>' +
     '<div class="parcela-title-actions">'+mapBtn+'</div>' +
     '</div>' +
     multiCliHeader +
@@ -5726,11 +5830,12 @@ function renderParcelaCard(g) {
       ? '<div class="parcela-meta-item"><span class="k">Sin cultivo</span><span class="v big" style="color:var(--accent)">'+supLibre.toFixed(2)+'<span style="font-size:13px;font-weight:400;color:var(--text2)"> ha</span></span></div>'
       : '') +
     '<div class="parcela-meta-item"><span class="k">Recintos</span><span class="v big">'+g.recintos.length+(nSinCultivo?'<span style="font-size:11px;color:var(--accent);margin-left:4px">('+nSinCultivo+' sin cultivo)</span>':'')+'</span></div>' +
-    '<div class="parcela-meta-item"><span class="k">Campaña'+(campanas.length>1?'s':'')+'</span><span class="v">'+campChips+'</span></div>' +
+    '<div class="parcela-meta-item"><span class="k">Campa&#xF1;a'+(campanas.length>1?'s':'')+'</span><span class="v">'+campChips+'</span></div>' +
     '</div>' +
     supBar +
     '<div class="parcela-cultivos">'+cultChips+'</div>' +
     '<div class="parcela-recintos-list">'+recRows+'</div>' +
+    laborHtml +
     '</div>' +
     '<div class="parcela-card-right">'+geoHtml+'</div>' +
     '</div>';
