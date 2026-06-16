@@ -1853,9 +1853,33 @@ var map, layerParcels, layerOSM, layerPNOA, layerSIGPAC;
 var parcelPolygons = {};
 
 function save() {
-  localStorage.setItem('agrotrack_data', JSON.stringify(DB));
+  // Compact MAPA products before saving — strip fields already in the embedded catalog
+  // (usosDetalle, denominacionesComunes, cultivosAutorizados, materiaActiva, etc.)
+  // iOS localStorage limit is 5 MB; full MAPA data exceeds that easily.
+  var dbToSave = JSON.parse(JSON.stringify(DB));
+  dbToSave.productos = (dbToSave.productos||[]).map(function(p) {
+    if(p.id && p.id.indexOf('mapa_') === 0) {
+      // Keep only user-editable fields; catalog fields are in CATALOGO_MAPA
+      return {
+        id:          p.id,
+        enCatalogo:  p.enCatalogo  || false,
+        formatos:    p.formatos    || [],
+        coste:       p.coste       || 0,
+        unidadCoste: p.unidadCoste || 'L',
+        usos:        p.usos        || '',
+        obs:         p.obs         || ''
+      };
+    }
+    return p;  // user's own products: keep everything
+  });
+  try {
+    localStorage.setItem('agrotrack_data', JSON.stringify(dbToSave));
+  } catch(e) {
+    // Storage still full after compaction — warn user
+    alert('\u26A0\uFE0F Almacenamiento lleno.\nLos datos del cat\u00e1logo MAPA ocupan demasiado espacio.\n\nPulsa "Reparar cat\u00e1logo" en la pesta\u00f1a Productos para limpiar los datos redundantes y liberar espacio.');
+    return;
+  }
   updateBadges();
-  // Auto-sync to Drive if connected (debounced — wait 2s after last save)
   if(gDrive.token) {
     clearTimeout(gDrive._saveTimer);
     gDrive._saveTimer = setTimeout(function(){ gDrive.uploadDB(); }, 2000);
@@ -9367,6 +9391,31 @@ function initCatalogoMapa() {
 }
 
 window.addEventListener('load', function() {
+  // ── Storage migration: compact MAPA products if localStorage is oversized ──
+  // Previous versions stored full MAPA product data (usosDetalle, denominacionesComunes)
+  // which exceeds iOS 5MB limit. Migrate on first load.
+  (function migrateStorage() {
+    var raw = localStorage.getItem('agrotrack_data');
+    if(!raw) return;
+    try {
+      var db = JSON.parse(raw);
+      var prods = db.productos || [];
+      var needsMigration = prods.some(function(p) {
+        return p.id && p.id.indexOf('mapa_') === 0 && (p.usosDetalle || p.denominacionesComunes);
+      });
+      if(needsMigration) {
+        db.productos = prods.map(function(p) {
+          if(p.id && p.id.indexOf('mapa_') === 0) {
+            return {id:p.id, enCatalogo:p.enCatalogo||false, formatos:p.formatos||[],
+                    coste:p.coste||0, unidadCoste:p.unidadCoste||'L', usos:p.usos||'', obs:p.obs||''};
+          }
+          return p;
+        });
+        localStorage.setItem('agrotrack_data', JSON.stringify(db));
+        console.log('AgroTrack: compacted MAPA product storage');
+      }
+    } catch(e) { /* ignore migration errors */ }
+  })();
   if(window.location.hash.indexOf('access_token') !== -1 ||
      window.location.hash.indexOf('error') !== -1) {
     gDrive.handleRedirect();
