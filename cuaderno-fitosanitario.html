@@ -8998,18 +8998,30 @@ function generateTratamientoPDF() {
   y += 7;
   var altRow = false;
   recs.forEach(function(r){
-    checkPage(7);
-    if(altRow) rect(margin, y, W-2*margin, 6, '#f9fbf9');
+    var finca   = r.nombreFinca||'';
+    var mun     = String(r.termMunicipal||'').split(' ')[0];
+    var sigpac  = (r.codProvincia||'?')+'-'+mun+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+    var cultivo = r.especieVariedad||'—';
+    var ha      = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(4);
+    var label   = finca || sigpac;
+
+    var wLabel   = doc.splitTextToSize(label,   52);
+    var wSigpac  = doc.splitTextToSize(sigpac,  45);
+    var wCultivo = doc.splitTextToSize(cultivo, 35);
+    var nLines   = Math.max(wLabel.length, wSigpac.length, wCultivo.length);
+    var rowH     = Math.max(6, nLines * 5 + 2);
+
+    checkPage(rowH + 1);
+    if(altRow) rect(margin, y, W-2*margin, rowH, '#f9fbf9');
     altRow = !altRow;
-    var mun = String(r.termMunicipal||'').split(' ')[0];
-    var sigpac = (r.codProvincia||'?')+'-'+mun+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
-    var ha = (parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0).toFixed(4);
     setFont(9,'normal','#111');
-    doc.text((r.nombreFinca||sigpac).slice(0,32), margin+2, y+4.5);
-    doc.text(sigpac.slice(0,28), 80, y+4.5);
-    doc.text((r.especieVariedad||'—').slice(0,22), 130, y+4.5);
-    doc.text(ha, 170, y+4.5);
-    y += 6;
+    doc.text(wLabel,   margin+2, y+4.5);
+    doc.text(wSigpac,  80,       y+4.5);
+    doc.text(wCultivo, 130,      y+4.5);
+    doc.text(ha,       170,      y+4.5);
+    doc.setDrawColor('#e0e0e0'); doc.setLineWidth(0.2);
+    doc.line(margin, y+rowH, W-margin, y+rowH);
+    y += rowH;
   });
   // Total row
   rect(margin, y, W-2*margin, 7, '#e8f5e8');
@@ -9023,54 +9035,76 @@ function generateTratamientoPDF() {
   setFont(12,'bold','#1a3d1a');
   doc.text('PRODUCTOS FITOSANITARIOS', margin, y); y += 7;
 
-  // Dynamic columns
-  var cols = includePrice
-    ? ['Producto','Materia activa','Dosis/ha','Total','PVP/ha','Total €']
-    : ['Producto','Materia activa','Plazo seg.','Dosis/ha','Total'];
-  var colX = includePrice
-    ? [margin+2, 52, 105, 125, 151, 175]
-    : [margin+2, 60, 110, 133, 161];
+  // Column definitions — no Plazo column
+  var cols, colX, colW;
+  if(includePrice) {
+    cols  = ['Producto','Materia activa','Dosis/ha','Total','PVP/ha','Total \u20ac'];
+    colX  = [margin+2,  52,    105,   128,   152,   175];
+    colW  = [48,         50,    20,    22,    21,    20];
+  } else {
+    cols  = ['Producto','Materia activa','Dosis/ha','Total'];
+    colX  = [margin+2,  65,    135,   163];
+    colW  = [61,         67,    25,    25];
+  }
 
   rect(margin, y, W-2*margin, 7, '#2d5a1a');
   setFont(9,'bold','#ffffff');
   cols.forEach(function(c,i){ doc.text(c, colX[i], y+5); });
   y += 7;
 
+  // Helper: wrap text and return lines array
+  function wrapText(txt, maxW) {
+    return doc.splitTextToSize(String(txt||'—'), maxW);
+  }
+
   var totalPVPTot = 0; var totalPVPHa = 0;
   altRow = false;
   prods.forEach(function(p){
-    checkPage(8);
-    if(altRow) rect(margin, y, W-2*margin, 7, '#f9fbf9');
-    altRow = !altRow;
     var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
-    var nombre = (prod?prod.nombre:'—').slice(0,28);
-    var materia = (prod?prod.materiaActiva||'—':'—').slice(0,30);
-    var plazo = prod?prod.plazo||'—':'—';
-    var total = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+    var nombre  = prod ? prod.nombre  : '—';
+    var materia = prod ? (prod.materiaActiva||'—') : '—';
+    var dosisStr= p.dosis+' '+(p.unidad||'L/ha');
+    var total   = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+
+    // Pre-wrap each column to measure row height
+    var wNombre  = wrapText(nombre,  colW[0]);
+    var wMateria = wrapText(materia, colW[1]);
+    var wDosis   = wrapText(dosisStr,colW[2]);
+    var wTotal   = wrapText(total,   colW[3]);
+    var nLines   = Math.max(wNombre.length, wMateria.length, wDosis.length, wTotal.length);
+    var rowH     = Math.max(7, nLines * 5 + 3);
+
+    checkPage(rowH + 2);
+    if(altRow) rect(margin, y, W-2*margin, rowH, '#f9fbf9');
+    altRow = !altRow;
+
     setFont(9,'normal','#111');
-    doc.text(nombre, colX[0], y+5);
-    doc.text(materia, colX[1], y+5);
+    // Draw each column with its wrapped lines
+    doc.text(wNombre,  colX[0], y+4.5);
+    doc.text(wMateria, colX[1], y+4.5);
+    doc.text(wDosis,   colX[2], y+4.5);
+    doc.text(wTotal,   colX[3], y+4.5);
+
     if(includePrice) {
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[2], y+5);
-      doc.text(total, colX[3], y+5);
       if(prod && prod.coste && p.dosis) {
         var costeHa = prod.coste * p.dosis;
         var pvpHa   = costeHa * (1 + (p.margen||0)/100);
         var pvpTot  = pvpHa * totalHa;
         totalPVPTot += pvpTot; totalPVPHa += pvpHa;
         setFont(9,'bold','#1a6b1a');
-        doc.text(pvpHa.toFixed(2)+' €', colX[4], y+5);
-        doc.text(pvpTot.toFixed(2)+' €', colX[5], y+5);
+        doc.text(pvpHa.toFixed(2)+' \u20ac', colX[4], y+4.5);
+        doc.text(pvpTot.toFixed(2)+' \u20ac', colX[5], y+4.5);
       } else {
-        doc.text('—', colX[4], y+5);
-        doc.text('—', colX[5], y+5);
+        setFont(9,'normal','#111');
+        doc.text('—', colX[4], y+4.5);
+        doc.text('—', colX[5], y+4.5);
       }
-    } else {
-      doc.text(plazo, colX[2], y+5);
-      doc.text(p.dosis+' '+(p.unidad||'L/ha'), colX[3], y+5);
-      doc.text(total, colX[4], y+5);
     }
-    y += 7;
+
+    // Divider line between rows
+    doc.setDrawColor('#e0e0e0'); doc.setLineWidth(0.2);
+    doc.line(margin, y+rowH, W-margin, y+rowH);
+    y += rowH;
   });
 
   // Cost total row
