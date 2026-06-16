@@ -3323,10 +3323,8 @@ function addToCatalogo(id) {
   var p = (DB.productos||[]).find(function(x){return x.id===id;});
   if(!p) return;
   p.enCatalogo = !p.enCatalogo;
-  save();
-  // Re-render current page without resetting to 0
   var savedPage = _prodPage;
-  renderProductos();
+  save();
   _prodPage = savedPage;
   renderProductos();
 }
@@ -3439,35 +3437,7 @@ var _prodPage = 0;
 var _prodPageSize = 25;
 var _prodDebounceTimer = null;
 
-// Event delegation for product cards — avoids iOS onclick+escaped-quotes issues
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-action]');
-  if(!btn) return;
-  var action = btn.dataset.action;
-  var pid    = btn.dataset.pid;
-  if(action === 'addCatalogo'  && pid) { e.stopPropagation(); addToCatalogo(pid); return; }
-  if(action === 'editProducto' && pid) { e.stopPropagation(); openProductoModal(pid); return; }
-  if(action === 'deleteProducto' && pid) { e.stopPropagation(); deleteProducto(pid); return; }
-  if(action === 'crearDC') {
-    e.stopPropagation();
-    var dcn = decodeURIComponent(btn.dataset.dcn||'');
-    var emp = decodeURIComponent(btn.dataset.emp||'');
-    crearProductoDesdeDC(pid, dcn, emp);
-    return;
-  }
-  // usosDetalle toggle
-  if(btn.classList && btn.classList.contains('toggle-usos-btn')) {
-    e.stopPropagation();
-    var togId = btn.dataset.togid;
-    var el = document.getElementById(togId);
-    if(el) {
-      var open = el.style.display !== 'none';
-      el.style.display = open ? 'none' : 'block';
-      btn.textContent = open ? '\uD83D\uDD0D Ver usos ('+btn.dataset.cnt+' cultivos)' : '\u25B4 Ocultar';
-    }
-    return;
-  }
-});
+// Product card actions use onclick="func(this.dataset.pid)" — most reliable on iOS
 
 function debounceProd() {
   clearTimeout(_prodDebounceTimer);
@@ -3601,10 +3571,13 @@ function buildProductCard(p) {
     dcHtml='<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">'
       +'<span style="font-size:10px;color:var(--text3);align-self:center;margin-right:2px">&#x1F3F7;</span>'
       +dcs.slice(0,5).map(function(d){
-        return '<button type="button" class="dc-pill" data-action="crearDC" data-pid="'+p.id
-          +'" data-dcn="'+encodeURIComponent(d.nombre||'')+'" data-emp="'+encodeURIComponent(d.empresa||'')+'" '
-          +'style="font-size:10px;padding:1px 7px;border-radius:8px;background:var(--surface);border:1px solid var(--border2);color:var(--text2);cursor:pointer" '
-          +'title="Crear producto: '+(d.nombre||'').replace(/"/g,'')+'">'+d.nombre+'</button>';
+        return '<button type="button" class="dc-pill"'
+          +' data-pid="'+p.id+'"'
+          +' data-dcn="'+encodeURIComponent(d.nombre||'')+'"'
+          +' data-emp="'+encodeURIComponent(d.empresa||'')+'"'
+          +' onclick="crearProductoDesdeDC(this.dataset.pid,decodeURIComponent(this.dataset.dcn),decodeURIComponent(this.dataset.emp))"'
+          +' style="font-size:10px;padding:1px 7px;border-radius:8px;background:var(--surface);border:1px solid var(--border2);color:var(--text2);cursor:pointer"'
+          +' title="Crear producto: '+(d.nombre||'').replace(/"/g,'')+'">'+d.nombre+'</button>';
       }).join('')
       +(dcs.length>5?'<span style="font-size:10px;color:var(--text3)">+' +(dcs.length-5)+'</span>':'')
       +'</div>';
@@ -3632,13 +3605,13 @@ function buildProductCard(p) {
         +'</tr></thead><tbody>'+usoRows+'</tbody></table></div>';
     }).join('');
     udHtml='<div id="'+togId+'" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px;max-height:260px;overflow-y:auto">'+rows+'</div>'
-      +'<button type="button" class="toggle-usos-btn" data-togid="'+togId+'" data-cnt="'+cvList.length+'" style="margin-top:4px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos ('+cvList.length+' cultivos)</button>';
+      +'<button type="button" class="toggle-usos-btn" data-togid="'+togId+'" data-cnt="'+cvList.length+'" onclick="var el=document.getElementById(this.dataset.togid);if(el){var op=el.style.display!==\'none\';el.style.display=op?\'none\':\'block\';this.textContent=op?\'\uD83D\uDD0D Ver usos ('+cvList.length+' cultivos)\':\'▴ Ocultar\';}" style="margin-top:4px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos ('+cvList.length+' cultivos)</button>';
   }
 
   var mapaBtn=isMapa&&!p.enCatalogo
-    ?'<button class="btn btn-accent btn-sm" data-action="addCatalogo" data-pid="'+p.id+'">&#x1F4CB; A\u00f1adir</button>'
+    ?'<button type="button" class="btn btn-accent btn-sm" data-pid="'+p.id+'" onclick="addToCatalogo(this.dataset.pid)">&#x1F4CB; A\u00f1adir</button>'
     :(isMapa&&p.enCatalogo
-      ?'<button class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" data-action="addCatalogo" data-pid="'+p.id+'">&#x2705; En cat&aacute;logo &middot; <span style="font-size:10px;opacity:.7">&#x2715;</span></button>':'');
+      ?'<button type="button" class="btn btn-sm" style="background:rgba(74,140,42,.15);color:var(--primary);border:1px solid var(--primary)" data-pid="'+p.id+'" onclick="addToCatalogo(this.dataset.pid)">&#x2705; En cat&aacute;logo &middot; <span style="font-size:10px;opacity:.7">&#x2715;</span></button>':'');
 
   return '<div class="product-card" style="'+cardStyle+'">'
     +'<div style="flex-shrink:0;font-size:22px">'+tipoEmoji(p.tipo)+'</div>'
@@ -3655,9 +3628,9 @@ function buildProductCard(p) {
     +'</div>'
     +'<div class="product-card-actions">'
     +fichaBtn(p)
-    +'<button class="btn btn-secondary btn-sm" data-action="editProducto" data-pid="'+p.id+'">&#x270F; Editar</button>'
+    +'<button type="button" class="btn btn-secondary btn-sm" data-pid="'+p.id+'" onclick="openProductoModal(this.dataset.pid)">&#x270F; Editar</button>'
     +mapaBtn
-    +'<button class="btn btn-danger btn-sm" data-action="deleteProducto" data-pid="'+p.id+'">&#x1F5D1;</button>'
+    +'<button type="button" class="btn btn-danger btn-sm" data-pid="'+p.id+'" onclick="deleteProducto(this.dataset.pid)">&#x1F5D1;</button>'
     +'</div></div>';
 }
 
@@ -4019,9 +3992,9 @@ function saveProducto() {
     if(typeof window._productoSaveHook === 'function') { window._productoSaveHook(newProd.id); window._productoSaveHook = null; }
   }
   var savedPage = _prodPage;
-  save(); closeModal('modal-producto');
-  renderProductos();
+  save();
   _prodPage = savedPage;
+  closeModal('modal-producto');
   renderProductos();
 }
 
