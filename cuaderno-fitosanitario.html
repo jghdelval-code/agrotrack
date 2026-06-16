@@ -3320,13 +3320,15 @@ function prodCultivoSelect(cv) {
 }
 
 function addToCatalogo(id) {
-  var p = (DB.productos||[]).find(function(x){return x.id===id;});
-  if(!p) return;
-  p.enCatalogo = !p.enCatalogo;
-  var savedPage = _prodPage;
-  save();
-  _prodPage = savedPage;
-  renderProductos();
+  try {
+    var p = (DB.productos||[]).find(function(x){return x.id===id;});
+    if(!p) { alert('Producto no encontrado: '+id); return; }
+    p.enCatalogo = !p.enCatalogo;
+    var savedPage = _prodPage;
+    save();
+    _prodPage = savedPage;
+    renderProductos();
+  } catch(e) { alert('Error addToCatalogo: '+e.message); }
 }
 
 function crearProductoDesdeDC(refId, dcNombre, empresa) {
@@ -3959,6 +3961,7 @@ function getFormatosValues() {
   return out;
 }
 function saveProducto() {
+  try {
   var nombre = document.getElementById('prod-nombre').value.trim();
   if(!nombre) { alert('Introduce el nombre del producto'); return; }
   var formatos = getFormatosValues();
@@ -3984,10 +3987,15 @@ function saveProducto() {
     enCatalogo:  enCatalogo
   };
   if(editingId.producto) {
-    var i = DB.productos.findIndex(function(p){return p.id===editingId.producto;});
-    if(i>=0) DB.productos[i] = Object.assign({}, DB.productos[i], data);
+    var idx = -1;
+    for(var ii=0;ii<DB.productos.length;ii++){ if(DB.productos[ii].id===editingId.producto){idx=ii;break;} }
+    if(idx>=0){
+      var old = DB.productos[idx];
+      Object.keys(data).forEach(function(k){ old[k]=data[k]; });
+    }
   } else {
-    var newProd = Object.assign({id:uid()}, data);
+    var newProd = {id:uid()};
+    Object.keys(data).forEach(function(k){ newProd[k]=data[k]; });
     DB.productos.push(newProd);
     if(typeof window._productoSaveHook === 'function') { window._productoSaveHook(newProd.id); window._productoSaveHook = null; }
   }
@@ -3996,6 +4004,7 @@ function saveProducto() {
   _prodPage = savedPage;
   closeModal('modal-producto');
   renderProductos();
+  } catch(e) { alert('Error saveProducto: '+e.message+' | '+e.stack); }
 }
 
 // ── Custom confirm dialog (replaces window.confirm which iOS blocks when iframe is active) ──
