@@ -3596,9 +3596,20 @@ function buildProductCard(p) {
   if(fmts.length){
     fmtHtml='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">'
       +fmts.slice(0,4).map(function(f){
-        return '<span style="font-size:11px;padding:2px 8px;background:rgba(74,140,42,.08);border:1px solid var(--border2);border-radius:6px">'
-          +(f.nombre||f.cantidad+' '+f.unidad)
-          +(f.precio?' &mdash; <b style="color:#7acc4a">'+f.precio.toFixed(2)+' \u20ac</b>':'')+'</span>';
+        var precioEnv = precioActual(f) || f.precio || 0;
+        var cant      = parseFloat(f.cantidad) || 1;
+        var unidad    = f.unidad || 'L';
+        var precioUnit= precioEnv && cant ? precioEnv / cant : 0;
+        var label     = f.nombre || (cant+' '+unidad);
+        var priceHtml = '';
+        if(precioEnv) {
+          priceHtml = ' &mdash; <b style="color:#7acc4a">'+precioEnv.toFixed(2)+' \u20ac</b>'
+            +(cant>1 && precioUnit
+              ? ' <span style="color:var(--text3);font-size:10px">('+precioUnit.toFixed(2)+' \u20ac/'+unidad+')</span>'
+              : '');
+        }
+        return '<span style="font-size:11px;padding:3px 9px;background:rgba(74,140,42,.08);border:1px solid var(--border2);border-radius:6px;white-space:nowrap">'
+          +'<span style="color:var(--text2)">&#x1F4E6; '+label+'</span>'+priceHtml+'</span>';
       }).join('')
       +(fmts.length>4?'<span style="font-size:11px;color:var(--text3);padding:2px 5px">+' +(fmts.length-4)+' m\u00e1s</span>':'')
       +'</div>';
