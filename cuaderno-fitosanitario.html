@@ -1059,12 +1059,20 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="form-group span-2">
           <label>Cultivos autorizados</label>
           <div id="prod-cultivos-tags" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;min-height:24px"></div>
-          <div style="display:flex;gap:6px">
-            <input type="text" id="prod-cultivo-input" placeholder="Añadir cultivo (ej: TRIGO) y pulsar ＋"
-              style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addCultivoTag();}">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addCultivoTag()">＋</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <div style="position:relative;flex:1">
+              <input type="text" id="prod-cultivo-input" placeholder="&#x1F50D; Buscar cultivo..."
+                style="flex:1;width:100%" autocomplete="off"
+                oninput="showCultivoDropdown(this.value)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();selectFirstCultivoSuggestion();}
+                           if(event.key==='Escape'){hideCultivoDropdown();}">
+              <div id="prod-cultivo-drop-new" style="display:none;position:absolute;top:100%;left:0;right:0;
+                background:var(--card);border:1px solid var(--primary);border-radius:var(--radius);
+                max-height:220px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openCultivoChooser()" title="Ver todos los cultivos">&#x1F4CB; Lista</button>
           </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">Haz clic en una etiqueta para eliminarla</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Escribe para buscar o pulsa <b>Lista</b> para ver todos. Clic en etiqueta para eliminar.</div>
         </div>
         <div class="form-group span-2">
           <label>Usos autorizados / Condicionamiento</label>
@@ -1396,6 +1404,27 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCliente()">&#x1F4BE; Guardar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CULTIVO CHOOSER -->
+<div class="modal-overlay" id="modal-cultivo-chooser">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3>&#x1F331; Cultivos autorizados</h3>
+      <button class="modal-close" onclick="closeCultivoChooser()">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px">
+      <input type="text" id="cultivo-chooser-search" placeholder="&#x1F50D; Filtrar cultivos..."
+        style="width:100%;margin-bottom:10px" oninput="filterCultivoChooser(this.value)">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+        Pulsa en un cultivo para a&ntilde;adirlo o quitarlo. Los seleccionados aparecen en verde.
+      </div>
+      <div id="cultivo-chooser-list" style="max-height:360px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:5px;padding:2px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeCultivoChooser()">&#x2714; Hecho</button>
     </div>
   </div>
 </div>
@@ -3728,17 +3757,143 @@ function renderCultivoTags(list) {
   }).join('');
 }
 
+// ── Master crop list (official + from recintos/MAPA) ──────────────────────────
+function getMasterCultivoList() {
+  var seen = {};
+  // From recintos
+  (DB.recintos||[]).forEach(function(r) {
+    if(r.especieVariedad) {
+      var cv = r.especieVariedad.split('/')[0].trim().toUpperCase();
+      if(cv) seen[cv] = 1;
+    }
+  });
+  // From MAPA products (cultivosAutorizados)
+  (DB.productos||[]).forEach(function(p) {
+    (p.cultivosAutorizados||[]).forEach(function(cv) {
+      if(cv) seen[cv.toUpperCase()] = 1;
+    });
+  });
+  // From CATALOGO_MAPA embedded products
+  if(typeof CATALOGO_MAPA !== 'undefined') {
+    CATALOGO_MAPA.forEach(function(c) {
+      (c.cv||[]).forEach(function(cv) {
+        if(cv) seen[cv.toUpperCase()] = 1;
+      });
+    });
+  }
+  // Static common crops for Spain (fallback)
+  ['TRIGO','CEBADA','MAIZ','GIRASOL','REMOLACHA','COLZA','AVENA','CENTENO','TRITICALE',
+   'GUISANTE','GARBANZO','LENTEJA','HABA','SOJA','ALFALFA','VID','OLIVO','ALMENDRO',
+   'ALBARICOQUERO','MELOCOTONERO','CEREZO','CIRUELO','MANZANO','PERAL','LIMONERO',
+   'NARANJO','MANDARIN','PATATA','TOMATE','PIMIENTO','MELON','SANDIA','PEPINO',
+   'LECHUGA','COL','BROCOLI','CEBOLLA','AJO','ZANAHORIA','ESPINACA','ESPÁRRAGO',
+   'RYE GRASS','FESTUCA','PRADERAS','CITRICOS','FRUTALES','HORTALIZAS','CEREALES',
+   'LEGUMINOSAS','TUBERCULOS'].forEach(function(cv){ seen[cv]=1; });
+  return Object.keys(seen).sort();
+}
+
+function showCultivoDropdown(q) {
+  var drop = document.getElementById('prod-cultivo-drop-new');
+  if(!drop) return;
+  q = (q||'').trim().toUpperCase();
+  if(!q) { drop.style.display='none'; return; }
+  var all = getMasterCultivoList();
+  var matches = all.filter(function(cv){ return cv.indexOf(q) >= 0; }).slice(0,15);
+  if(!matches.length) { drop.style.display='none'; return; }
+  var existing = getCultivoTagsValues().map(function(cv){ return cv.toUpperCase(); });
+  drop.innerHTML = matches.map(function(cv) {
+    var inList = existing.indexOf(cv) >= 0;
+    return '<div onclick="selectCultivoFromDrop(\''+cv+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;'
+      +'display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);'
+      +'background:'+(inList?'rgba(74,140,42,.12)':'')+';">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+(inList?'#7acc4a':'var(--text3))')+';flex-shrink:0"></span>'
+      +cv+(inList?' <span style="font-size:10px;color:#7acc4a">&#x2713;</span>':'')+'</div>';
+  }).join('');
+  drop.style.display='';
+}
+
+function selectCultivoFromDrop(cv) {
+  var existing = getCultivoTagsValues();
+  var uppers = existing.map(function(x){ return x.toUpperCase(); });
+  if(uppers.indexOf(cv.toUpperCase()) < 0) {
+    existing.push(cv);
+    renderCultivoTags(existing);
+  }
+  var inp = document.getElementById('prod-cultivo-input');
+  if(inp) inp.value = '';
+  hideCultivoDropdown();
+}
+
+function selectFirstCultivoSuggestion() {
+  var drop = document.getElementById('prod-cultivo-drop-new');
+  if(!drop || drop.style.display === 'none') { addCultivoTag(); return; }
+  var first = drop.querySelector('div');
+  if(first) first.click();
+}
+
+function hideCultivoDropdown() {
+  var drop = document.getElementById('prod-cultivo-drop-new');
+  if(drop) drop.style.display = 'none';
+}
+
+function openCultivoChooser() {
+  hideCultivoDropdown();
+  var searchEl = document.getElementById('cultivo-chooser-search');
+  if(searchEl) searchEl.value = '';
+  renderCultivoChooserList('');
+  openModal('modal-cultivo-chooser');
+}
+
+function closeCultivoChooser() {
+  closeModal('modal-cultivo-chooser');
+}
+
+function filterCultivoChooser(q) {
+  renderCultivoChooserList(q);
+}
+
+function renderCultivoChooserList(q) {
+  var listEl = document.getElementById('cultivo-chooser-list');
+  if(!listEl) return;
+  q = (q||'').trim().toUpperCase();
+  var all = getMasterCultivoList();
+  var filtered = q ? all.filter(function(cv){ return cv.indexOf(q) >= 0; }) : all;
+  var selected = getCultivoTagsValues().map(function(cv){ return cv.toUpperCase(); });
+  listEl.innerHTML = filtered.map(function(cv) {
+    var isOn = selected.indexOf(cv) >= 0;
+    var col = getCropColor(cv);
+    return '<button type="button" onclick="toggleCultivoChooser(\''+cv+'\')" style="'
+      +'padding:4px 10px;border-radius:12px;font-size:12px;cursor:pointer;font-weight:600;'
+      +'background:'+(isOn?col+'44':'var(--surface)')+';'
+      +'border:1.5px solid '+(isOn?col:'var(--border2)')+';'
+      +'color:'+(isOn?'var(--white)':'var(--text2)')+';">'
+      +(isOn?'&#x2713; ':'')+cv+'</button>';
+  }).join('');
+}
+
+function toggleCultivoChooser(cv) {
+  var existing = getCultivoTagsValues();
+  var uppers = existing.map(function(x){ return x.toUpperCase(); });
+  var idx = uppers.indexOf(cv.toUpperCase());
+  if(idx >= 0) existing.splice(idx, 1);
+  else existing.push(cv);
+  renderCultivoTags(existing);
+  var searchEl = document.getElementById('cultivo-chooser-search');
+  renderCultivoChooserList(searchEl ? searchEl.value : '');
+}
+
 function addCultivoTag() {
   var inp = document.getElementById('prod-cultivo-input');
-  var val = (inp.value||'').trim().toUpperCase();
+  var val = (inp ? inp.value : '').trim().toUpperCase();
   if(!val) return;
-  var container = document.getElementById('prod-cultivos-tags');
-  var existing = Array.prototype.slice.call(container.querySelectorAll('span[data-cv]')).map(function(s){return s.dataset.cv.toUpperCase();});
-  if(existing.includes(val)) { inp.value=''; return; }
-  existing.push(val);
-  renderCultivoTags(existing);
-  inp.value = '';
-  inp.focus();
+  var existing = getCultivoTagsValues();
+  var uppers = existing.map(function(x){ return x.toUpperCase(); });
+  if(uppers.indexOf(val) < 0) {
+    existing.push(val);
+    renderCultivoTags(existing);
+  }
+  if(inp) inp.value = '';
+  hideCultivoDropdown();
 }
 
 function removeCultivoTag(el) {
@@ -3861,6 +4016,47 @@ function addFormatoRow(data) {
   mainRow.appendChild(inp1); mainRow.appendChild(inp2); mainRow.appendChild(sel);
   mainRow.appendChild(precioLabel); mainRow.appendChild(histBtn); mainRow.appendChild(removeBtn);
 
+  // ── Price breakdown: €/unit and total ──────────────────────────────────
+  var priceBreakdown = document.createElement('div');
+  priceBreakdown.style.cssText = 'display:none;padding:4px 12px 6px;font-size:12px;color:var(--text2);background:rgba(74,140,42,.04);border-top:1px solid var(--border)';
+
+  function updatePriceBreakdown() {
+    var cant   = parseFloat(inp2.value) || 0;
+    var unit   = sel.value || 'L';
+    var precio = precioActual({precios: _getLocalPrecios()});
+    if(!precio || !cant) { priceBreakdown.style.display='none'; return; }
+    var precioUnit = precio / cant;   // € por litro/kg
+    var totalEnv   = precio;          // precio del envase completo (ya es el precio del envase)
+    priceBreakdown.style.display = '';
+    priceBreakdown.innerHTML =
+      '<span style="margin-right:16px">&#x1F4B6; <b style="color:#7acc4a">'+precioUnit.toFixed(2)+'&nbsp;\u20ac/'+unit+'</b></span>'
+      +'<span>&#x1F4E6; Envase ('+cant+' '+unit+'): <b style="color:var(--white)">'+totalEnv.toFixed(2)+'&nbsp;\u20ac</b></span>';
+  }
+
+  // Helper to get current local precios list from the wrapper
+  function _getLocalPrecios() {
+    return wrapper._precios || precios;
+  }
+
+  // Update breakdown whenever quantity or unit changes
+  inp2.addEventListener('input',  updatePriceBreakdown);
+  sel.addEventListener('change',  updatePriceBreakdown);
+
+  // Also patch histBtn toggle to update after price changes
+  histBtn.onclick = function() {
+    var isOpen = histPanel.style.display !== 'none';
+    histPanel.style.display = isOpen ? 'none' : '';
+    if(isOpen) {
+      // After closing panel, update breakdown with latest price
+      var latestPrecios = wrapper._precios || precios;
+      var pa2 = latestPrecios.length ? precioActual({precios:latestPrecios}) : 0;
+      precioLabel.style.color = pa2 ? '#7acc4a' : 'var(--text3)';
+      precioLabel.textContent = pa2 ? pa2.toFixed(2)+' \u20ac' : 'sin precio';
+      wrapper._precios = latestPrecios;
+      updatePriceBreakdown();
+    }
+  };
+
   // ── History panel (hidden by default) ────────────────────────────────
   var histPanel = document.createElement('div');
   histPanel.style.cssText='display:none;padding:8px 12px;background:rgba(74,140,42,.04);border-top:1px solid var(--border)';
@@ -3956,8 +4152,10 @@ function addFormatoRow(data) {
   wrapper.querySelector = function(sel){ return mainRow.querySelector ? mainRow.querySelector(sel) : null };
 
   wrapper.appendChild(mainRow);
+  wrapper.appendChild(priceBreakdown);
   wrapper.appendChild(histPanel);
   cont.appendChild(wrapper);
+  updatePriceBreakdown(); // initial calculation
 }
 function getFormatosValues() {
   var cont = document.getElementById('prod-formatos-rows');
