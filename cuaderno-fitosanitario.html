@@ -1171,13 +1171,29 @@ textarea { resize: vertical; min-height: 72px; }
             <option>Secano</option><option>Regadío</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="position:relative">
           <label>Especie / Cultivo</label>
-          <input type="text" id="rec-especie" placeholder="ej: TRIGO" oninput="syncEspecieVariedad()">
+          <input type="text" id="rec-especie" placeholder="Buscar o escribir nuevo..."
+            autocomplete="off"
+            oninput="syncEspecieVariedad();showRecEspecieDrop(this.value)"
+            onfocus="showRecEspecieDrop(this.value)"
+            onkeydown="if(event.key==='ArrowDown'){event.preventDefault();focusRecDrop('rec-esp-drop');}
+                       if(event.key==='Escape')hideRecDrop('rec-esp-drop');">
+          <div id="rec-esp-drop" style="display:none;position:absolute;top:100%;left:0;right:0;
+            background:var(--card);border:1px solid var(--primary);border-radius:var(--radius);
+            max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="position:relative">
           <label>Variedad</label>
-          <input type="text" id="rec-variedad" placeholder="ej: RIMBAUD" oninput="syncEspecieVariedad()">
+          <input type="text" id="rec-variedad" placeholder="Buscar o escribir nueva..."
+            autocomplete="off"
+            oninput="syncEspecieVariedad();showRecVariedadDrop(this.value)"
+            onfocus="showRecVariedadDrop(this.value)"
+            onkeydown="if(event.key==='ArrowDown'){event.preventDefault();focusRecDrop('rec-var-drop');}
+                       if(event.key==='Escape')hideRecDrop('rec-var-drop');">
+          <div id="rec-var-drop" style="display:none;position:absolute;top:100%;left:0;right:0;
+            background:var(--card);border:1px solid var(--primary);border-radius:var(--radius);
+            max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
         </div>
         <input type="hidden" id="rec-especie-variedad-combined">
         <div class="form-group span-3">
@@ -4426,6 +4442,106 @@ function toggleRecGrp2(grpId) {
 }
 function toggleRecGrp(id){} // stub, replaced by onclick above
 
+// ── Especie/Variedad smart dropdowns ──────────────────────────────────────────
+
+function getEspeciesUsadas() {
+  var seen = {};
+  (DB.recintos||[]).forEach(function(r) {
+    if(r.especieVariedad) {
+      var esp = r.especieVariedad.split('/')[0].trim().toUpperCase();
+      if(esp) seen[esp] = 1;
+    }
+  });
+  // Merge with master crop list from product catalog
+  getMasterCultivoList().forEach(function(cv){ seen[cv.toUpperCase()]=1; });
+  return Object.keys(seen).sort();
+}
+
+function getVariedadesPorEspecie(especie) {
+  var seen = {};
+  var espUp = (especie||'').trim().toUpperCase();
+  (DB.recintos||[]).forEach(function(r) {
+    if(!r.especieVariedad) return;
+    var parts = r.especieVariedad.split('/');
+    var esp = parts[0].trim().toUpperCase();
+    var vari = parts.slice(1).join('/').trim();
+    if((!espUp || esp === espUp) && vari) seen[vari.toUpperCase()] = vari;
+  });
+  return Object.keys(seen).sort().map(function(k){ return seen[k]; });
+}
+
+function showRecEspecieDrop(q) {
+  var drop = document.getElementById('rec-esp-drop');
+  if(!drop) return;
+  var all = getEspeciesUsadas();
+  var qUp = (q||'').trim().toUpperCase();
+  var matches = qUp
+    ? all.filter(function(cv){ return cv.indexOf(qUp) >= 0; })
+    : all;
+  if(!matches.length) { hideRecDrop('rec-esp-drop'); return; }
+  drop.innerHTML = matches.slice(0,12).map(function(cv) {
+    return '<div data-val="'+cv+'" onclick="selectRecEspecie(\''+cv.replace(/'/g,"\\'")+'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);font-weight:600">'
+      +'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+getCropColor(cv)+';margin-right:7px;vertical-align:middle"></span>'
+      +cv+'</div>';
+  }).join('');
+  drop.style.display = '';
+}
+
+function showRecVariedadDrop(q) {
+  var drop = document.getElementById('rec-var-drop');
+  if(!drop) return;
+  var especie = (document.getElementById('rec-especie')||{value:''}).value.trim();
+  var all = getVariedadesPorEspecie(especie);
+  var qUp = (q||'').trim().toUpperCase();
+  var matches = qUp
+    ? all.filter(function(v){ return v.toUpperCase().indexOf(qUp) >= 0; })
+    : all;
+  if(!matches.length) { hideRecDrop('rec-var-drop'); return; }
+  drop.innerHTML = matches.slice(0,12).map(function(v) {
+    return '<div data-val="'+v+'" onclick="selectRecVariedad(\''+v.replace(/'/g,"\\'")+'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">'
+      +v+'</div>';
+  }).join('');
+  drop.style.display = '';
+}
+
+function selectRecEspecie(val) {
+  var inp = document.getElementById('rec-especie');
+  if(inp) inp.value = val;
+  hideRecDrop('rec-esp-drop');
+  syncEspecieVariedad();
+  // Refresh variedad dropdown for new especie
+  var varInp = document.getElementById('rec-variedad');
+  if(varInp) showRecVariedadDrop(varInp.value);
+}
+
+function selectRecVariedad(val) {
+  var inp = document.getElementById('rec-variedad');
+  if(inp) inp.value = val;
+  hideRecDrop('rec-var-drop');
+  syncEspecieVariedad();
+}
+
+function hideRecDrop(id) {
+  var el = document.getElementById(id);
+  if(el) el.style.display = 'none';
+}
+
+function focusRecDrop(id) {
+  var el = document.getElementById(id);
+  if(!el) return;
+  var first = el.querySelector('[data-val]');
+  if(first) {
+    first.style.background = 'var(--primary)';
+    first.focus && first.focus();
+  }
+}
+
+// Hide dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if(!e.target.closest('#rec-especie') && !e.target.closest('#rec-esp-drop')) hideRecDrop('rec-esp-drop');
+  if(!e.target.closest('#rec-variedad') && !e.target.closest('#rec-var-drop')) hideRecDrop('rec-var-drop');
+});
+
 function syncEspecieVariedad() {
   var esp = (document.getElementById('rec-especie')||{value:''}).value.trim();
   var vari = (document.getElementById('rec-variedad')||{value:''}).value.trim();
@@ -6611,27 +6727,63 @@ function buildParcelaPopup(groupKey, groups) {
   Object.keys(cvCount).forEach(function(cv){ if(cvCount[cv]>maxCnt){ maxCnt=cvCount[cv]; dominantCv=cv; } });
   var color = getCropColor(dominantCv);
 
-  var totSIG=0, totCul=0;
-  g.recintos.forEach(function(r){ totSIG+=parseFloat(r.supSigpac)||0; totCul+=parseFloat(r.supCultivada)||0; });
+  // SIGPAC area: group by polígono-parcela — each unique pol-par has ONE SIGPAC area
+  // Multiple recintos of the same parcel share that area — don't sum them
+  var sigpacByParcel = {};
+  g.recintos.forEach(function(r) {
+    var parcelKey = (r.numPoligono||'?')+'-'+(r.numParcela||'?');
+    var sup = parseFloat(r.supSigpac)||0;
+    // Keep the largest reported value for this pol-par (all recintos should be the same)
+    if(!sigpacByParcel[parcelKey] || sup > sigpacByParcel[parcelKey]) {
+      sigpacByParcel[parcelKey] = sup;
+    }
+  });
+  var totSIG = 0;
+  Object.keys(sigpacByParcel).forEach(function(k){ totSIG += sigpacByParcel[k]; });
+
+  // Cultivated area per crop
+  var cvHa = {};
+  g.recintos.forEach(function(r) {
+    var cv  = r.especieVariedad || 'Sin cultivo';
+    var sup = parseFloat(r.supCultivada) || parseFloat(r.supSigpac) || 0;
+    cvHa[cv] = (cvHa[cv]||0) + sup;
+  });
+  var totCul = Object.keys(cvHa).reduce(function(s,k){ return s + cvHa[k]; }, 0);
 
   var nombre  = g.nombreFinca || ('Pol.'+g.recintos[0].numPoligono);
   var encKey  = groupKey.replace(/"/g,'&quot;');
   var campStr = currentCampana ? ('Campaña '+currentCampana) : 'Todas las campañas';
   var nRec    = g.recintos.length;
 
-  // Mixed-crop indicator
+  // Crop breakdown section
   var mixedRows = '';
-  if(Object.keys(cvCount).length > 1) {
-    mixedRows = '<div style="margin-bottom:8px;padding:6px 8px;background:#fff8e1;border-radius:5px;border:1px solid #ffe082">' +
-      '<div style="font-size:10px;font-weight:700;color:#b8860b;margin-bottom:4px;text-transform:uppercase">⚠️ Recintos con cultivos distintos</div>';
-    g.recintos.forEach(function(r){
-      var ref = r.numPoligono+'-'+r.numParcela+'-'+r.numRecinto;
-      var c2  = getCropColor(r.especieVariedad);
-      mixedRows += '<div style="display:flex;align-items:center;gap:5px;font-size:11px;padding:2px 0">' +
-        '<span style="width:7px;height:7px;border-radius:50%;background:'+c2+';flex-shrink:0"></span>' +
-        '<span style="color:#555;font-family:monospace">'+ref+'</span> ' +
-        '<span style="color:#222;font-weight:600">'+(r.especieVariedad||'Sin cultivo')+'</span>' +
-        '</div>';
+  var cvList = Object.keys(cvHa).sort();
+  if(cvList.length === 1) {
+    // Single crop — show inline
+    var cv1 = cvList[0]; var c1 = getCropColor(cv1);
+    mixedRows = '<div style="display:flex;align-items:center;gap:6px;padding:5px 0;margin-bottom:6px">'
+      +'<span style="width:10px;height:10px;border-radius:50%;background:'+c1+';flex-shrink:0"></span>'
+      +'<span style="color:#e8f5e8;font-weight:700">'+cv1+'</span>'
+      +'<span style="color:#7aaa7a;margin-left:auto">'+cvHa[cv1].toFixed(2)+' ha</span>'
+      +'</div>';
+  } else {
+    // Multiple crops — show breakdown table
+    mixedRows = '<div style="margin-bottom:8px;padding:7px 8px;background:rgba(74,140,42,.08);border-radius:6px;border:1px solid #3a5a2a">'
+      +'<div style="font-size:10px;font-weight:700;color:#7acc4a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">&#x1F33E; Cultivos por superficie</div>';
+    cvList.forEach(function(cv) {
+      var c2  = getCropColor(cv);
+      var pct = totSIG > 0 ? (cvHa[cv]/totSIG*100).toFixed(0) : 0;
+      mixedRows += '<div style="margin-bottom:4px">'
+        +'<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:2px">'
+        +'<span style="width:8px;height:8px;border-radius:50%;background:'+c2+';flex-shrink:0"></span>'
+        +'<span style="color:#e8f5e8;font-weight:600;flex:1">'+cv+'</span>'
+        +'<span style="color:#7acc4a;font-weight:700;white-space:nowrap">'+cvHa[cv].toFixed(2)+' ha</span>'
+        +'<span style="color:#5a7a5a;font-size:10px;width:30px;text-align:right">'+pct+'%</span>'
+        +'</div>'
+        +'<div style="height:4px;background:#1a3a1a;border-radius:2px">'
+        +'<div style="height:100%;width:'+pct+'%;background:'+c2+';border-radius:2px;transition:width .3s"></div>'
+        +'</div>'
+        +'</div>';
     });
     mixedRows += '</div>';
   }
