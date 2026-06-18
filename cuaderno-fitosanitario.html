@@ -3954,13 +3954,17 @@ function getPrecioEnFecha(fmt, fecha) {
 }
 
 function getPrecioProducto(prod, formatoIdx, fecha) {
+  // Returns price per unit (€/L or €/kg), NOT price per package.
   if(!prod) return 0;
   var fmts = (prod.formatos && prod.formatos.length) ? prod.formatos : [];
   if(fmts.length) {
     var fmt = fmts[formatoIdx != null ? formatoIdx : 0];
     if(!fmt) return 0;
-    return getPrecioEnFecha(fmt, fecha||null);
+    var precioEnvase = getPrecioEnFecha(fmt, fecha||null);
+    var cantidad = parseFloat(fmt.cantidad) || 1;
+    return precioEnvase / cantidad;   // €/L or €/kg
   }
+  // Legacy: prod.coste was already stored as €/unit
   return prod.coste||0;
 }
 
@@ -9296,7 +9300,8 @@ function generateTratamientoPDF() {
 
     if(includePrice) {
       if(prod && prod.coste && p.dosis) {
-        var costeHa = prod.coste * p.dosis;
+        var precioUnit = getPrecioProducto(prod, p.formatoIdx||0, t&&t.fecha||null);
+        var costeHa = precioUnit * p.dosis;
         var pvpHa   = costeHa * (1 + (p.margen||0)/100);
         var pvpTot  = pvpHa * totalHa;
         totalPVPTot += pvpTot; totalPVPHa += pvpHa;
