@@ -531,6 +531,24 @@ textarea { resize: vertical; min-height: 72px; }
 </style>
 </head>
 <body>
+<!-- DRIVE RECONNECT BANNER — fixed at top, shown when session expires -->
+<div id="drive-reconnect-banner" style="display:none;opacity:0;transform:translateY(-60px);transition:opacity .3s,transform .3s;
+  position:fixed;top:0;left:0;right:0;z-index:99998;
+  background:linear-gradient(135deg,#b71c1c,#c62828);
+  padding:10px 16px;align-items:center;gap:12px;
+  box-shadow:0 4px 20px rgba(183,28,28,.6);border-bottom:2px solid #e53935">
+  <span style="font-size:18px;flex-shrink:0">&#x26A0;&#xFE0F;</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:800;font-size:13px;color:#fff">Sesi&#xF3;n de Google Drive expirada</div>
+    <div id="pending-badge" style="display:none;font-size:11px;color:#ffcdd2;margin-top:1px">0 cambios sin guardar en Drive</div>
+  </div>
+  <button type="button" onclick="reconnectDrive()" style="background:#fff;color:#b71c1c;border:none;border-radius:8px;padding:7px 14px;font-weight:800;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap">
+    &#x1F504; Reconectar
+  </button>
+  <button type="button" onclick="dismissReconnectBanner()" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0">
+    Ignorar
+  </button>
+</div>
 
 <!-- MOBILE BOTTOM NAV (visible on screens ≤600px) -->
 <nav id="mobile-nav">
@@ -1929,6 +1947,7 @@ function save() {
     clearTimeout(gDrive._saveTimer);
     gDrive._saveTimer = setTimeout(function(){ gDrive.uploadDB(); }, 2000);
     updateSyncStatus('pending');
+    markPendingChange();
   }
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6) }
@@ -1957,6 +1976,7 @@ var gDrive = {
       updateSyncStatus('connected');      // Show green immediately
       this.verifyToken();                 // Verify in background (calls silentLogin if expired)
       this.startAutoSync();
+      startExpiryCountdown();
     } else {
       updateSyncStatus('disconnected');
       if(this.CLIENT_ID && window.location.protocol !== 'file:') {
@@ -2109,9 +2129,12 @@ var gDrive = {
     localStorage.removeItem('agrotrack_gdrive_lastmod');
     localStorage.removeItem('agrotrack_oauth_pending');
     this._lastModified = null;
+    showReconnectBanner(false);
+    clearPendingChanges();
     updateSyncStatus('connected');
     this.downloadDB();
     this.startAutoSync();
+    startExpiryCountdown();
   },
 
 
@@ -2227,7 +2250,7 @@ var gDrive = {
         localStorage.setItem('agrotrack_gdrive_fileid', self.fileId);
         if(d.modifiedTime) localStorage.setItem('agrotrack_gdrive_lastmod', d.modifiedTime);
         if(callback) callback(self.fileId);
-        updateSyncStatus('synced');
+        updateSyncStatus('synced'); clearPendingChanges();
       }).catch(function(e){ updateSyncStatus('error'); });
   },
 
@@ -2247,7 +2270,7 @@ var gDrive = {
             self._lastModified = d.modifiedTime;
             localStorage.setItem('agrotrack_gdrive_lastmod', d.modifiedTime);
           }
-          updateSyncStatus('synced');
+          updateSyncStatus('synced'); clearPendingChanges();
         }).catch(function(e){ updateSyncStatus('error'); });
     });
   },
@@ -2268,7 +2291,7 @@ var gDrive = {
             var newJson = JSON.stringify(data);
             var oldJson = JSON.stringify(DB);
             if(newJson === oldJson) {
-              updateSyncStatus('synced');
+              updateSyncStatus('synced'); clearPendingChanges();
               return; // no change — skip re-render
             }
             DB = data;
@@ -2304,7 +2327,7 @@ var gDrive = {
               else if(tabId === 'recintos')    renderRecintos();
               else if(tabId === 'clientes')    renderClientes();
             }
-            updateSyncStatus('synced');
+            updateSyncStatus('synced'); clearPendingChanges();
             if(!silent) showSyncToast('✅ Datos actualizados desde Google Drive');
             else        showSyncToast('🔄 Sincronizado automáticamente');
           } else {
@@ -2332,7 +2355,8 @@ function updateSyncStatus(status) {
     pending:      { icon:'🟡', color:'var(--accent)',    label:'Drive…',       title:'Guardando en Drive…' },
     syncing:      { icon:'🔄', color:'var(--accent)',    label:'Sync…',        title:'Sincronizando…' },
     synced:       { icon:'✅', color:'#7acc4a',          label:'Drive ✓',      title:'Datos guardados en Drive' },
-    error:        { icon:'🔴', color:'#e74c3c',          label:'Drive Error',  title:'Error de sincronización. Clic para reintentar' }
+    error:        { icon:'🔴', color:'#e74c3c',          label:'Drive Error',  title:'Error de sincronización. Clic para reintentar' },
+    expiring:     { icon:'🟠', color:'#f39c12',          label:'¡Token expira!', title:'La sesión de Drive expira pronto. Clic para renovar' }
   };
   var s = map[status] || map['disconnected'];
   ind.textContent = s.icon;
@@ -2340,6 +2364,86 @@ function updateSyncStatus(status) {
   btn.style.color = s.color;
   btn.querySelector('.gdrive-label').textContent = s.label;
   if(indM) indM.textContent = s.icon;
+
+  // Show/hide the reconnect banner
+  showReconnectBanner(status === 'disconnected' && !!gDrive.CLIENT_ID);
+}
+
+// ── Pending-changes counter ───────────────────────────────────────────────────
+var _pendingChanges = 0;
+
+function markPendingChange() {
+  _pendingChanges++;
+  updatePendingBadge();
+}
+function clearPendingChanges() {
+  _pendingChanges = 0;
+  updatePendingBadge();
+}
+function updatePendingBadge() {
+  var badge = document.getElementById('pending-badge');
+  if(!badge) return;
+  badge.style.display = _pendingChanges > 0 ? '' : 'none';
+  badge.textContent   = _pendingChanges + ' sin guardar';
+}
+
+// ── Reconnect banner ──────────────────────────────────────────────────────────
+var _reconnectBannerShown = false;
+
+function showReconnectBanner(show) {
+  var banner = document.getElementById('drive-reconnect-banner');
+  if(!banner) return;
+  if(show && !_reconnectBannerShown) {
+    _reconnectBannerShown = true;
+    banner.style.display = '';
+    // Animate in
+    setTimeout(function(){ banner.style.opacity='1'; banner.style.transform='translateY(0)'; }, 10);
+  } else if(!show) {
+    _reconnectBannerShown = false;
+    banner.style.opacity='0'; banner.style.transform='translateY(-60px)';
+    setTimeout(function(){ banner.style.display='none'; }, 300);
+  }
+}
+
+// ── Token expiry countdown ────────────────────────────────────────────────────
+var _expiryCheckInterval = null;
+
+function startExpiryCountdown() {
+  clearInterval(_expiryCheckInterval);
+  _expiryCheckInterval = setInterval(function() {
+    var savedAt = parseInt(localStorage.getItem('agrotrack_gdrive_token_at')||'0');
+    if(!savedAt || !gDrive.token) return;
+    var age = (Date.now() - savedAt) / 1000;
+    var remaining = 3600 - age; // Google tokens last 3600s
+
+    if(remaining <= 0) {
+      // Already expired
+      clearInterval(_expiryCheckInterval);
+      gDrive.token = null;
+      localStorage.removeItem('agrotrack_gdrive_token');
+      updateSyncStatus('disconnected');
+      gDrive.silentLogin(); // try silent refresh first
+
+    } else if(remaining <= 300) {
+      // Less than 5 min — try silent refresh NOW before it expires
+      clearInterval(_expiryCheckInterval);
+      gDrive.silentLogin();
+
+    } else if(remaining <= 600) {
+      // Less than 10 min — show warning colour
+      updateSyncStatus('expiring');
+      var mins = Math.ceil(remaining / 60);
+      var btn = document.getElementById('gdrive-btn');
+      if(btn) btn.title = 'La sesión de Drive expira en ' + mins + ' min. Pulsa para renovar.';
+    }
+  }, 30000); // check every 30 seconds
+}
+
+function reconnectDrive() {
+  gDrive.login();
+}
+function dismissReconnectBanner() {
+  showReconnectBanner(false);
 }
 
 function showSyncToast(msg) {
