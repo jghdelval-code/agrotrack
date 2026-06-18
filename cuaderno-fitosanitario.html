@@ -9553,18 +9553,39 @@ function generateTratamientoPDF() {
     var wDosis   = wrapText(dosisStr,colW[2]);
     var wTotal   = wrapText(total,   colW[3]);
     var nLines   = Math.max(wNombre.length, wMateria.length, wDosis.length, wTotal.length);
-    var rowH     = Math.max(7, nLines * 5 + 3);
+    var rowH     = Math.max(10, nLines * 6 + 4);
 
     checkPage(rowH + 2);
     if(altRow) rect(margin, y, W-2*margin, rowH, '#f9fbf9');
     altRow = !altRow;
 
-    setFont(9,'normal','#111');
-    // Draw each column with its wrapped lines
+    // Nombre y materia activa — normal
+    setFont(11,'bold','#111');
     doc.text(wNombre,  colX[0], y+4.5);
+    setFont(8,'normal','#555');
     doc.text(wMateria, colX[1], y+4.5);
-    doc.text(wDosis,   colX[2], y+4.5);
-    doc.text(wTotal,   colX[3], y+4.5);
+
+    // ── DOSIS — highlighted box ────────────────────────────────────────────────
+    var dosisBoxX = colX[2] - 1;
+    var dosisBoxW = colW[2] + 2;
+    var dosisBoxH = rowH - 3;
+    // Green pill background
+    doc.setFillColor(42, 111, 42);
+    doc.roundedRect(dosisBoxX, y+1.5, dosisBoxW, dosisBoxH, 2, 2, 'F');
+    // White bold text — centred both horizontally AND vertically
+    setFont(13,'bold','#ffffff');
+    var lineH    = 5.5;                                    // px per line at 13pt
+    var blockH   = wDosis.length * lineH;                  // total text block height
+    var startY   = y + 1.5 + (dosisBoxH - blockH) / 2 + lineH - 1; // vertical centre
+    wDosis.forEach(function(line, li) {
+      var tw = doc.getTextWidth(line);
+      var cx = dosisBoxX + (dosisBoxW - tw) / 2;           // horizontal centre
+      doc.text(line, cx, startY + li * lineH);
+    });
+
+    // ── TOTAL — bold dark green, slightly smaller ──────────────────────────────
+    setFont(9,'bold','#1a5c1a');
+    doc.text(wTotal, colX[3], y+4.5);
 
     if(includePrice) {
       if(prod && prod.coste && p.dosis) {
