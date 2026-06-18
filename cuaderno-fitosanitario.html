@@ -2747,6 +2747,11 @@ function buildTrtCardHtml(t) {
   var tableBody = prods.map(function(p){
     var prod=DB.productos.find(function(pr){return pr.id===p.productoId;});
     var totalProd=(p.dosis*totalHa).toFixed(3);
+    // Derive correct unit from product formato
+    var prodFmts = prod && prod.formatos && prod.formatos.length ? prod.formatos : null;
+    var prodFmtUnit = prodFmts ? (prodFmts[p.formatoIdx||0]||prodFmts[0]).unidad||(prod.unidadCoste||'L') : (prod?prod.unidadCoste||'L':'L');
+    var dispUnit  = p.unidad || (prodFmtUnit.replace('/ha','')+'/ha');
+    var totalUnit = dispUnit.replace('/ha','');
     var cc='';
     if(hasCost){
       var pvpHaP, costeHaP;
@@ -2759,7 +2764,7 @@ function buildTrtCardHtml(t) {
       }
       if(pvpHaP&&p.dosis){var pTot=pvpHaP*totalHa; cc='<td style="color:var(--text3)">'+costeHaP.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pvpHaP.toFixed(2)+'&euro;</td><td style="color:#7acc4a;font-weight:700">'+pTot.toFixed(2)+'&euro;</td>';} else{cc='<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>';}
     }
-    return '<tr><td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td><td style="color:var(--text2)">'+(prod?prod.materiaActiva||'&mdash;':'&mdash;')+'</td><td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'&mdash;')+'</td><td><b>'+p.dosis+' '+(p.unidad||'L/ha')+'</b></td><td><b>'+totalProd+' '+(p.unidad||'L/ha').replace('/ha','')+'</b></td>'+cc+'<td style="color:var(--text2)">'+(p.justificacion||'&mdash;')+'</td></tr>';
+    return '<tr><td>'+(prod?'<b>'+prod.nombre+'</b>':'Producto eliminado')+'</td><td style="color:var(--text2)">'+(prod?prod.materiaActiva||'&mdash;':'&mdash;')+'</td><td>'+(prod?'<span class="tag '+tipoBadge(prod.tipo)+'">'+prod.tipo+'</span>':'&mdash;')+'</td><td><b>'+p.dosis+' '+dispUnit+'</b></td><td><b>'+totalProd+' '+totalUnit+'</b></td>'+cc+'<td style="color:var(--text2)">'+(p.justificacion||'&mdash;')+'</td></tr>';
   }).join('');
   var tableFoot = hasCost?'<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;color:var(--text2)">TOTAL</td><td style="color:var(--text3);font-weight:700">'+totalCosteHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700">'+totalPVPHa.toFixed(2)+'&euro;/ha</td><td style="color:#7acc4a;font-weight:700;font-size:14px">'+totalPVPTot.toFixed(2)+'&euro;</td><td></td></tr></tfoot>':'';
   // Build HTML as array to avoid quote nesting
@@ -9276,8 +9281,15 @@ function generateTratamientoPDF() {
     var prod = DB.productos.find(function(pr){return pr.id===p.productoId;});
     var nombre  = prod ? prod.nombre  : '—';
     var materia = prod ? (prod.materiaActiva||'—') : '—';
-    var dosisStr= p.dosis+' '+(p.unidad||'L/ha');
-    var total   = (p.dosis * totalHa).toFixed(2)+' '+(p.unidad||'L/ha').replace('/ha','');
+    // Derive correct unit from product formato, not hardcoded L/ha
+    var fmts = prod && prod.formatos && prod.formatos.length ? prod.formatos : null;
+    var fmtUnit = fmts ? (fmts[p.formatoIdx||0] || fmts[0]).unidad || (prod.unidadCoste||'L') : (prod ? prod.unidadCoste||'L' : 'L');
+    var rawUnit = p.unidad || (fmtUnit.replace('/ha','') + '/ha');
+    var dispUnit = rawUnit;   // e.g. "L/ha", "kg/ha", "g/ha", "cc/ha"
+    var totalUnit = rawUnit.replace('/ha',''); // e.g. "L", "kg", "g", "cc"
+
+    var dosisStr = p.dosis+' '+dispUnit;
+    var total    = (p.dosis * totalHa).toFixed(2)+' '+totalUnit;
 
     // Pre-wrap each column to measure row height
     var wNombre  = wrapText(nombre,  colW[0]);
