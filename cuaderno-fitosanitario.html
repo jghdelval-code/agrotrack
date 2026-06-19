@@ -1955,6 +1955,81 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 // ============================================================
 // GOOGLE DRIVE SYNC
 // ============================================================
+// ============================================================
+// DRIVE SYNC — SAFE MERGE (prevents data loss between devices)
+// ============================================================
+// The old sync logic did "DB = remoteData" or "upload local blindly",
+// which silently destroyed any record that existed only on one device.
+// This merge is a non-destructive UNION by record id:
+//   - records that exist on only one side are always kept
+//   - records that exist on both sides: the "winning" side's copy is used
+//   - explicit deletions (tombstones in _deletedIds) always win over a
+//     record still present on the other side, so deletes still propagate
+var SYNC_ENTITY_KEYS = ['clientes','recintos','tratamientos','productos','abonos','abonados','compras'];
+
+function mergeDB(remote, local, preferLocalOnConflict) {
+  remote = remote || {};
+  local  = local  || {};
+  var merged = {};
+
+  // Non-entity top-level keys: keep remote's value, fall back to local's
+  Object.keys(remote).forEach(function(k){ merged[k] = remote[k]; });
+  Object.keys(local).forEach(function(k){ if(merged[k] === undefined) merged[k] = local[k]; });
+
+  // Merge tombstones (deleted-id lists) first — union of both sides, deduped
+  var mergedDeleted = {};
+  SYNC_ENTITY_KEYS.forEach(function(key) {
+    var rIds = (remote._deletedIds && remote._deletedIds[key]) || [];
+    var lIds = (local._deletedIds  && local._deletedIds[key])  || [];
+    var seen = {};
+    rIds.concat(lIds).forEach(function(id){ seen[id] = 1; });
+    mergedDeleted[key] = Object.keys(seen);
+  });
+  merged._deletedIds = mergedDeleted;
+
+  // Merge each entity array by id
+  SYNC_ENTITY_KEYS.forEach(function(key) {
+    var remoteArr = remote[key] || [];
+    var localArr  = local[key]  || [];
+    var map = {};
+    var loserArr  = preferLocalOnConflict ? remoteArr : localArr;
+    var winnerArr = preferLocalOnConflict ? localArr  : remoteArr;
+    loserArr.forEach(function(item){  if(item && item.id) map[item.id] = item; });
+    winnerArr.forEach(function(item){ if(item && item.id) map[item.id] = item; }); // overwrites on collision
+    // Apply tombstones: anything explicitly deleted on either device must stay gone
+    var deletedSet = {};
+    (mergedDeleted[key]||[]).forEach(function(id){ deletedSet[id] = 1; });
+    merged[key] = Object.keys(map)
+      .filter(function(id){ return !deletedSet[id]; })
+      .map(function(id){ return map[id]; });
+  });
+
+  return merged;
+}
+
+function refreshUIAfterSync() {
+  if(!DB.abonos)   DB.abonos   = [];
+  if(!DB.abonados) DB.abonados = [];
+  if(!DB.compras)  DB.compras  = [];
+  var camps = getAllCampanas();
+  if(camps.length) currentCampana = camps[camps.length-1];
+  refreshCampanaSelector();
+  populateAllFilters();
+  updateBadges();
+  var activeTab = document.querySelector('.tab-panel.active');
+  if(activeTab) {
+    var tabId = activeTab.id.replace('tab-','');
+    if(tabId === 'tratamientos') renderTratamientos();
+    else if(tabId === 'productos')   renderProductos();
+    else if(tabId === 'abonos')      renderAbonos();
+    else if(tabId === 'abonado')     renderAbonado();
+    else if(tabId === 'compras')     renderCompras();
+    else if(tabId === 'parcelas')    renderParcelas();
+    else if(tabId === 'recintos')    renderRecintos();
+    else if(tabId === 'clientes')    renderClientes();
+  }
+}
+
 var gDrive = {
   CLIENT_ID: '',          // Set by user in settings
   SCOPES:    'https://www.googleapis.com/auth/drive.file',
@@ -2194,6 +2269,9 @@ var gDrive = {
   checkForUpdates: function() {
     var self = this;
     if(!this.token || !this.fileId) return;
+    // If a local save is about to be uploaded (debounce timer active), let that
+    // upload go first — it will already merge in anything new from Drive.
+    if(this._saveTimer) return;
     // Only fetch metadata (modifiedTime) — very cheap, no data transfer
     fetch('https://www.googleapis.com/drive/v3/files/'+this.fileId+'?fields=modifiedTime', {
       headers: { 'Authorization': 'Bearer '+this.token }
@@ -2204,7 +2282,7 @@ var gDrive = {
         var localTime = self._lastModified;
         // Download only if Drive is newer than what we last synced
         if(!localTime || driveTime > localTime) {
-          self.downloadDB(true); // silent=true (no toast if no changes)
+          self.downloadDB(true); // silent=true (no toast if no changes) — now merge-safe
         }
       }).catch(function(){}); // ignore network errors silently
   },
@@ -2214,13 +2292,16 @@ var gDrive = {
     var self = this;
     if(this.fileId) { callback(this.fileId); return; }
     var q = encodeURIComponent("name='"+this.FILE_NAME+"' and trashed=false");
-    fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,modifiedTime)&spaces=drive', {
+    // orderBy modifiedTime desc: if a past race ever created duplicate files
+    // with the same name, always use the MOST RECENTLY MODIFIED one —
+    // never an old/empty duplicate.
+    fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)&spaces=drive', {
       headers: { 'Authorization': 'Bearer '+this.token }
     }).then(function(r){ return r.json(); })
       .then(function(d){
         if(d.error) { self._handleApiError(d.error); return; }
         if(d.files && d.files.length > 0) {
-          self.fileId = d.files[0].id;
+          self.fileId = d.files[0].id; // most recently modified, thanks to orderBy
           localStorage.setItem('agrotrack_gdrive_fileid', self.fileId);
           callback(self.fileId);
         } else {
@@ -2254,53 +2335,70 @@ var gDrive = {
       }).catch(function(e){ updateSyncStatus('error'); });
   },
 
-  // ── Upload DB to Drive ──
+  // ── Upload DB to Drive — SAFE: merges with whatever is currently on Drive
+  // before overwriting, so changes made on another device are never lost. ──
   uploadDB: function() {
     var self = this;
     updateSyncStatus('syncing');
     this.ensureFile(function(fid) {
-      fetch('https://www.googleapis.com/upload/drive/v3/files/'+fid+'?uploadType=media&fields=modifiedTime', {
-        method: 'PATCH',
-        headers: { 'Authorization': 'Bearer '+self.token, 'Content-Type': 'application/json' },
-        body: JSON.stringify(DB)
+      fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?alt=media', {
+        headers: { 'Authorization': 'Bearer '+self.token }
       }).then(function(r){ return r.json(); })
-        .then(function(d){
-          if(d.error){ self._handleApiError(d.error); return; }
-          if(d.modifiedTime) {
-            self._lastModified = d.modifiedTime;
-            localStorage.setItem('agrotrack_gdrive_lastmod', d.modifiedTime);
+        .catch(function(){ return null; }) // if remote fetch fails, fall back to local-only
+        .then(function(remoteData){
+          var toUpload = DB;
+          if(remoteData && remoteData.clientes && remoteData.recintos) {
+            // We're about to push local's intent — local wins on conflicts,
+            // but anything that only exists on Drive (added by another device
+            // since our last sync) is kept too, not discarded.
+            toUpload = mergeDB(remoteData, DB, true);
+            var changed = JSON.stringify(toUpload) !== JSON.stringify(DB);
+            DB = toUpload;
+            localStorage.setItem('agrotrack_data', JSON.stringify(DB));
+            if(changed) refreshUIAfterSync();
           }
-          updateSyncStatus('synced'); clearPendingChanges();
-        }).catch(function(e){ updateSyncStatus('error'); });
+          fetch('https://www.googleapis.com/upload/drive/v3/files/'+fid+'?uploadType=media&fields=modifiedTime', {
+            method: 'PATCH',
+            headers: { 'Authorization': 'Bearer '+self.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(DB)
+          }).then(function(r){ return r.json(); })
+            .then(function(d){
+              if(d.error){ self._handleApiError(d.error); return; }
+              if(d.modifiedTime) {
+                self._lastModified = d.modifiedTime;
+                localStorage.setItem('agrotrack_gdrive_lastmod', d.modifiedTime);
+              }
+              updateSyncStatus('synced'); clearPendingChanges();
+            }).catch(function(e){ updateSyncStatus('error'); });
+        });
     });
   },
 
-  // ── Download DB from Drive ──
+  // ── Download DB from Drive — SAFE: merges remote into local instead of
+  // blindly overwriting, so any not-yet-uploaded local changes survive. ──
   downloadDB: function(silent) {
     var self = this;
     if(!silent) updateSyncStatus('syncing');
     this.ensureFile(function(fid) {
-      // Fetch with modifiedTime to record it
       fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?alt=media', {
         headers: { 'Authorization': 'Bearer '+self.token }
       }).then(function(r){ return r.json(); })
         .then(function(data){
           if(data.error){ self._handleApiError(data.error); return; }
           if(data.clientes && data.recintos) {
-            // Check if data actually changed before re-rendering
-            var newJson = JSON.stringify(data);
+            // Merge: remote wins on conflicts (so edits from other devices
+            // propagate here), but any local-only records (not yet uploaded)
+            // are preserved, not deleted.
+            var merged = mergeDB(data, DB, false);
+            var newJson = JSON.stringify(merged);
             var oldJson = JSON.stringify(DB);
             if(newJson === oldJson) {
               updateSyncStatus('synced'); clearPendingChanges();
-              return; // no change — skip re-render
+              return; // nothing actually changed — skip re-render
             }
-            DB = data;
-            if(!DB.abonos)   DB.abonos   = [];
-            if(!DB.abonados) DB.abonados = [];
-            if(!DB.compras)  DB.compras  = [];
+            DB = merged;
             localStorage.setItem('agrotrack_data', JSON.stringify(DB));
-            // Record this as the last known version
-            // Get modifiedTime from a metadata fetch
+            // Get current modifiedTime for tracking
             fetch('https://www.googleapis.com/drive/v3/files/'+fid+'?fields=modifiedTime', {
               headers: { 'Authorization': 'Bearer '+self.token }
             }).then(function(r){return r.json();}).then(function(m){
@@ -2309,24 +2407,7 @@ var gDrive = {
                 localStorage.setItem('agrotrack_gdrive_lastmod', m.modifiedTime);
               }
             }).catch(function(){});
-            var camps = getAllCampanas();
-            if(camps.length) currentCampana = camps[camps.length-1];
-            refreshCampanaSelector();
-            populateAllFilters();
-            updateBadges();
-            // Re-render current active tab
-            var activeTab = document.querySelector('.tab-panel.active');
-            if(activeTab) {
-              var tabId = activeTab.id.replace('tab-','');
-              if(tabId === 'tratamientos') renderTratamientos();
-              else if(tabId === 'productos')   renderProductos();
-              else if(tabId === 'abonos')      renderAbonos();
-              else if(tabId === 'abonado')     renderAbonado();
-              else if(tabId === 'compras')     renderCompras();
-              else if(tabId === 'parcelas')    renderParcelas();
-              else if(tabId === 'recintos')    renderRecintos();
-              else if(tabId === 'clientes')    renderClientes();
-            }
+            refreshUIAfterSync();
             updateSyncStatus('synced'); clearPendingChanges();
             if(!silent) showSyncToast('✅ Datos actualizados desde Google Drive');
             else        showSyncToast('🔄 Sincronizado automáticamente');
@@ -3456,8 +3537,15 @@ function saveTratamiento() {
   renderTratamientos();
 }
 
+function markDeleted(key, id) {
+  if(!DB._deletedIds) DB._deletedIds = {};
+  if(!DB._deletedIds[key]) DB._deletedIds[key] = [];
+  if(DB._deletedIds[key].indexOf(id) < 0) DB._deletedIds[key].push(id);
+}
+
 function deleteTratamiento(id) {
   confirmDialog('¿Eliminar este tratamiento?', function() {
+    markDeleted('tratamientos', id);
     DB.tratamientos = DB.tratamientos.filter(function(t){ return t.id!==id; });
     save(); renderTratamientos(); updateBadges();
   });
@@ -4400,6 +4488,7 @@ function deleteProducto(id) {
     ? 'Este producto está en uso en algún tratamiento.\n¿Eliminar de todos modos?'
     : '¿Eliminar este producto del catálogo?';
   confirmDialog(msg, function() {
+    markDeleted('productos', id);
     DB.productos = DB.productos.filter(function(p){ return p.id!==id; });
     save(); renderProductos();
   });
@@ -4740,6 +4829,7 @@ function saveRecinto() {
 
 function deleteRecinto(id) {
   confirmDialog('¿Eliminar este recinto?', function() {
+    markDeleted('recintos', id);
     DB.recintos = DB.recintos.filter(function(r){ return r.id!==id; });
     save(); renderRecintos(); populateAllFilters(); updateBadges();
   });
@@ -5485,15 +5575,14 @@ function deleteCliente(id) {
   var nRec = DB.recintos.filter(function(r){ return r.clienteId===id; }).length;
   var nTrt = DB.tratamientos.filter(function(t){ return t.clienteId===id; }).length;
   confirmDialog('¿Eliminar cliente?\nSe borrarán también ' + nRec + ' recintos y ' + nTrt + ' tratamientos asociados.', function() {
+    markDeleted('clientes', id);
+    DB.recintos.forEach(function(r){ if(r.clienteId===id) markDeleted('recintos', r.id); });
+    DB.tratamientos.forEach(function(t){ if(t.clienteId===id) markDeleted('tratamientos', t.id); });
     DB.clientes     = DB.clientes.filter(function(c){ return c.id!==id; });
     DB.recintos     = DB.recintos.filter(function(r){ return r.clienteId!==id; });
     DB.tratamientos = DB.tratamientos.filter(function(t){ return t.clienteId!==id; });
     save(); populateAllFilters(); renderClientes(); updateBadges();
-  }); return;
-  DB.clientes    = DB.clientes.filter(function(c){ return c.id!==id; });
-  DB.recintos    = DB.recintos.filter(function(r){ return r.clienteId!==id; });
-  DB.tratamientos= DB.tratamientos.filter(function(t){ return t.clienteId!==id; });
-  save(); populateAllFilters(); renderClientes(); updateBadges();
+  });
 }
 
 // ============================================================
@@ -7841,11 +7930,10 @@ function saveAbono() {
 
 function deleteAbono(id) {
   confirmDialog('¿Eliminar este abono?', function() {
+    markDeleted('abonos', id);
     DB.abonos = (DB.abonos||[]).filter(function(a){ return a.id!==id; });
-    save(); renderAbonos();
-  }); return;
-  DB.abonos = (DB.abonos||[]).filter(function(a){return a.id!==id;});
-  save(); renderAbonos(); updateBadges();
+    save(); renderAbonos(); updateBadges();
+  });
 }
 
 // ============================================================
@@ -8604,6 +8692,7 @@ function saveAbonado() {
 
 function deleteAbonado(id) {
   confirmDialog('¿Eliminar este abonado?', function() {
+    markDeleted('abonados', id);
     DB.abonados = (DB.abonados||[]).filter(function(a){ return a.id!==id; });
     save(); renderAbonado(); updateBadges();
   });
@@ -9161,11 +9250,10 @@ function saveCompra() {
 
 function deleteCompra(id) {
   confirmDialog('¿Eliminar esta compra?\nEl stock se recalculará automáticamente.', function() {
+    markDeleted('compras', id);
     DB.compras = (DB.compras||[]).filter(function(c){ return c.id!==id; });
-    save(); renderCompras();
-  }); return;
-  DB.compras = (DB.compras||[]).filter(function(c){return c.id!==id;});
-  save(); renderCompras(); updateBadges();
+    save(); renderCompras(); updateBadges();
+  });
 }
 
 // ============================================================
