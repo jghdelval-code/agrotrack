@@ -1104,6 +1104,15 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Observaciones</label>
           <textarea id="prod-obs" rows="2"></textarea>
         </div>
+        <div class="form-group span-2">
+          <label>&#x1F4C4; Ficha t&eacute;cnica en PDF</label>
+          <div id="prod-ficha-wrap" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius)">
+            <div id="prod-ficha-status" style="flex:1;font-size:12px;color:var(--text3)">Sin ficha subida</div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('prod-ficha-file').click()">&#x1F4CE; Subir PDF</button>
+            <input type="file" id="prod-ficha-file" accept="application/pdf" style="display:none" onchange="uploadFichaPdf(this)">
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Se guarda en tu Google Drive (requiere estar conectado) y queda disponible en cualquier dispositivo.</div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2337,6 +2346,41 @@ var gDrive = {
         if(callback) callback(self.fileId);
         updateSyncStatus('synced'); clearPendingChanges();
       }).catch(function(e){ updateSyncStatus('error'); });
+  },
+
+  // ── Upload a binary PDF (ficha técnica) as its own separate Drive file ──
+  // Does NOT touch agrotrack_datos.json — keeps the synced DB small and fast.
+  uploadFichaPdf: function(arrayBuffer, fileName, callback) {
+    var self = this;
+    if(!self.token) { if(callback) callback(null, 'No conectado a Google Drive'); return; }
+    var meta = JSON.stringify({ name: fileName, mimeType: 'application/pdf' });
+    var bytes = new Uint8Array(arrayBuffer);
+    var binaryStr = '';
+    for(var i=0; i<bytes.length; i++) binaryStr += String.fromCharCode(bytes[i]);
+    var base64Pdf = btoa(binaryStr);
+    var boundary = '-------agrotrack_ficha_boundary';
+    var multipart = '--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+meta+
+                    '\r\n--'+boundary+'\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n'+base64Pdf+
+                    '\r\n--'+boundary+'--';
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+self.token, 'Content-Type': 'multipart/related; boundary='+boundary },
+      body: multipart
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.error){ if(callback) callback(null, d.error.message||'Error de Drive'); return; }
+        if(callback) callback(d.id, null);
+      }).catch(function(e){ if(callback) callback(null, 'Error de red'); });
+  },
+
+  // ── Delete a Drive file by id (best-effort, used when removing a ficha) ──
+  deleteFile: function(fileId) {
+    var self = this;
+    if(!self.token || !fileId) return;
+    fetch('https://www.googleapis.com/drive/v3/files/'+fileId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer '+self.token }
+    }).catch(function(){});
   },
 
   // ── Upload DB to Drive — SAFE: merges with whatever is currently on Drive
@@ -3685,7 +3729,7 @@ function addToCatalogo(id) {
     save();
     _prodPage = savedPage;
     renderProductos();
-  } catch(e) { alert('Error addToCatalogo: '+e.message); }
+  } catch(e) { alert('No se pudo guardar: '+e.message); }
 }
 
 function crearProductoDesdeDC(refId, dcNombre, empresa) {
@@ -4021,9 +4065,124 @@ function fichaBtn(p) {
     // Fallback: search by product name
     url = 'https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/productos-fitosanitarios/registro/productos/Default.aspx?nombre=' + encodeURIComponent(p.nombre||'');
   }
-  return '<a href="'+url+'" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" ' +
+  var mapaLink = '<a href="'+url+'" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" ' +
     'title="Ver ficha técnica en el registro del MAPA" ' +
-    'style="text-decoration:none">📄 Ficha MAPA</a>';
+    'style="text-decoration:none">&#x1F4C4; Ficha MAPA</a>';
+
+  // Web search for the PDF technical sheet — Claude/the app can't auto-fetch
+  // and embed arbitrary external PDFs (CORS), but a one-click pre-filled
+  // search gets the user to it immediately.
+  var searchQuery = (p.nombre||'') + (reg?' '+reg:'') + ' ficha t\u00e9cnica filetype:pdf';
+  var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(searchQuery);
+  var searchLink = '<a href="'+searchUrl+'" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" ' +
+    'title="Buscar la ficha t\u00e9cnica en PDF en internet" ' +
+    'style="text-decoration:none">&#x1F50D; Buscar PDF</a>';
+
+  // If the user has uploaded their own ficha PDF to Drive, show a direct view button
+  var ownFichaBtn = '';
+  if(p.fichaPdfFileId) {
+    ownFichaBtn = '<button type="button" class="btn btn-accent btn-sm" data-fid="'+p.fichaPdfFileId+'" '
+      + 'onclick="verFichaPdf(this.dataset.fid)" title="Ver la ficha que subiste">&#x1F4CE; Mi ficha</button>';
+  }
+
+  return mapaLink + searchLink + ownFichaBtn;
+}
+
+// ============================================================
+// FICHA TÉCNICA EN PDF — almacenada en Google Drive del usuario
+// (no se mete en el JSON principal para no inflar localStorage/sync)
+// ============================================================
+
+function renderFichaStatus(p) {
+  var statusEl = document.getElementById('prod-ficha-status');
+  var wrapEl   = document.getElementById('prod-ficha-wrap');
+  if(!statusEl) return;
+  // Remove any previous "ver/eliminar" buttons (we rebuild them each time)
+  var oldBtns = wrapEl ? wrapEl.querySelectorAll('.ficha-dyn-btn') : [];
+  oldBtns.forEach(function(b){ b.remove(); });
+
+  if(p && p.fichaPdfFileId) {
+    statusEl.innerHTML = '&#x2705; <b style="color:var(--white)">'+(p.fichaPdfName||'ficha.pdf')+'</b>';
+    var verBtn = document.createElement('button');
+    verBtn.type='button'; verBtn.className='btn btn-accent btn-sm ficha-dyn-btn';
+    verBtn.innerHTML='&#x1F441; Ver ficha';
+    verBtn.onclick = function(){ verFichaPdf(p.fichaPdfFileId); };
+    var delBtn = document.createElement('button');
+    delBtn.type='button'; delBtn.className='btn btn-danger btn-sm ficha-dyn-btn';
+    delBtn.innerHTML='&#x2715;';
+    delBtn.title='Eliminar ficha';
+    delBtn.onclick = function(){ eliminarFichaPdf(); };
+    var fileBtn = wrapEl.querySelector('button[onclick*="prod-ficha-file"]');
+    if(fileBtn) { wrapEl.insertBefore(verBtn, fileBtn); wrapEl.insertBefore(delBtn, fileBtn); }
+  } else {
+    statusEl.textContent = 'Sin ficha subida';
+  }
+}
+
+function uploadFichaPdf(inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    alert('Solo se admiten archivos PDF'); inputEl.value=''; return;
+  }
+  if(!gDrive.token) {
+    alert('Necesitas conectar Google Drive primero para guardar fichas t\u00e9cnicas.\n\nVe a Ajustes \u2192 Google Drive y conecta tu cuenta.');
+    inputEl.value=''; return;
+  }
+  var statusEl = document.getElementById('prod-ficha-status');
+  if(statusEl) statusEl.innerHTML = '&#x23F3; Subiendo a Drive...';
+
+  var nombreProd = (document.getElementById('prod-nombre')||{value:'producto'}).value.trim() || 'producto';
+  var fname = 'AgroTrack_Ficha_' + nombreProd.replace(/[^a-zA-Z0-9]/g,'_') + '_' + Date.now() + '.pdf';
+
+  var reader = new FileReader();
+  reader.onload = function() {
+    gDrive.uploadFichaPdf(reader.result, fname, function(fileId, err) {
+      if(err) {
+        if(statusEl) statusEl.textContent = 'Error al subir';
+        alert('No se pudo subir la ficha: ' + err);
+        return;
+      }
+      // Save reference on the in-progress product (works for both new and existing)
+      window._pendingFichaUpload = {fileId: fileId, name: file.name};
+      if(editingId.producto) {
+        var prod = DB.productos.find(function(x){ return x.id === editingId.producto; });
+        if(prod) {
+          prod.fichaPdfFileId = fileId;
+          prod.fichaPdfName   = file.name;
+          save();
+          renderFichaStatus(prod);
+          return;
+        }
+      }
+      // New product not yet saved: show as pending, will attach on save
+      if(statusEl) statusEl.innerHTML = '&#x2705; <b style="color:var(--white)">'+file.name+'</b> <span style="color:var(--text3)">(se vincular\u00e1 al guardar)</span>';
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function verFichaPdf(fileId) {
+  if(!fileId) return;
+  window.open('https://drive.google.com/file/d/'+fileId+'/view', '_blank');
+}
+
+function eliminarFichaPdf() {
+  if(!editingId.producto) {
+    window._pendingFichaUpload = null;
+    renderFichaStatus(null);
+    return;
+  }
+  var prod = DB.productos.find(function(x){ return x.id === editingId.producto; });
+  if(!prod || !prod.fichaPdfFileId) return;
+  confirmDialog('\u00bfEliminar la ficha t\u00e9cnica de este producto?', function() {
+    var fileId = prod.fichaPdfFileId;
+    prod.fichaPdfFileId = null;
+    prod.fichaPdfName   = null;
+    save();
+    renderFichaStatus(prod);
+    if(gDrive.token) gDrive.deleteFile(fileId); // best-effort cleanup in Drive
+  });
 }
 
 function openProductoModal(id=null) {
@@ -4043,6 +4202,7 @@ function openProductoModal(id=null) {
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
   renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
+  renderFichaStatus(p);
 
   // enCatalogo toggle
   var isMapa = p && p.id && p.id.indexOf('mapa_') === 0;
@@ -4537,6 +4697,11 @@ function saveProducto() {
   } else {
     var newProd = {id:uid()};
     Object.keys(data).forEach(function(k){ newProd[k]=data[k]; });
+    if(window._pendingFichaUpload) {
+      newProd.fichaPdfFileId = window._pendingFichaUpload.fileId;
+      newProd.fichaPdfName   = window._pendingFichaUpload.name;
+      window._pendingFichaUpload = null;
+    }
     DB.productos.push(newProd);
     if(typeof window._productoSaveHook === 'function') { window._productoSaveHook(newProd.id); window._productoSaveHook = null; }
   }
@@ -4545,7 +4710,7 @@ function saveProducto() {
   _prodPage = savedPage;
   closeModal('modal-producto');
   renderProductos();
-  } catch(e) { alert('Error saveProducto: '+e.message+' | '+e.stack); }
+  } catch(e) { alert('Error al guardar el producto: '+e.message); }
 }
 
 // ── Custom confirm dialog (replaces window.confirm which iOS blocks when iframe is active) ──
@@ -7453,7 +7618,7 @@ function importarProductosMapa(input) {
         var CULTIVOS_DETALLE = {
           'PATATA':1,'REMOLACHA AZUCARERA':1,'VID':1,'ALMENDRO':1,'REMOLACHA DE MESA':1,
           'ALFALFA':1,'GUISANTE VERDE':1,'LEGUMINOSAS GRANO':1,'GUISANTE GRANO':1,'GARBANZO':1,
-          'TRIGO':1,'CEBADA':1,'AVENA':1,'CENTENO':1,'TRITICALE':1,
+          'TRIGO':1,'CEBADA':1,'AVENA':1,'CENTENO':1,'TRITICALE':1,'COLZA':1,'GIRASOL':1,
           'CEREALES DE INVIERNO':1,'CEREALES DE VERANO':1,'CEREALES DE INVIERNO/VERANO':1,
           'TRIGO BLANDO':1,'TRIGO DURO':1,'CEBADA DE INVIERNO':1,'CEBADA DE PRIMAVERA':1
         };
