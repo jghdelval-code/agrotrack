@@ -1104,6 +1104,16 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Observaciones</label>
           <textarea id="prod-obs" rows="2"></textarea>
         </div>
+        <div class="form-group span-2" id="prod-cancelado-wrap" style="display:none">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(192,57,43,.08);border:1px solid var(--danger);border-radius:var(--radius)">
+            <span style="font-size:18px">&#x26D4;</span>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:13px;color:#e74c3c">Marcado como cancelado en MAPA</div>
+              <div style="font-size:11px;color:var(--text3)">Esto ocurre cuando el MAPA no encuentra este producto en su última actualización. Si es un error (p. ej. un fertilizante foliar u otro producto sin registro MAPA), puedes quitarlo aquí.</div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="quitarCancelado()" style="white-space:nowrap">&#x2705; Quitar cancelado</button>
+          </div>
+        </div>
         <div class="form-group span-2">
           <label>&#x1F4C4; Ficha t&eacute;cnica en PDF</label>
           <div id="prod-ficha-wrap" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius)">
@@ -4119,6 +4129,17 @@ function renderFichaStatus(p) {
   }
 }
 
+function quitarCancelado() {
+  if(!editingId.producto) return;
+  var prod = DB.productos.find(function(x){ return x.id === editingId.producto; });
+  if(!prod) return;
+  prod._cancelado = false;
+  prod._vigente    = true;
+  save();
+  var cancWrap = document.getElementById('prod-cancelado-wrap');
+  if(cancWrap) cancWrap.style.display = 'none';
+}
+
 function uploadFichaPdf(inputEl) {
   var file = inputEl.files && inputEl.files[0];
   if(!file) return;
@@ -4203,6 +4224,9 @@ function openProductoModal(id=null) {
   document.getElementById('prod-cultivo-input').value = '';
   renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
   renderFichaStatus(p);
+
+  var cancWrap = document.getElementById('prod-cancelado-wrap');
+  if(cancWrap) cancWrap.style.display = (p && p._cancelado) ? '' : 'none';
 
   // enCatalogo toggle
   var isMapa = p && p.id && p.id.indexOf('mapa_') === 0;
@@ -7832,7 +7856,14 @@ function importarProductosMapa(input) {
       });
 
       // 2. Check existing DB products against MAPA
+      // Solo se comprueban productos fitosanitarios CON número de registro:
+      // los fertilizantes foliares, "Otro" y cualquier producto sin nº de
+      // registro no están sujetos al ROPF del MAPA y nunca deben marcarse
+      // como cancelados por no aparecer en este fichero.
+      var TIPOS_NO_MAPA = {'Fertilizante foliar':1, 'Otro':1};
       DB.productos.forEach(function(p) {
+        if(TIPOS_NO_MAPA[p.tipo]) return;           // no es un producto del registro MAPA
+        if(!String(p.numRegistro||'').trim()) return; // sin nº de registro, no se puede comprobar
         var numReg = (p.numRegistro||'').toUpperCase();
         var nomb   = (p.nombre||'').toUpperCase();
         var inMapa = (numReg && mapaIndex[numReg]) || mapaByNombre[nomb];
