@@ -1968,7 +1968,9 @@ function save() {
   updateBadges();
   if(gDrive.token) {
     clearTimeout(gDrive._saveTimer);
-    gDrive._saveTimer = setTimeout(function(){ gDrive.uploadDB(); }, 2000);
+    // Short debounce: just enough to batch rapid consecutive edits (e.g. typing),
+    // without leaving a big window where a closed tab/locked phone loses changes.
+    gDrive._saveTimer = setTimeout(function(){ gDrive.uploadDB(); }, 600);
     updateSyncStatus('pending');
     markPendingChange();
   }
@@ -2525,6 +2527,32 @@ function updatePendingBadge() {
   badge.style.display = _pendingChanges > 0 ? '' : 'none';
   badge.textContent   = _pendingChanges + ' sin guardar';
 }
+
+// ── Flush pending upload immediately ──────────────────────────────────────────
+// Called when the tab is about to go to background or close. The normal save()
+// flow waits ~600ms (debounced) before uploading — if the user switches app or
+// locks the phone in that window, the change never reaches Drive. This forces
+// the upload to start right away instead of waiting out the debounce.
+function flushPendingUpload() {
+  if(!gDrive.token) return;
+  if(gDrive._saveTimer) {
+    clearTimeout(gDrive._saveTimer);
+    gDrive._saveTimer = null;
+    gDrive.uploadDB();
+  } else if(_pendingChanges > 0) {
+    // Timer already fired or was never set, but something is still marked
+    // pending (e.g. a previous upload failed) — try again now.
+    gDrive.uploadDB();
+  }
+}
+
+// Fires reliably on iOS/Android when switching apps, locking the screen, or
+// closing the tab — well before the OS may suspend/kill the page.
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState === 'hidden') flushPendingUpload();
+});
+// Backup for actual navigation/close events.
+window.addEventListener('pagehide', flushPendingUpload);
 
 // ── Reconnect banner ──────────────────────────────────────────────────────────
 var _reconnectBannerShown = false;
