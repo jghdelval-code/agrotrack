@@ -3225,8 +3225,9 @@ function getTrtTipoFilter() {
 function refreshProductRows() {
   // Re-render all existing product rows so groups update when recintos change
   var existing = Array.prototype.slice.call(document.querySelectorAll('#trt-products-rows .product-row')).map(function(row) {
+    var comboInp = row.querySelector('.prod-combo-input');
     return {
-      productoId:   row.querySelector('.prod-row-sel')?.value,
+      productoId:   comboInp ? comboInp.dataset.prodId : '',
       dosis:        parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0,
       unidad:       (row.querySelector('.prod-row-unidad')||{}).value,
       justificacion:(row.querySelector('.prod-row-just')||{}).value||'',
@@ -3294,7 +3295,8 @@ function addProductRow(data) {
   var fields=document.createElement('div'); fields.className='prod-row-fields';
   var unidades=['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'];
   fields.innerHTML='<div class="prod-row-field"><label class="prod-row-label">Dosis</label><input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis!=null?data.dosis:'')+'" oninput="calcProdRowPVP(this)"></div>'
-    +'<div class="prod-row-field"><label class="prod-row-label">Unidad</label><select class="prod-row-unidad">'+unidades.map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></div>'
+    +'<div class="prod-row-field"><label class="prod-row-label">Unidad</label><select class="prod-row-unidad" onchange="calcProdRowPVP(this)">'+unidades.map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></div>'
+    +'<div class="prod-row-field"><label class="prod-row-label">&#x1F4E6; Necesitas</label><span class="prod-row-cantidad" style="font-weight:800;color:#7acc4a;font-size:14px">&mdash;</span></div>'
     +'<div class="prod-row-field"><label class="prod-row-label">Margen %</label><input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>'
     +'<div class="prod-row-field"><label class="prod-row-label">PVP/ha</label><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
   var justInp=document.createElement('input'); justInp.type='text';
@@ -3305,6 +3307,10 @@ function addProductRow(data) {
   row._prodList=allProds;
   row.appendChild(inner);
   document.getElementById('trt-products-rows').appendChild(row);
+  // Calculate initial "Necesitas" / PVP display immediately (e.g. when editing
+  // an existing treatment, or after recintos change and rows are rebuilt)
+  var dosisInp = row.querySelector('.prod-row-dosis');
+  if(dosisInp) calcProdRowPVP(dosisInp);
 }
 function prodComboFilter(inp) {
   var row=inp.closest('.product-row'); if(!row) return;
@@ -3336,13 +3342,16 @@ function prodComboSelect(item) {
   var inp=drop.parentNode?drop.parentNode.querySelector('.prod-combo-input'):null; if(!inp) return;
   inp.value=item.dataset.label; inp.dataset.prodId=item.dataset.id;
   drop.style.display='none';
+  calcProdRowPVP(inp); // refresh "Necesitas" + PVP now that a product is selected
 
   // If product is not in catalog, ask to add it
   if(item.dataset.nocatalog) {
-    var prod = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
-    if(prod && confirm('"\u200b' + prod.nombre + '" no est\u00e1 en tu cat\u00e1logo.\n\n\u00bFQuieres a\u00f1adirlo a Mi Cat\u00e1logo para que aparezca directamente en tratamientos?')) {
-      prod.enCatalogo = true;
-      save();
+    var prodNC = (DB.productos||[]).find(function(p){return p.id===item.dataset.id;});
+    if(prodNC) {
+      confirmDialog('"' + prodNC.nombre + '" no est\u00e1 en tu cat\u00e1logo.\n\u00bFA\u00f1adirlo a Mi Cat\u00e1logo para que aparezca directamente en tratamientos?', function() {
+        prodNC.enCatalogo = true;
+        save();
+      });
     }
   }
 
@@ -3470,14 +3479,49 @@ function prodComboBlur(inp) {
     if(drop) drop.style.display='none';
   },200);
 }
+function getTrtTotalHa() {
+  var total = 0;
+  document.querySelectorAll('#recintos-picker input[type=checkbox][value]:checked').forEach(function(cb){
+    var r = DB.recintos.find(function(rc){ return rc.id === cb.value; });
+    if(r) total += parseFloat(r.supCultivada) || parseFloat(r.supSigpac) || 0;
+  });
+  return total;
+}
+
 function calcProdRowPVP(input) {
   var row=input.closest('.product-row'); if(!row) return;
   var comboInp=row.querySelector('.prod-combo-input');
   var dosis=parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
+  var unidadSel=row.querySelector('.prod-row-unidad');
+  var unidad=unidadSel?unidadSel.value:'';
   var margen=parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
-  var pvpSpan=row.querySelector('.prod-row-pvp'); if(!pvpSpan) return;
+  var pvpSpan=row.querySelector('.prod-row-pvp');
+  var cantSpan=row.querySelector('.prod-row-cantidad');
   var prodId=comboInp?comboInp.dataset.prodId:'';
   var prod=prodId?(DB.productos||[]).find(function(p){return p.id===prodId;}):null;
+
+  // ── Cantidad total necesaria (se actualiza siempre, con o sin producto seleccionado) ──
+  if(cantSpan) {
+    var totalHa = getTrtTotalHa();
+    if(!dosis || !totalHa) {
+      cantSpan.textContent='\u2014'; cantSpan.style.color='var(--text3)';
+    } else if(unidad.indexOf('/1000L') >= 0) {
+      // Dosis por 1000L de caldo: usamos un volumen de caldo estándar de 200 L/ha como estimación
+      var caldoTotal = totalHa * 200; // L
+      var totalProd  = dosis * (caldoTotal/1000);
+      var unidBase   = unidad.replace('/1000L','');
+      cantSpan.innerHTML = totalProd.toFixed(2)+' '+unidBase+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">aprox. (200 L caldo/ha)</span>';
+      cantSpan.style.color='#7acc4a';
+    } else {
+      var totalProd2 = dosis * totalHa;
+      var unidBase2  = unidad.replace('/ha','');
+      cantSpan.innerHTML = totalProd2.toFixed(2)+' '+unidBase2+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">para '+totalHa.toFixed(2)+' ha</span>';
+      cantSpan.style.color='#7acc4a';
+    }
+  }
+
+  // ── PVP (necesita producto seleccionado con precio) ──
+  if(!pvpSpan) return;
   if(!prod||!dosis){pvpSpan.textContent='\u2014';pvpSpan.style.color='var(--text3)';return;}
   // Use treatment date to find correct price
   var trtFecha=(document.getElementById('trt-fecha')||{}).value||'';
