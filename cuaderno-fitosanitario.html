@@ -159,11 +159,15 @@ textarea { resize: vertical; min-height: 72px; }
 .prod-combo-item:hover, .prod-combo-item.sel { background:rgba(74,140,42,.15); }
 .prod-row-inner { display:flex;flex-direction:column;gap:6px;padding:10px 12px; }
 .prod-row-top { display:flex;gap:8px;align-items:center; }
-.prod-row-fields { display:grid;grid-template-columns:1fr 90px 70px 80px;gap:6px;align-items:end; }
+.prod-row-fields { display:grid;grid-template-columns:1fr 90px 70px;gap:6px;align-items:end; }
 .prod-row-field { display:flex;flex-direction:column;gap:3px; }
 .prod-row-label { font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px; }
+.prod-row-info { display:flex;flex-wrap:wrap;gap:6px;margin-top:6px; }
+.prod-row-badge { flex:1;min-width:90px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;display:flex;flex-direction:column;gap:1px; }
+.prod-row-badge-label { font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px; }
+@media(max-width:500px){.prod-row-fields{grid-template-columns:1fr 1fr 1fr;}.prod-row-badge{min-width:80px}}
 .prod-row-pvp { font-size:12px;color:#7acc4a;font-weight:700; }
-@media(max-width:500px){.prod-row-fields{grid-template-columns:1fr 1fr;}}
+.prod-row-cantidad, .prod-row-stock { font-size:13px;font-weight:800;color:var(--text3); }
 .recinto-check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
 .recinto-check:last-child { border-bottom: none; }
 .recinto-check:hover { background: var(--primary-light); }
@@ -918,11 +922,11 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group">
           <label>Campaña</label>
-          <input type="text" id="trt-campana" placeholder="ej: 26">
+          <input type="text" id="trt-campana" placeholder="ej: 26" oninput="refreshProductRows()">
         </div>
         <div class="form-group span-2">
           <label>Cliente *</label>
-          <select id="trt-cliente" onchange="loadRecintosPicker()">
+          <select id="trt-cliente" onchange="loadRecintosPicker();refreshProductRows()">
             <option value="">— Selecciona cliente —</option>
           </select>
         </div>
@@ -3296,14 +3300,16 @@ function addProductRow(data) {
   var unidades=['L/ha','kg/ha','g/ha','mL/ha','cc/ha','L/1000L','g/1000L'];
   fields.innerHTML='<div class="prod-row-field"><label class="prod-row-label">Dosis</label><input type="number" step="0.01" min="0" placeholder="0.0" class="prod-row-dosis" value="'+(data&&data.dosis!=null?data.dosis:'')+'" oninput="calcProdRowPVP(this)"></div>'
     +'<div class="prod-row-field"><label class="prod-row-label">Unidad</label><select class="prod-row-unidad" onchange="calcProdRowPVP(this)">'+unidades.map(function(u){return '<option'+(data&&data.unidad===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></div>'
-    +'<div class="prod-row-field"><label class="prod-row-label">&#x1F4E6; Necesitas</label><span class="prod-row-cantidad" style="font-weight:800;color:#7acc4a;font-size:14px">&mdash;</span></div>'
-    +'<div class="prod-row-field"><label class="prod-row-label">Margen %</label><input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>'
-    +'<div class="prod-row-field"><label class="prod-row-label">PVP/ha</label><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
+    +'<div class="prod-row-field"><label class="prod-row-label">Margen %</label><input type="number" step="0.1" min="0" max="500" placeholder="%" class="prod-row-margen" value="'+(data&&data.margen!=null?data.margen:'')+'" oninput="calcProdRowPVP(this)"></div>';
+  var infoRow=document.createElement('div'); infoRow.className='prod-row-info';
+  infoRow.innerHTML='<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4E6; Necesitas</span><span class="prod-row-cantidad">&mdash;</span></div>'
+    +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4CA; Stock</span><span class="prod-row-stock">&mdash;</span></div>'
+    +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4B6; PVP/ha</span><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
   var justInp=document.createElement('input'); justInp.type='text';
   justInp.placeholder='Justificación / plaga objetivo'; justInp.className='prod-row-just';
   justInp.style.cssText='width:100%;margin-top:5px';
   if(data&&data.justificacion) justInp.value=data.justificacion;
-  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(justInp);
+  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(infoRow); inner.appendChild(justInp);
   row._prodList=allProds;
   row.appendChild(inner);
   document.getElementById('trt-products-rows').appendChild(row);
@@ -3497,26 +3503,67 @@ function calcProdRowPVP(input) {
   var margen=parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
   var pvpSpan=row.querySelector('.prod-row-pvp');
   var cantSpan=row.querySelector('.prod-row-cantidad');
+  var stockSpan=row.querySelector('.prod-row-stock');
   var prodId=comboInp?comboInp.dataset.prodId:'';
   var prod=prodId?(DB.productos||[]).find(function(p){return p.id===prodId;}):null;
 
   // ── Cantidad total necesaria (se actualiza siempre, con o sin producto seleccionado) ──
+  var totalHa = getTrtTotalHa();
+  var cantidadNecesaria = 0;   // en la unidad base (L, kg, g...) sin /ha
+  var unidadBase = unidad.replace('/ha','').replace('/1000L','');
   if(cantSpan) {
-    var totalHa = getTrtTotalHa();
     if(!dosis || !totalHa) {
       cantSpan.textContent='\u2014'; cantSpan.style.color='var(--text3)';
     } else if(unidad.indexOf('/1000L') >= 0) {
       // Dosis por 1000L de caldo: usamos un volumen de caldo estándar de 200 L/ha como estimación
       var caldoTotal = totalHa * 200; // L
-      var totalProd  = dosis * (caldoTotal/1000);
-      var unidBase   = unidad.replace('/1000L','');
-      cantSpan.innerHTML = totalProd.toFixed(2)+' '+unidBase+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">aprox. (200 L caldo/ha)</span>';
+      cantidadNecesaria = dosis * (caldoTotal/1000);
+      cantSpan.innerHTML = cantidadNecesaria.toFixed(2)+' '+unidadBase+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">aprox. (200 L caldo/ha)</span>';
       cantSpan.style.color='#7acc4a';
     } else {
-      var totalProd2 = dosis * totalHa;
-      var unidBase2  = unidad.replace('/ha','');
-      cantSpan.innerHTML = totalProd2.toFixed(2)+' '+unidBase2+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">para '+totalHa.toFixed(2)+' ha</span>';
+      cantidadNecesaria = dosis * totalHa;
+      cantSpan.innerHTML = cantidadNecesaria.toFixed(2)+' '+unidadBase+'<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">para '+totalHa.toFixed(2)+' ha</span>';
       cantSpan.style.color='#7acc4a';
+    }
+  }
+
+  // ── Stock disponible de este producto (a partir de compras registradas) ──
+  if(stockSpan) {
+    if(!prod) {
+      stockSpan.textContent='\u2014'; stockSpan.style.color='var(--text3)';
+    } else {
+      var clienteId = (document.getElementById('trt-cliente')||{}).value||'';
+      var campanaV  = (document.getElementById('trt-campana')||{}).value||currentCampana||'';
+      var stockData = calcStock(clienteId||null, campanaV||null, editingId.tratamiento||null);
+      var pStock    = stockData.productos[prod.id];
+      if(!pStock) {
+        stockSpan.innerHTML = 'Sin compras<span style="font-size:9px;color:var(--text3);display:block;font-weight:400">no hay stock registrado</span>';
+        stockSpan.style.color = 'var(--text3)';
+      } else {
+        // Convert cantidadNecesaria (in unidadBase, e.g. L/kg/g/mL/cc) to the stock's base unit (L or kg)
+        var necesarioBase = cantidadNecesaria;
+        var ub = unidadBase.toLowerCase();
+        if(ub==='ml'||ub==='cc') necesarioBase = cantidadNecesaria/1000; // → L
+        else if(ub==='g')        necesarioBase = cantidadNecesaria/1000; // → kg
+        else if(ub==='t')         necesarioBase = cantidadNecesaria*1000; // → kg
+
+        var restante = pStock.stock - necesarioBase;
+        var stockTxt = formatStockQty(pStock.stock, pStock.unidad);
+        var color, nota;
+        if(restante < 0) {
+          color = '#e74c3c';
+          nota  = 'Faltan '+formatStockQty(Math.abs(restante), pStock.unidad)+' &#x26A0;';
+        } else if(pStock.stock === 0) {
+          color = 'var(--text3)';
+          nota  = 'Agotado';
+        } else {
+          var st = stockStatusClass(restante, 'producto');
+          color = st.color;
+          nota  = 'Quedar\u00e1n '+formatStockQty(restante, pStock.unidad)+' tras aplicar';
+        }
+        stockSpan.innerHTML = stockTxt+'<span style="font-size:9px;color:'+color+';display:block;font-weight:600">'+nota+'</span>';
+        stockSpan.style.color = color;
+      }
     }
   }
 
@@ -3544,13 +3591,13 @@ function saveTratamiento() {
 
   var productos = [];
   document.querySelectorAll('#trt-products-rows .product-row').forEach(function(row) {
-    var comboInp=row.querySelector('.prod-combo-input'); var pid=comboInp?comboInp.dataset.prodId:(row.querySelector('.prod-row-sel')||{value:''}).value;
+    var comboInp=row.querySelector('.prod-combo-input'); var pid=comboInp?comboInp.dataset.prodId:'';
     var dosis = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
     var unidad = (row.querySelector('.prod-row-unidad')||{}).value;
     var just   = (row.querySelector('.prod-row-just')||{}).value||'';
     var margen = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
-    var pvpText= row.querySelector('.prod-row-pvp')?.textContent||'';
-    var pvpHa  = parseFloat(pvpText)||0;
+    var pvpEl  = row.querySelector('.prod-row-pvp');
+    var pvpHa  = pvpEl ? (parseFloat(pvpEl.textContent)||0) : 0;
     if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
@@ -8741,7 +8788,7 @@ function deleteAbonado(id) {
     save(); renderAbonado(); updateBadges();
   });
 }
-function calcStock(clienteId, campana) {
+function calcStock(clienteId, campana, excludeTratamientoId) {
   var stockProductos = {};  // keyed by productoId
   var stockAbonos    = {};  // keyed by abonoId
 
@@ -8780,6 +8827,7 @@ function calcStock(clienteId, campana) {
   (DB.tratamientos||[]).forEach(function(t) {
     if(clienteId && t.clienteId !== clienteId) return;
     if(campana    && t.campana   !== campana)   return;
+    if(excludeTratamientoId && t.id === excludeTratamientoId) return; // being edited right now — don't double-count
     var recs = (t.recintoIds||[]).map(function(id){return DB.recintos.find(function(r){return r.id===id;});}).filter(Boolean);
     var haTotal = recs.reduce(function(s,r){return s+(parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0);},0);
     (t.productos||[]).forEach(function(row) {
