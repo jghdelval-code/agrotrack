@@ -4098,19 +4098,7 @@ function tipoEmoji(tipo) {
 }
 
 function fichaBtn(p) {
-  // Build MAPA registry URL from numRegistro (e.g. "ES-00123" or just "00123")
   var reg = (p.numRegistro||'').trim().replace(/^ES-?/i,'').replace(/\D/g,'');
-  var url = '';
-  if(reg) {
-    // Direct product page on MAPA registry
-    url = 'https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/productos-fitosanitarios/registro/productos/Default.aspx?numregistro=' + encodeURIComponent(reg);
-  } else {
-    // Fallback: search by product name
-    url = 'https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/productos-fitosanitarios/registro/productos/Default.aspx?nombre=' + encodeURIComponent(p.nombre||'');
-  }
-  var mapaLink = '<a href="'+url+'" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" ' +
-    'title="Ver ficha técnica en el registro del MAPA" ' +
-    'style="text-decoration:none">&#x1F4C4; Ficha MAPA</a>';
 
   // Web search for the PDF technical sheet — Claude/the app can't auto-fetch
   // and embed arbitrary external PDFs (CORS), but a one-click pre-filled
@@ -4128,7 +4116,7 @@ function fichaBtn(p) {
       + 'onclick="verFichaPdf(this.dataset.fid)" title="Ver la ficha que subiste">&#x1F4CE; Mi ficha</button>';
   }
 
-  return mapaLink + searchLink + ownFichaBtn;
+  return searchLink + ownFichaBtn;
 }
 
 // ============================================================
