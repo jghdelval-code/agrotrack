@@ -502,6 +502,54 @@ textarea { resize: vertical; min-height: 72px; }
   text-align: center;
 }
 
+/* ── SERVICIOS menu (mobile hub for Tratamientos/Productos/Abonos/Abonado/Compras) ── */
+.servicios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  padding: 4px 0 20px;
+}
+.servicio-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 26px 14px;
+  cursor: pointer;
+  transition: transform .12s, border-color .12s, background .12s;
+  text-align: center;
+  position: relative;
+}
+.servicio-btn:hover, .servicio-btn:active { border-color: var(--primary); background: rgba(74,140,42,.06); transform: scale(.98); }
+.servicio-btn .servicio-icon { font-size: 38px; line-height: 1; }
+.servicio-btn .servicio-label { font-size: 15px; font-weight: 800; color: var(--white); }
+.servicio-btn .servicio-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 700;
+  min-width: 20px; height: 20px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; padding: 0 5px;
+}
+@media (max-width: 600px) {
+  .servicios-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .servicio-btn { padding: 28px 10px; }
+  .servicio-btn .servicio-icon { font-size: 42px; }
+}
+
+/* Mobile-only "← Servicios" back link inside each service sub-tab */
+.mobile-servicios-back { display: none; }
+@media (max-width: 600px) {
+  .mobile-servicios-back {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--primary); font-weight: 800; font-size: 13px;
+    cursor: pointer; padding: 4px 0 10px;
+  }
+}
+
 /* Larger tap targets on mobile */
 @media (max-width: 600px) {
   .btn { min-height: 38px; }
@@ -556,14 +604,9 @@ textarea { resize: vertical; min-height: 72px; }
 
 <!-- MOBILE BOTTOM NAV (visible on screens ≤600px) -->
 <nav id="mobile-nav">
-  <button class="mnav-btn" onclick="switchTab('tratamientos')" id="mnav-tratamientos">
-    <span class="mnav-icon">💊</span><span>Tratam.</span>
-  </button>
-  <button class="mnav-btn" onclick="switchTab('abonado')" id="mnav-abonado">
-    <span class="mnav-icon">🌱</span><span>Abonado</span>
-  </button>
-  <button class="mnav-btn" onclick="switchTab('compras')" id="mnav-compras">
-    <span class="mnav-icon">🛒</span><span>Compras</span>
+  <button class="mnav-btn" onclick="switchTab('servicios')" id="mnav-servicios" style="position:relative">
+    <span class="mnav-icon">&#x1F527;</span><span>Servicios</span>
+    <span class="mnav-badge" id="mnav-badge-servicios" style="display:none">0</span>
   </button>
   <button class="mnav-btn" onclick="switchTab('parcelas')" id="mnav-parcelas">
     <span class="mnav-icon">🗂️</span><span>Parcelas</span>
@@ -576,12 +619,6 @@ textarea { resize: vertical; min-height: 72px; }
   </button>
   <button class="mnav-btn active" onclick="switchTab('clientes')" id="mnav-clientes">
     <span class="mnav-icon">👥</span><span>Clientes</span>
-  </button>
-  <button class="mnav-btn" onclick="switchTab('productos')" id="mnav-productos">
-    <span class="mnav-icon">🌿</span><span>Produc.</span>
-  </button>
-  <button class="mnav-btn" onclick="switchTab('abonos')" id="mnav-abonos">
-    <span class="mnav-icon">🧪</span><span>Abonos</span>
   </button>
 </nav>
 
@@ -618,9 +655,46 @@ textarea { resize: vertical; min-height: 72px; }
 </nav>
 
 <main>
+  <!-- SERVICIOS — mobile hub with big buttons for the 5 grouped tabs -->
+  <div class="tab-panel" id="tab-servicios">
+    <div class="content">
+      <div class="section-header">
+        <h2>&#x1F527; Servicios</h2>
+      </div>
+      <div class="servicios-grid">
+        <div class="servicio-btn" onclick="switchTab('tratamientos')">
+          <span class="servicio-badge" id="svc-badge-trt">0</span>
+          <span class="servicio-icon">&#x1F48A;</span>
+          <span class="servicio-label">Tratamientos</span>
+        </div>
+        <div class="servicio-btn" onclick="switchTab('productos')">
+          <span class="servicio-badge" id="svc-badge-prod">0</span>
+          <span class="servicio-icon">&#x1F33F;</span>
+          <span class="servicio-label">Productos</span>
+        </div>
+        <div class="servicio-btn" onclick="switchTab('abonos')">
+          <span class="servicio-badge" id="svc-badge-abo">0</span>
+          <span class="servicio-icon">&#x1F9EA;</span>
+          <span class="servicio-label">Abonos</span>
+        </div>
+        <div class="servicio-btn" onclick="switchTab('abonado')">
+          <span class="servicio-badge" id="svc-badge-abonado">0</span>
+          <span class="servicio-icon">&#x1F331;</span>
+          <span class="servicio-label">Abonado</span>
+        </div>
+        <div class="servicio-btn" onclick="switchTab('compras')">
+          <span class="servicio-badge" id="svc-badge-compras">0</span>
+          <span class="servicio-icon">&#x1F6D2;</span>
+          <span class="servicio-label">Compras</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TRATAMIENTOS -->
   <div class="tab-panel" id="tab-tratamientos">
     <div class="content">
+      <div class="mobile-servicios-back" onclick="switchTab('servicios')">&#x2190; Servicios</div>
       <div class="section-header">
         <h2>Tratamientos fitosanitarios</h2>
         <div class="actions">
@@ -640,6 +714,7 @@ textarea { resize: vertical; min-height: 72px; }
   <!-- PRODUCTOS -->
   <div class="tab-panel" id="tab-productos">
     <div class="content">
+      <div class="mobile-servicios-back" onclick="switchTab('servicios')">&#x2190; Servicios</div>
       <div class="section-header">
         <h2>Catálogo de productos</h2>
         <div class="actions">
@@ -801,6 +876,7 @@ textarea { resize: vertical; min-height: 72px; }
   <!-- COMPRAS -->
   <div class="tab-panel" id="tab-compras">
     <div class="content">
+      <div class="mobile-servicios-back" onclick="switchTab('servicios')">&#x2190; Servicios</div>
       <div class="section-header">
         <h2>Compras de materias</h2>
         <div class="actions">
@@ -842,6 +918,7 @@ textarea { resize: vertical; min-height: 72px; }
   <!-- ABONOS -->
   <div class="tab-panel" id="tab-abonos">
     <div class="content">
+      <div class="mobile-servicios-back" onclick="switchTab('servicios')">&#x2190; Servicios</div>
       <div class="section-header">
         <h2>Catálogo de abonos</h2>
         <div class="actions">
@@ -868,6 +945,7 @@ textarea { resize: vertical; min-height: 72px; }
   <!-- ABONADO -->
   <div class="tab-panel" id="tab-abonado">
     <div class="content">
+      <div class="mobile-servicios-back" onclick="switchTab('servicios')">&#x2190; Servicios</div>
       <div class="section-header">
         <h2>Plan de abonado</h2>
         <div class="actions">
@@ -2646,6 +2724,13 @@ function updateBadges() {
   if(comprasBadge) comprasBadge.textContent = (DB.compras||[]).length;
   var parcelaKeys = new Set(DB.recintos.map(function(r){ return (r.nombreFinca||'').trim() || ('__solo__'+r.id); }));
   document.getElementById('badge-par').textContent = parcelaKeys.size;
+
+  // Servicios menu — mirror the same counts on the big mobile buttons
+  var svcTrt = document.getElementById('svc-badge-trt');           if(svcTrt) svcTrt.textContent = DB.tratamientos.length;
+  var svcProd = document.getElementById('svc-badge-prod');         if(svcProd) svcProd.textContent = DB.productos.length;
+  var svcAbo = document.getElementById('svc-badge-abo');           if(svcAbo) svcAbo.textContent = (DB.abonos||[]).length;
+  var svcAbonado = document.getElementById('svc-badge-abonado');   if(svcAbonado) svcAbonado.textContent = (DB.abonados||[]).length;
+  var svcCompras = document.getElementById('svc-badge-compras');   if(svcCompras) svcCompras.textContent = (DB.compras||[]).length;
 }
 
 // ============================================================
@@ -2660,13 +2745,16 @@ function switchTab(name) {
     p.classList.remove('active');
     if(p.id === 'tab-'+name) p.classList.add('active');
   });
-  // Sync mobile bottom nav
+  // Sync mobile bottom nav — Tratamientos/Productos/Abonos/Abonado/Compras and the
+  // Servicios menu itself all share the single "Servicios" button on mobile.
+  var serviciosGroup = ['servicios','tratamientos','productos','abonos','abonado','compras'];
+  var mnavTarget = serviciosGroup.indexOf(name) >= 0 ? 'servicios' : name;
   document.querySelectorAll('.mnav-btn').forEach(function(b) {
     b.classList.remove('active');
-    if(b.id === 'mnav-'+name) b.classList.add('active');
+    if(b.id === 'mnav-'+mnavTarget) b.classList.add('active');
   });
   // Scroll mobile nav to show active button
-  var activeBtn = document.getElementById('mnav-'+name);
+  var activeBtn = document.getElementById('mnav-'+mnavTarget);
   if(activeBtn) activeBtn.scrollIntoView({inline:'center', behavior:'smooth'});
 
   if(name === 'mapa') { setTimeout(function(){ map && map.invalidateSize(); renderMap(); }, 100); }
@@ -5229,7 +5317,7 @@ function renderClientes() {
       return { recs, totSIG, totCul, haSecano, haRegadio, cultivoMap, cultivoSecano, cultivoRegadio, nSinCultivo, nTrt };
     }
 
-    function buildCultivoRows(stats) {
+    function buildCultivoRows(stats, contextId) {
       var cultivoList = Object.keys(stats.cultivoMap).sort(function(a,b){return stats.cultivoMap[b]-stats.cultivoMap[a];});
       var html = '';
       cultivoList.forEach(function(cv){
@@ -5240,7 +5328,10 @@ function renderClientes() {
         var reg2  = stats.cultivoRegadio[cv] || 0;
         var pctSec2 = ha > 0 ? (sec2/ha*100) : 0;
         var pctReg2 = ha > 0 ? (reg2/ha*100) : 0;
-        html += '<div class="cultivo-row">' +
+        var rowId = 'cvrow-'+c.id+'-'+sanitizeDomId(contextId)+'-'+sanitizeDomId(cv);
+        html += '<div>';
+        html += '<div class="cultivo-row" style="cursor:pointer" onclick="toggleClienteBody(\''+rowId+'\')">' +
+          '<span id="ico-'+rowId+'" style="font-size:9px;color:var(--text3);width:9px;flex-shrink:0">&#x25B8;</span>' +
           '<span class="crop-dot" style="background:'+color+';width:10px;height:10px;flex-shrink:0"></span>' +
           '<span class="cultivo-row-name">'+cv+'</span>' +
           '<div class="cultivo-row-bar"><div class="cultivo-row-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+color+'"></div></div>' +
@@ -5250,16 +5341,23 @@ function renderClientes() {
           (sec2>0.005?'<span class="reg-pill reg-pill-sec">🌾 '+pctSec2.toFixed(0)+'% sec</span>':'') +
           (reg2>0.005?'<span class="reg-pill reg-pill-reg">💧 '+pctReg2.toFixed(0)+'% reg</span>':'') +
           '</div></div>';
+        html += '<div id="'+rowId+'" style="display:none">'+buildParcelaListForCrop(stats.recs, cv)+'</div>';
+        html += '</div>';
       });
       if(!html) html = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin cultivos asignados</div>';
       if(stats.nSinCultivo > 0) {
-        html += '<div class="cultivo-row">' +
+        var rowIdSC = 'cvrow-'+c.id+'-'+sanitizeDomId(contextId)+'-sincultivo';
+        html += '<div>';
+        html += '<div class="cultivo-row" style="cursor:pointer" onclick="toggleClienteBody(\''+rowIdSC+'\')">' +
+          '<span id="ico-'+rowIdSC+'" style="font-size:9px;color:var(--text3);width:9px;flex-shrink:0">&#x25B8;</span>' +
           '<span style="width:10px;height:10px;border:1px solid var(--border2);border-radius:50%;display:inline-block;flex-shrink:0"></span>' +
           '<span class="cultivo-row-name" style="color:var(--text3)">Sin cultivo</span>' +
           '<div class="cultivo-row-bar"></div>' +
           '<span class="cultivo-row-pct" style="color:var(--text3)">—</span>' +
           '<span class="cultivo-row-ha" style="color:var(--text3)">'+stats.nSinCultivo+' rec.</span>' +
           '<div class="cultivo-row-reg"></div></div>';
+        html += '<div id="'+rowIdSC+'" style="display:none">'+buildParcelaListForCrop(stats.recs, '')+'</div>';
+        html += '</div>';
       }
       return html;
     }
@@ -5331,7 +5429,7 @@ function renderClientes() {
         html += '<div class="cliente-card-body">' +
           '<div class="cliente-summary-block">' +
           '<div class="cliente-summary-title">🌾 Cultivos — sup. cultivada</div>' +
-          buildCultivoRows(stats) +
+          buildCultivoRows(stats, currentCampana) +
           '</div>' +
           '<div class="cliente-summary-block">' +
           '<div class="cliente-summary-title">💧 Régimen hídrico</div>' +
@@ -5345,7 +5443,7 @@ function renderClientes() {
       var stats0 = buildCampStats(null);
       if(stats0.recs.length) {
         html += '<div class="cliente-card-body">' +
-          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos</div>'+buildCultivoRows(stats0)+'</div>' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos</div>'+buildCultivoRows(stats0,'nocamp')+'</div>' +
           '<div class="cliente-summary-block"><div class="cliente-summary-title">💧 Régimen hídrico</div>'+buildRegimenBlock(stats0)+'</div></div>';
       }
     } else {
@@ -5368,7 +5466,7 @@ function renderClientes() {
           '</div>';
         html += '<div id="'+blockId+'" style="display:'+(openByDefault?'block':'none')+';overflow:hidden">';
         html += '<div class="cliente-card-body">' +
-          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos — sup. cultivada</div>'+buildCultivoRows(stats)+'</div>' +
+          '<div class="cliente-summary-block"><div class="cliente-summary-title">🌾 Cultivos — sup. cultivada</div>'+buildCultivoRows(stats,camp)+'</div>' +
           '<div class="cliente-summary-block"><div class="cliente-summary-title">💧 Régimen hídrico</div>'+buildRegimenBlock(stats)+'</div>' +
           '</div>';
         html += '</div></div>'; // end block + collapsible
@@ -5380,6 +5478,46 @@ function renderClientes() {
   }
 
   cont.innerHTML = html;
+}
+
+function sanitizeDomId(s) {
+  return String(s||'').replace(/[^a-zA-Z0-9]/g,'_');
+}
+
+// Builds the list of parcelas for a given client + cultivo (same recintos that
+// would appear in the Parcelas tab), used to expand a cultivo row inline.
+function buildParcelaListForCrop(recs, cv) {
+  var matching = recs.filter(function(r) {
+    var rcv = (r.especieVariedad||'').trim();
+    return cv ? rcv === cv : !rcv;
+  });
+  matching.sort(function(a,b){ return (parseFloat(a.numOrden)||999) - (parseFloat(b.numOrden)||999); });
+  if(!matching.length) return '<div style="padding:8px 10px;color:var(--text3);font-size:12px">Sin parcelas</div>';
+
+  var rows = matching.map(function(r) {
+    var mun = String(r.termMunicipal||'').split(' ')[0];
+    var sigpacRef = (r.codProvincia||'?')+'-'+mun+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+    var label = r.nombreFinca || sigpacRef;
+    var ha = parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0;
+    var reg = (r.secanoRegadio||'').toLowerCase();
+    var regBadge = reg.indexOf('secano')>=0 ? '<span class="reg-pill reg-pill-sec">&#x1F33E; Secano</span>'
+                 : reg.indexOf('regad')>=0  ? '<span class="reg-pill reg-pill-reg">&#x1F4A7; Regad&iacute;o</span>'
+                 : '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px">'
+      + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+      + '<b style="color:var(--white)">'+label+'</b> <span style="color:var(--text3);font-size:11px">'+sigpacRef+'</span></span>'
+      + regBadge
+      + '<span style="font-weight:700;color:#7acc4a;min-width:60px;text-align:right;flex-shrink:0">'+ha.toFixed(2)+' ha</span>'
+      + '<button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px;flex-shrink:0" '
+      + 'onclick="event.stopPropagation();verParcelaEnMapa(\''+r.id+'\')" title="Ver en el mapa">&#x1F4CD;</button>'
+      + '</div>';
+  }).join('');
+  return rows;
+}
+
+function verParcelaEnMapa(recintoId) {
+  switchTab('mapa');
+  setTimeout(function(){ flyToParcel(recintoId); }, 350); // wait for map invalidateSize/render
 }
 
 function toggleClienteBody(bodyId) {
