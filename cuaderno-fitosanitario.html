@@ -5503,14 +5503,15 @@ function buildParcelaListForCrop(recs, cv) {
     var regBadge = reg.indexOf('secano')>=0 ? '<span class="reg-pill reg-pill-sec">&#x1F33E; Secano</span>'
                  : reg.indexOf('regad')>=0  ? '<span class="reg-pill reg-pill-reg">&#x1F4A7; Regad&iacute;o</span>'
                  : '';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px">'
-      + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-      + '<b style="color:var(--white)">'+label+'</b> <span style="color:var(--text3);font-size:11px">'+sigpacRef+'</span></span>'
+    return '<div style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">'
+      + '<div style="font-weight:700;color:var(--white);word-break:break-word;line-height:1.3">'+label+'</div>'
+      + (r.nombreFinca ? '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+sigpacRef+'</div>' : '')
+      + '<div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">'
       + regBadge
-      + '<span style="font-weight:700;color:#7acc4a;min-width:60px;text-align:right;flex-shrink:0">'+ha.toFixed(2)+' ha</span>'
+      + '<span style="font-weight:700;color:#7acc4a;margin-left:auto">'+ha.toFixed(2)+' ha</span>'
       + '<button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px;flex-shrink:0" '
       + 'onclick="event.stopPropagation();verParcelaEnMapa(\''+r.id+'\')" title="Ver en el mapa">&#x1F4CD;</button>'
-      + '</div>';
+      + '</div></div>';
   }).join('');
   return rows;
 }
