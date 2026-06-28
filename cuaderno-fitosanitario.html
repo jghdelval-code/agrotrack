@@ -1543,6 +1543,24 @@ textarea { resize: vertical; min-height: 72px; }
   </div>
 </div>
 
+<!-- MODAL HISTORIAL DE PARCELA -->
+<div class="modal-overlay" id="modal-historial-parcela">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3>&#x1F4CB; <span id="hist-parcela-title">Historial de la parcela</span></h3>
+      <button class="modal-close" onclick="closeModal('modal-historial-parcela')">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:14px 18px">
+      <div id="hist-parcela-info" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+      <div id="hist-parcela-stats" style="display:flex;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border2)"></div>
+      <div id="hist-parcela-body" style="max-height:50vh;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-historial-parcela')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CULTIVO CHOOSER -->
 <div class="modal-overlay" id="modal-cultivo-chooser">
   <div class="modal" style="max-width:480px">
@@ -5480,6 +5498,105 @@ function renderClientes() {
   cont.innerHTML = html;
 }
 
+// ── Shared: gather treatments + fertilizations for a set of recintos ─────────
+function gatherLabores(recintosArray) {
+  var labores = [];
+  (DB.tratamientos||[]).forEach(function(t) {
+    var tRecs = recintosArray.filter(function(r){ return (t.recintoIds||[]).indexOf(r.id) >= 0; });
+    if(!tRecs.length) return;
+    tRecs.forEach(function(r) {
+      (t.productos||[]).forEach(function(p) {
+        var prod = (DB.productos||[]).find(function(x){ return x.id===p.productoId; });
+        labores.push({
+          fecha:   t.fecha||t.fechaInicio||'',
+          tipo:    'tratamiento',
+          cultivo: r.especieVariedad||'',
+          recinto: r,
+          detalle: prod ? prod.nombre : 'Producto no encontrado',
+          extra:   p.dosis + (p.unidad?' '+p.unidad:'') + (t.problema?' &mdash; '+t.problema:''),
+          maquinaria: t.maquinaria||'',
+          aplicador:  t.aplicador||''
+        });
+      });
+    });
+  });
+  (DB.abonados||[]).forEach(function(ab) {
+    var abRecs = recintosArray.filter(function(r){ return (ab.recintoIds||[]).indexOf(r.id) >= 0; });
+    if(!abRecs.length) return;
+    abRecs.forEach(function(r) {
+      (ab.abonos||[]).forEach(function(row) {
+        var abo = (DB.abonos||[]).find(function(a){ return a.id===row.abonoId; });
+        labores.push({
+          fecha:   ab.fecha||'',
+          tipo:    'abonado',
+          cultivo: r.especieVariedad||'',
+          recinto: r,
+          detalle: abo ? abo.nombre : 'Abono no encontrado',
+          extra:   row.dosis + (row.unidad?' '+row.unidad:'') + (row.modo?' &mdash; '+row.modo:'')
+        });
+      });
+    });
+  });
+  return labores;
+}
+
+// ── Shared: render a list of labores as HTML rows ─────────────────────────────
+function renderLaboresHtml(items) {
+  if(!items.length) return '<div style="padding:14px 0;color:var(--text3);font-size:13px;text-align:center">Sin labores registradas en esta parcela</div>';
+  return items.map(function(lb) {
+    var isTrt = lb.tipo === 'tratamiento';
+    var icon  = isTrt ? '&#x1F48A;' : '&#x1F9EA;';
+    var color = isTrt ? '#4a8c2a' : '#2980b9';
+    var label = isTrt ? 'Tratamiento' : 'Abonado';
+    return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+      + '<div style="flex-shrink:0;text-align:center;min-width:62px">'
+      + '<div style="font-size:10px;font-weight:700;color:var(--text3)">'+(lb.fecha?formatDate(lb.fecha):'&mdash;')+'</div>'
+      + '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:'+color+'22;color:'+color+';border:1px solid '+color+'44;white-space:nowrap">'+icon+' '+label+'</span>'
+      + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-weight:700;font-size:13px;color:var(--white)">'+lb.detalle+'</div>'
+      + '<div style="font-size:12px;color:var(--text2)">'+lb.extra+'</div>'
+      + (lb.aplicador||lb.maquinaria ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+(lb.aplicador?'&#x1F464; '+lb.aplicador:'')+(lb.maquinaria?' &middot; &#x1F69C; '+lb.maquinaria:'')+'</div>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Modal: full history for a single parcela (recinto), opened by clicking its name ──
+function verHistorialParcela(recintoId) {
+  var r = DB.recintos.find(function(x){ return x.id === recintoId; });
+  if(!r) return;
+  var cli = DB.clientes.find(function(c){ return c.id === r.clienteId; });
+
+  var mun = String(r.termMunicipal||'').split(' ')[0];
+  var sigpacRef = (r.codProvincia||'?')+'-'+mun+'-'+(r.numPoligono||'?')+'-'+(r.numParcela||'?')+'-'+(r.numRecinto||'?');
+  var ev = (r.especieVariedad||'').split('/');
+  var ha = parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||0;
+  var reg = (r.secanoRegadio||'').toLowerCase();
+  var regBadge = reg.indexOf('secano')>=0 ? '<span class="reg-pill reg-pill-sec">&#x1F33E; Secano</span>'
+               : reg.indexOf('regad')>=0  ? '<span class="reg-pill reg-pill-reg">&#x1F4A7; Regad&iacute;o</span>'
+               : '';
+
+  document.getElementById('hist-parcela-title').textContent = r.nombreFinca || sigpacRef;
+  document.getElementById('hist-parcela-info').innerHTML =
+    (cli ? '<span class="tag tag-blue">&#x1F464; '+cli.nombre+'</span>' : '') +
+    (r.especieVariedad ? '<span class="tag tag-green">&#x1F331; '+ev[0].trim()+(ev[1]?' / '+ev.slice(1).join('/').trim():'')+'</span>' : '') +
+    '<span class="tag tag-gray">'+sigpacRef+'</span>' +
+    '<span class="tag tag-gray">'+ha.toFixed(2)+' ha</span>' +
+    regBadge +
+    (r.campana ? '<span class="tag tag-yellow">&#x1F4C5; Campa&ntilde;a '+r.campana+'</span>' : '');
+
+  var labores = gatherLabores([r]);
+  labores.sort(function(a,b){ return b.fecha.localeCompare(a.fecha); });
+  var nTrt = labores.filter(function(l){ return l.tipo==='tratamiento'; }).length;
+  var nAbo = labores.filter(function(l){ return l.tipo==='abonado'; }).length;
+  document.getElementById('hist-parcela-stats').innerHTML =
+    '<span class="tag tag-green">&#x1F48A; '+nTrt+' tratamiento'+(nTrt!==1?'s':'')+'</span>' +
+    '<span class="tag tag-blue">&#x1F9EA; '+nAbo+' abonado'+(nAbo!==1?'s':'')+'</span>';
+
+  document.getElementById('hist-parcela-body').innerHTML = renderLaboresHtml(labores);
+  openModal('modal-historial-parcela');
+}
+
 function sanitizeDomId(s) {
   return String(s||'').replace(/[^a-zA-Z0-9]/g,'_');
 }
@@ -5504,7 +5621,10 @@ function buildParcelaListForCrop(recs, cv) {
                  : reg.indexOf('regad')>=0  ? '<span class="reg-pill reg-pill-reg">&#x1F4A7; Regad&iacute;o</span>'
                  : '';
     return '<div style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">'
-      + '<div style="font-weight:700;color:var(--white);word-break:break-word;line-height:1.3">'+label+'</div>'
+      + '<div style="font-weight:700;color:var(--primary);word-break:break-word;line-height:1.3;cursor:pointer;text-decoration:underline;text-decoration-color:transparent" '
+      + 'onclick="event.stopPropagation();verHistorialParcela(\''+r.id+'\')" '
+      + 'onmouseover="this.style.textDecorationColor=\'currentColor\'" onmouseout="this.style.textDecorationColor=\'transparent\'" '
+      + 'title="Ver historial completo de esta parcela">'+label+'</div>'
       + (r.nombreFinca ? '<div style="color:var(--text3);font-size:11px;margin-top:1px">'+sigpacRef+'</div>' : '')
       + '<div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">'
       + regBadge
