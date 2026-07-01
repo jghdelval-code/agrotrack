@@ -273,7 +273,8 @@ textarea { resize: vertical; min-height: 72px; }
 .parcela-meta-item .v.big { font-size: 22px; }
 .parcela-cultivos { display: flex; flex-wrap: wrap; gap: 6px; }
 .parcela-recintos-list { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.parcela-recinto-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; }
+.parcela-recinto-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; transition: background .15s; }
+.parcela-recinto-row:hover { background: rgba(255,255,255,.04); }
 .parcela-recinto-row:last-child { border-bottom: none; }
 .parcela-recinto-row:hover { background: var(--primary-light); }
 /* SVG geo preview */
@@ -1140,6 +1141,20 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Plazo seguridad</label>
           <input type="text" id="prod-plazo" placeholder="ej: 21 días / NP">
         </div>
+        <div class="form-group">
+          <label>Unidad de compra</label>
+          <select id="prod-unidad-compra">
+            <option value="">— Seleccionar —</option>
+            <option value="L">L (litros)</option>
+            <option value="kg">kg (kilos)</option>
+            <option value="g">g (gramos)</option>
+            <option value="mL">mL (mililitros)</option>
+            <option value="t">t (toneladas)</option>
+            <option value="saco">saco</option>
+            <option value="ud">ud (unidades)</option>
+          </select>
+          <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block">Se selecciona automáticamente al añadirlo en una compra</span>
+        </div>
         <div class="form-group span-2">
           <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
           <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
@@ -1700,6 +1715,17 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="form-group">
           <label>Dosis habitual</label>
           <input type="text" id="abono-dosis" placeholder="ej: 300-500 kg/ha">
+        </div>
+        <div class="form-group">
+          <label>Unidad de compra</label>
+          <select id="abono-unidad-compra">
+            <option value="kg">kg (kilos)</option>
+            <option value="t">t (toneladas)</option>
+            <option value="L">L (litros)</option>
+            <option value="saco">saco</option>
+            <option value="ud">ud (unidades)</option>
+          </select>
+          <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block">Se selecciona automáticamente al añadirlo en una compra</span>
         </div>
         <div class="form-group span-2">
           <label>Observaciones</label>
@@ -4345,6 +4371,8 @@ function openProductoModal(id=null) {
   document.getElementById('prod-formulacion').value = p ? p.formulacion||'' : '';
   document.getElementById('prod-dosis').value = p ? p.dosis||'' : '';
   document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
+  var ucEl = document.getElementById('prod-unidad-compra');
+  if(ucEl) ucEl.value = p ? (p.unidadCompra||p.unidadCoste||'') : '';
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
@@ -4830,6 +4858,7 @@ function saveProducto() {
     formulacion: document.getElementById('prod-formulacion').value,
     dosis:       document.getElementById('prod-dosis').value.trim(),
     plazo:       document.getElementById('prod-plazo').value.trim(),
+    unidadCompra: (document.getElementById('prod-unidad-compra')||{value:''}).value || '',
     formatos:    formatos,
     coste:       legacyCoste,
     unidadCoste: legacyUnidad,
@@ -6897,12 +6926,12 @@ function renderParcelaCard(g) {
       supStyle   = 'color:var(--accent);white-space:nowrap;font-size:12px;font-style:italic';
     }
     recRows +=
-      '<div class="parcela-recinto-row">' +
+      '<div class="parcela-recinto-row" onmouseover="highlightGeoPath(\''+r.id+'\',true)" onmouseout="highlightGeoPath(\''+r.id+'\',false)">' +
       '<span class="crop-dot" style="background:'+color+';width:10px;height:10px;flex-shrink:0"></span>' +
       '<span style="flex:1;min-width:0"><code style="font-size:11px;color:var(--accent)">'+sigpac+'</code>'+cultTxt+cliTag+'</span>' +
       '<span style="'+supStyle+'">'+supDisplay+supLabel+'</span>' +
-      '<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px" title="Copiar para dividir cultivos" onclick="copyRecinto(\''+r.id+'\')">📋</button>' +
-      '<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px" onclick="openRecintoModal(\''+r.id+'\')">✏️</button>' +
+      '<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px" title="Copiar para dividir cultivos" onclick="event.stopPropagation();copyRecinto(\''+r.id+'\')">📋</button>' +
+      '<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px" onclick="event.stopPropagation();openRecintoModal(\''+r.id+'\')">✏️</button>' +
       '</div>';
   });
 
@@ -7149,8 +7178,8 @@ function buildParcelaGeoSVG(recintos, nombre) {
     p.coords.forEach(function(c, i) { d += (i?'L':'M') + toX(c[1]).toFixed(1) + ',' + toY(c[0]).toFixed(1); });
     d += ' Z';
     var fill = getCropColor(p.cultivo);
-    paths += '<path d="' + d + '" fill="' + fill + '" fill-opacity=".5" stroke="' + fill + '" stroke-width="1.5"' +
-      ' style="cursor:pointer" data-ids="' + p.id + '" onclick="flyToParcelaGroup(this.dataset.ids.split(\',\'))"/>';
+    paths += '<path id="geo-path-' + p.id + '" d="' + d + '" fill="' + fill + '" fill-opacity=".5" stroke="' + fill + '" stroke-width="1.5" data-color="' + fill + '"' +
+      ' style="cursor:pointer;transition:fill-opacity .15s,stroke-width .15s" data-ids="' + p.id + '" onclick="flyToParcelaGroup(this.dataset.ids.split(\',\'))"/>';
     if(p.cultivo) {
       var cx = 0, cy = 0;
       p.coords.forEach(function(c) { cx += toX(c[1]); cy += toY(c[0]); });
@@ -7172,6 +7201,20 @@ function buildParcelaGeoSVG(recintos, nombre) {
     '<span style="font-size:11px;color:var(--text3);flex:1">' + polys.length + '/' + recintos.length + ' recintos con geometría</span>' +
     '<button class="btn btn-secondary btn-sm" style="font-size:11px" data-ids="' + geoIds + '" onclick="event.stopPropagation();flyToParcelaGroup(this.dataset.ids.split(\',\'))">🗺️ Mapa</button>' +
     '</div>';
+}
+
+function highlightGeoPath(recintoId, on) {
+  var el = document.getElementById('geo-path-'+recintoId);
+  if(!el) return;
+  if(on) {
+    el.setAttribute('fill-opacity', '.9');
+    el.setAttribute('stroke-width', '3.5');
+    el.setAttribute('stroke', '#ffffff');
+  } else {
+    el.setAttribute('fill-opacity', '.5');
+    el.setAttribute('stroke-width', '1.5');
+    el.setAttribute('stroke', el.getAttribute('data-color'));
+  }
 }
 
 function flyToParcelaGroup(ids) {
@@ -8480,6 +8523,8 @@ function openAbonoModal(id) {
   document.getElementById('abono-fabricante').value= a?.fabricante||'';
   document.getElementById('abono-dosis').value     = a?.dosis||'';
   document.getElementById('abono-obs').value       = a?.obs||'';
+  var aucEl = document.getElementById('abono-unidad-compra');
+  if(aucEl) aucEl.value = a?.unidadCompra||'kg';
   openModal('modal-abono');
 }
 
@@ -8496,7 +8541,8 @@ function saveAbono() {
     otros:      document.getElementById('abono-otros').value.trim(),
     fabricante: document.getElementById('abono-fabricante').value.trim(),
     dosis:      document.getElementById('abono-dosis').value.trim(),
-    obs:        document.getElementById('abono-obs').value.trim()
+    obs:        document.getElementById('abono-obs').value.trim(),
+    unidadCompra: (document.getElementById('abono-unidad-compra')||{value:'kg'}).value || 'kg'
   };
   if(!DB.abonos) DB.abonos = [];
   if(editingId.abono) {
@@ -9733,6 +9779,38 @@ function compraComboSelect(item) {
   inp.value = item.dataset.label;
   inp.dataset.itemId = item.dataset.id;
   drop.style.display = 'none';
+
+  // Auto-fill unit from the product/abono record
+  var row    = inp.closest('.product-row'); if(!row) return;
+  var tipo   = (row.querySelector('.compra-row-tipo')||{value:'producto'}).value;
+  var itemId = item.dataset.id;
+  var unidSel = row.querySelector('.compra-row-unidad');
+  if(unidSel && itemId) {
+    var unit = '';
+    if(tipo === 'abono') {
+      var abo = (DB.abonos||[]).find(function(a){ return a.id===itemId; });
+      unit = (abo && abo.unidadCompra) ? abo.unidadCompra : 'kg';
+    } else {
+      var prod = (DB.productos||[]).find(function(p){ return p.id===itemId; });
+      if(prod) {
+        unit = prod.unidadCompra || prod.unidadCoste || '';
+        // Fallback: derive from first formato unidad
+        if(!unit && prod.formatos && prod.formatos.length) {
+          unit = prod.formatos[0].unidad || '';
+        }
+        // Final fallback from tipo
+        if(!unit) unit = (prod.tipo==='Herbicida'||prod.tipo==='Fungicida'||prod.tipo==='Insecticida'||prod.tipo==='Acaricida'||prod.tipo==='Fitorregulador') ? 'L' : 'kg';
+      }
+    }
+    if(unit) {
+      // Try to match option; if not found, add it temporarily
+      var found = false;
+      for(var i=0; i<unidSel.options.length; i++){ if(unidSel.options[i].value===unit){found=true;break;} }
+      if(!found){ var opt=document.createElement('option'); opt.value=unit; opt.textContent=unit; unidSel.add(opt); }
+      unidSel.value = unit;
+    }
+  }
+
   onCompraItemChange(inp);
 }
 
