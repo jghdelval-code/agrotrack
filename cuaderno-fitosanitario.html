@@ -1572,6 +1572,36 @@ textarea { resize: vertical; min-height: 72px; }
   </div>
 </div>
 
+<!-- MODAL FOTOS DE PARCELA -->
+<div class="modal-overlay" id="modal-fotos-parcela">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3>&#x1F4F7; Fotos — <span id="fotos-parcela-nombre"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-fotos-parcela')">&#x2715;</button>
+    </div>
+    <div class="modal-body" style="padding:14px 18px">
+
+      <!-- Capture new photo -->
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0 14px;border-bottom:1px solid var(--border2)">
+        <button type="button" class="btn btn-primary" onclick="capturarFoto()" style="font-size:14px;padding:10px 20px">
+          &#x1F4F7; Hacer foto
+        </button>
+        <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none" onchange="procesarFoto(this)">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('foto-input').removeAttribute('capture');document.getElementById('foto-input').click()">
+          &#x1F5BC;&#xFE0F; Subir imagen
+        </button>
+        <span id="foto-upload-status" style="font-size:12px;color:var(--text3)"></span>
+      </div>
+
+      <!-- Photo gallery -->
+      <div id="fotos-lista" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-fotos-parcela')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL HISTORIAL DE PARCELA -->
 <div class="modal-overlay" id="modal-historial-parcela">
   <div class="modal" style="max-width:560px">
@@ -7015,8 +7045,14 @@ function renderParcelaCard(g) {
   }
 
   var mapBtn = conWkt
-    ? '<button class="btn btn-accent btn-sm" data-ids="'+allIds+'" onclick="flyToParcelaGroup(this.dataset.ids.split(\',\'))">🗺️ Ver en mapa</button>'
+    ? '<button class="btn btn-accent btn-sm" data-ids="'+allIds+'" onclick="flyToParcelaGroup(this.dataset.ids.split(\',\'))">&#x1F5FA;&#xFE0F; Ver en mapa</button>'
     : '';
+
+  // Photo button — shows count of existing photos for this group of recintos
+  var allRecintoIds = g.recintos.map(function(r){ return r.id; });
+  var fotoCount = (DB.fotos||[]).filter(function(f){ return allRecintoIds.indexOf(f.recintoId) >= 0; }).length;
+  var fotoBadge = fotoCount > 0 ? ' <span style="background:var(--primary);color:#fff;font-size:9px;padding:0 4px;border-radius:6px;font-weight:700">'+fotoCount+'</span>' : '';
+  var fotoBtn = '<button class="btn btn-secondary btn-sm" onclick="abrirFotosModal(\''+g.recintos[0].id+'\',\''+nombre.replace(/'/g,'')+'\')">&#x1F4F7;'+fotoBadge+'</button>';
 
   var multiCliHeader = isMultiClient
     ? '<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(41,128,185,.1);border:1px solid rgba(41,128,185,.3);border-radius:6px;margin-bottom:8px;font-size:12px;">' +
@@ -7171,7 +7207,7 @@ function renderParcelaCard(g) {
     '<div class="parcela-card-left">' +
     '<div class="parcela-title">' +
     '<div class="parcela-title-name">&#x1F3E1; '+nombre+'</div>' +
-    '<div class="parcela-title-actions">'+mapBtn+'</div>' +
+    '<div class="parcela-title-actions">'+mapBtn+fotoBtn+'</div>' +
     '</div>' +
     multiCliHeader +
     '<div style="margin-bottom:8px">'+cliChips+'</div>' +
@@ -7271,6 +7307,184 @@ function highlightGeoPath(recintoId, on) {
     el.setAttribute('stroke-width', '1.5');
     el.setAttribute('stroke', el.getAttribute('data-color'));
   }
+}
+
+// ============================================================
+// FOTOS DE PARCELA — geolocalizadas, guardadas en Google Drive
+// ============================================================
+var _fotoRecintoId = null;
+
+function abrirFotosModal(recintoId, nombre) {
+  _fotoRecintoId = recintoId;
+  document.getElementById('fotos-parcela-nombre').textContent = nombre;
+  document.getElementById('foto-upload-status').textContent = '';
+  // Restore capture attribute (may have been removed for gallery-upload)
+  var fi = document.getElementById('foto-input');
+  fi.value = '';
+  fi.setAttribute('capture','environment');
+  renderFotosGaleria();
+  openModal('modal-fotos-parcela');
+}
+
+function capturarFoto() {
+  var fi = document.getElementById('foto-input');
+  fi.setAttribute('capture','environment');
+  fi.click();
+}
+
+function procesarFoto(input) {
+  var file = input.files && input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')) { alert('Solo se admiten imágenes'); input.value=''; return; }
+  var status = document.getElementById('foto-upload-status');
+  status.textContent = '&#x23F3; Leyendo ubicación...';
+
+  // Get GPS location at the time of the upload (best effort)
+  function doUpload(lat, lng) {
+    status.textContent = '&#x23F3; Comprimiendo...';
+    comprimirImagen(file, 1600, function(blob, dataUrl) {
+      if(!gDrive.token) {
+        // Offline: store as base64 locally (no Drive)
+        guardarFotoLocal(file.name, dataUrl, lat, lng);
+        status.textContent = '&#x26A0;&#xFE0F; Guardada localmente (sin Drive)';
+        renderFotosGaleria();
+        renderParcelas && renderParcelas();
+        return;
+      }
+      status.textContent = '&#x23F3; Subiendo a Drive...';
+      var fecha = new Date().toISOString().slice(0,10);
+      var r = DB.recintos.find(function(x){return x.id===_fotoRecintoId;});
+      var fname = 'AgroTrack_Foto_'+(r?r.nombreFinca||r.numPoligono:'parcela')+'_'+fecha+'_'+Date.now()+'.jpg';
+      gDrive.uploadFichaPdf(blob, fname, function(fileId, err) {
+        if(err) {
+          status.textContent = '&#x274C; Error al subir: '+err;
+          return;
+        }
+        guardarFotoDrive(fname, fileId, lat, lng);
+        status.textContent = '&#x2705; Foto guardada en Drive';
+        input.value = '';
+        renderFotosGaleria();
+        renderParcelas && renderParcelas();
+      });
+    });
+  }
+
+  if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ doUpload(pos.coords.latitude, pos.coords.longitude); },
+      function(){ doUpload(null, null); },
+      {timeout:5000, enableHighAccuracy:true}
+    );
+  } else {
+    doUpload(null, null);
+  }
+}
+
+function comprimirImagen(file, maxW, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if(w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob) {
+        var dr = new FileReader();
+        dr.onload = function(ev){ callback(ev.target.result, canvas.toDataURL('image/jpeg',0.82)); };
+        dr.readAsArrayBuffer(blob);
+      }, 'image/jpeg', 0.82);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function guardarFotoLocal(nombre, dataUrl, lat, lng) {
+  if(!DB.fotos) DB.fotos = [];
+  DB.fotos.push({
+    id: uid(), recintoId: _fotoRecintoId,
+    fecha: new Date().toISOString(), nombre: nombre,
+    lat: lat, lng: lng, tipo: 'local', dataUrl: dataUrl
+  });
+  save();
+}
+
+function guardarFotoDrive(nombre, driveFileId, lat, lng) {
+  if(!DB.fotos) DB.fotos = [];
+  DB.fotos.push({
+    id: uid(), recintoId: _fotoRecintoId,
+    fecha: new Date().toISOString(), nombre: nombre,
+    lat: lat, lng: lng, tipo: 'drive', driveFileId: driveFileId
+  });
+  save();
+}
+
+function renderFotosGaleria() {
+  var cont = document.getElementById('fotos-lista'); if(!cont) return;
+  var r = DB.recintos.find(function(x){return x.id===_fotoRecintoId;});
+  // Show photos for all recintos of the same parcela group (same pol-par)
+  var compañeros = r ? DB.recintos.filter(function(x){
+    return x.clienteId===r.clienteId && x.numPoligono===r.numPoligono && x.numParcela===r.numParcela;
+  }).map(function(x){return x.id;}) : [_fotoRecintoId];
+
+  var fotos = (DB.fotos||[]).filter(function(f){ return compañeros.indexOf(f.recintoId) >= 0; })
+    .sort(function(a,b){ return b.fecha.localeCompare(a.fecha); });
+
+  if(!fotos.length) {
+    cont.innerHTML = '<div style="padding:20px 0;text-align:center;color:var(--text3);font-size:13px">Sin fotos aún. Pulsa &#x1F4F7; para hacer la primera.</div>';
+    return;
+  }
+
+  cont.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">'
+    + fotos.map(function(f) {
+      var d = new Date(f.fecha);
+      var fechaStr = d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      var recName = (DB.recintos.find(function(x){return x.id===f.recintoId;})||{}).nombreFinca||'';
+      var coordStr = (f.lat&&f.lng) ? '&#x1F4CD; '+f.lat.toFixed(5)+', '+f.lng.toFixed(5) : '';
+      var img = f.tipo==='local'
+        ? '<img src="'+f.dataUrl+'" style="width:100%;height:110px;object-fit:cover;border-radius:6px 6px 0 0;display:block">'
+        : '<div onclick="verFotoDrive(\''+f.driveFileId+'\')" style="cursor:pointer;width:100%;height:110px;background:rgba(74,140,42,.08);display:flex;align-items:center;justify-content:center;border-radius:6px 6px 0 0;flex-direction:column;gap:6px">'
+          +'<span style="font-size:32px">&#x1F5BC;&#xFE0F;</span>'
+          +'<span style="font-size:11px;color:var(--primary);font-weight:700">Ver en Drive</span>'
+          +'</div>';
+      return '<div style="background:var(--card);border:1px solid var(--border2);border-radius:8px;overflow:hidden">'
+        + img
+        + '<div style="padding:7px 8px">'
+        + '<div style="font-size:10px;color:var(--text3);margin-bottom:2px">'+fechaStr+'</div>'
+        + (recName?'<div style="font-size:11px;font-weight:700;color:var(--white)">'+recName+'</div>':'')
+        + (coordStr?'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+coordStr+'</div>':'')
+        + '<div style="display:flex;gap:5px;margin-top:5px">'
+        + (f.tipo==='drive'?'<button type="button" class="btn btn-accent btn-sm" style="flex:1;font-size:11px" onclick="verFotoDrive(\''+f.driveFileId+'\')">&#x1F441; Ver</button>':'')
+        + (f.lat&&f.lng?'<button type="button" class="btn btn-secondary btn-sm" style="flex:1;font-size:11px" onclick="verFotoEnMapa('+f.lat+','+f.lng+')">&#x1F4CD;</button>':'')
+        + '<button type="button" class="btn btn-danger btn-sm" style="font-size:11px" onclick="eliminarFotoRegistro(\''+f.id+'\')">&#x1F5D1;</button>'
+        + '</div></div></div>';
+    }).join('')
+    + '</div>';
+}
+
+function verFotoDrive(fileId) {
+  window.open('https://drive.google.com/file/d/'+fileId+'/view', '_blank');
+}
+
+function verFotoEnMapa(lat, lng) {
+  closeModal('modal-fotos-parcela');
+  switchTab('mapa');
+  setTimeout(function(){
+    if(map) map.setView([lat, lng], 17);
+    L.marker([lat, lng]).addTo(map).bindPopup('&#x1F4F7; Foto tomada aquí').openPopup();
+  }, 400);
+}
+
+function eliminarFotoRegistro(fotoId) {
+  confirmDialog('¿Eliminar esta foto?\n(El archivo en Drive NO se borrará automáticamente)', function() {
+    DB.fotos = (DB.fotos||[]).filter(function(f){ return f.id!==fotoId; });
+    save();
+    renderFotosGaleria();
+    renderParcelas && renderParcelas();
+  });
 }
 
 function flyToParcelaGroup(ids) {
