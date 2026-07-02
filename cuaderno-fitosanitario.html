@@ -1334,14 +1334,28 @@ textarea { resize: vertical; min-height: 72px; }
           <label>Ecoregimen / Práctica</label>
           <select id="rec-eco">
             <option value="">—</option>
-            <option>P1 — Pastoreo</option><option>P2 — Siega</option>
-            <option>P3 — Espacios biodiversidad arable</option>
-            <option>P4 — Rotación cultivos secano</option>
-            <option>P5 — Rotación cultivos regadío</option>
-            <option>P6 — Siembra directa</option>
-            <option>P7 — Cubiertas vegetales</option>
-            <option>P8 — Cubiertas inertes</option>
-            <option>P9 — Espacios biodiversidad permanentes</option>
+            <optgroup label="Ecorregímenes P — Prácticas agrarias">
+              <option>P1 — Pastoreo</option>
+              <option>P2 — Siega</option>
+              <option>P3 — Espacios biodiversidad arable</option>
+              <option>P4 — Rotación cultivos secano</option>
+              <option>P5 — Rotación cultivos regadío</option>
+              <option>P6 — Siembra directa</option>
+              <option>P7 — Cubiertas vegetales</option>
+              <option>P8 — Cubiertas inertes</option>
+              <option>P9 — Espacios biodiversidad permanentes</option>
+            </optgroup>
+            <optgroup label="Ecorregímenes AE — Agricultura ecológica">
+              <option>AE-P1 — Pastoreo (ecológico)</option>
+              <option>AE-P2 — Siega (ecológico)</option>
+              <option>AE-P3 — Espacios biodiversidad arable (ecológico)</option>
+              <option>AE-P4 — Rotación cultivos secano (ecológico)</option>
+              <option>AE-P5 — Espacios de biodiversidad (ecológico)</option>
+              <option>AE-P6 — Siembra directa (ecológico)</option>
+              <option>AE-P7 — Cubiertas vegetales (ecológico)</option>
+              <option>AE-P8 — Cubiertas inertes (ecológico)</option>
+              <option>AE-P9 — Espacios biodiversidad permanentes (ecológico)</option>
+            </optgroup>
           </select>
         </div>
         <div class="form-group">
@@ -5219,13 +5233,55 @@ function openRecintoModal(id=null) {
 }
 
 function saveRecinto() {
-  var clienteId = document.getElementById('rec-cliente').value;
+  var clienteId   = document.getElementById('rec-cliente').value;
   var numPoligono = document.getElementById('rec-pol').value.trim();
-  if(!clienteId) { alert('Selecciona un cliente'); return; }
+  if(!clienteId)   { alert('Selecciona un cliente'); return; }
   if(!numPoligono) { alert('Indica el número de polígono'); return; }
+
+  var numOrden  = parseInt(document.getElementById('rec-orden').value)||1;
+  var campana   = document.getElementById('rec-campana').value;
+
+  // ── Validate numOrden: no duplicate within same client + campaign ──
+  var sibling = DB.recintos.find(function(r) {
+    if(editingId.recinto && r.id === editingId.recinto) return false; // skip self
+    return r.clienteId === clienteId &&
+           r.campana   === campana   &&
+           parseInt(r.numOrden||0)   === numOrden;
+  });
+  if(sibling) {
+    // Suggest the next free number
+    var usados = DB.recintos
+      .filter(function(r){ return r.clienteId===clienteId && r.campana===campana && (!editingId.recinto||r.id!==editingId.recinto); })
+      .map(function(r){ return parseInt(r.numOrden||0); })
+      .sort(function(a,b){ return a-b; });
+    var sugerido = 1;
+    while(usados.indexOf(sugerido) >= 0) sugerido++;
+    if(!confirm('El Nº de orden '+numOrden+' ya está asignado a otro recinto de este cliente en la campaña '+campana+'.\n\n¿Continuar igualmente? (Sugerido: '+sugerido+')')) {
+      document.getElementById('rec-orden').value = sugerido;
+      document.getElementById('rec-orden').focus();
+      return;
+    }
+  }
+
+  // ── Warn if order number would create a gap ──
+  var existentes = DB.recintos
+    .filter(function(r){ return r.clienteId===clienteId && r.campana===campana && (!editingId.recinto||r.id!==editingId.recinto); })
+    .map(function(r){ return parseInt(r.numOrden||0); })
+    .filter(function(n){ return n > 0; })
+    .sort(function(a,b){ return a-b; });
+  if(existentes.length) {
+    var maxExist = existentes[existentes.length-1];
+    if(numOrden > maxExist + 1) {
+      if(!confirm('El Nº de orden '+numOrden+' dejaría un hueco (el último asignado es '+maxExist+'). ¿Continuar igualmente?')) {
+        document.getElementById('rec-orden').focus();
+        return;
+      }
+    }
+  }
+
   var data = {
-    clienteId, numOrden:parseInt(document.getElementById('rec-orden').value)||1,
-    campana:document.getElementById('rec-campana').value,
+    clienteId, numOrden,
+    campana,
     codProvincia:document.getElementById('rec-prov').value, termMunicipal:document.getElementById('rec-mun').value,
     codAgregado:document.getElementById('rec-agr').value, zona:document.getElementById('rec-zona').value,
     numPoligono, numParcela:document.getElementById('rec-par').value, numRecinto:document.getElementById('rec-rec').value,
