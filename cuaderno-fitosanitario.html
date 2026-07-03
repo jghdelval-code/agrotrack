@@ -1155,6 +1155,28 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
           <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block">Se selecciona automáticamente al añadirlo en una compra</span>
         </div>
+        <!-- ── Límites legales de aplicación ── -->
+        <div class="form-group span-2">
+          <label style="color:#e67e22;font-weight:700">&#x26A0;&#xFE0F; Límites legales de aplicación (MAPA)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
+            <div>
+              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Dosis máx. por pase (L o kg/ha)</label>
+              <input type="number" step="0.01" min="0" id="prod-dosis-max-pase" placeholder="ej: 2.5"
+                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Dosis máx. total/campaña (L o kg/ha)</label>
+              <input type="number" step="0.01" min="0" id="prod-dosis-max-total" placeholder="ej: 7.5"
+                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Nº máx. tratamientos/campaña</label>
+              <input type="number" step="1" min="0" id="prod-ntrts-max" placeholder="ej: 3"
+                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">Datos de la etiqueta o ficha del MAPA. Se usan para avisar si se supera el límite al registrar tratamientos.</div>
+        </div>
         <div class="form-group span-2">
           <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
           <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border2);overflow:hidden">
@@ -3568,11 +3590,12 @@ function addProductRow(data) {
   infoRow.innerHTML='<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4E6; Necesitas</span><span class="prod-row-cantidad">&mdash;</span></div>'
     +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4CA; Stock</span><span class="prod-row-stock">&mdash;</span></div>'
     +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4B6; PVP/ha</span><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
+  var limiteDiv=document.createElement('div'); limiteDiv.className='prod-row-limite';
   var justInp=document.createElement('input'); justInp.type='text';
   justInp.placeholder='Justificación / plaga objetivo'; justInp.className='prod-row-just';
   justInp.style.cssText='width:100%;margin-top:5px';
   if(data&&data.justificacion) justInp.value=data.justificacion;
-  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(infoRow); inner.appendChild(justInp);
+  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(infoRow); inner.appendChild(limiteDiv); inner.appendChild(justInp);
   row._prodList=allProds;
   row.appendChild(inner);
   document.getElementById('trt-products-rows').appendChild(row);
@@ -3757,6 +3780,30 @@ function getTrtTotalHa() {
   return total;
 }
 
+// ── Accumulated usage of a product in a campaign for a set of recintos ──────
+// Returns {nTrts, dosisTotal} — nTrts = number of treatments where the product
+// was applied (per recinto, weighted by ha), dosisTotal = sum of doses × ha
+// across all treatments in the same campaign (same client + campaign).
+// excludeTrtId: omit the treatment being edited (edit mode).
+function calcUsoProducto(prodId, clienteId, campana, recintoIds, excludeTrtId) {
+  var nTrts = 0;          // number of pases already applied
+  var dosisTotalHa = 0;   // cumulative dose already applied (L or kg / ha)
+  (DB.tratamientos||[]).forEach(function(t) {
+    if(t.id === excludeTrtId) return;
+    if(t.clienteId !== clienteId) return;
+    if(t.campana   !== campana)   return;
+    // Find if this treatment applied our product
+    var pRow = (t.productos||[]).find(function(p){ return p.productoId === prodId; });
+    if(!pRow) return;
+    // Check overlap with our target recintos
+    var overlap = (t.recintoIds||[]).filter(function(rid){ return recintoIds.indexOf(rid) >= 0; });
+    if(!overlap.length) return;
+    nTrts++;
+    dosisTotalHa += (parseFloat(pRow.dosis)||0);
+  });
+  return { nTrts: nTrts, dosisTotalHa: dosisTotalHa };
+}
+
 function calcProdRowPVP(input) {
   var row=input.closest('.product-row'); if(!row) return;
   var comboInp=row.querySelector('.prod-combo-input');
@@ -3841,6 +3888,54 @@ function calcProdRowPVP(input) {
   if(!precio){pvpSpan.textContent='\u2014';pvpSpan.style.color='var(--text3)';return;}
   pvpSpan.textContent=(precio*dosis*(1+margen/100)).toFixed(2)+'\u20ac/ha';
   pvpSpan.style.color='#7acc4a';
+
+  // ── Legal limits badge ────────────────────────────────────────────────────
+  var limBadge = row.querySelector('.prod-row-limite');
+  if(!limBadge) return;
+  if(!prod) { limBadge.innerHTML=''; return; }
+
+  var clienteId  = (document.getElementById('trt-cliente')||{}).value||'';
+  var campanaV   = (document.getElementById('trt-campana')||{}).value||currentCampana||'';
+  var recintoIds = Array.prototype.slice.call(document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')).map(function(c){ return c.value; });
+  var uso        = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds, editingId.tratamiento||null);
+
+  var msgs = [];
+
+  // Check nº of treatments
+  if(prod.nTrtsMax > 0) {
+    var trtsRestantes = prod.nTrtsMax - uso.nTrts;
+    if(trtsRestantes <= 0) {
+      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Tratamientos: ya se han dado '+uso.nTrts+'/'+prod.nTrtsMax+' permitidos esta campaña</span>');
+    } else if(trtsRestantes === 1) {
+      msgs.push('<span style="color:#e67e22;font-weight:700">&#x26A0; Tratamientos: este sería el último permitido ('+prod.nTrtsMax+' máx.)</span>');
+    } else {
+      msgs.push('<span style="color:#7acc4a">&#x2705; Tratamientos: '+uso.nTrts+'/'+prod.nTrtsMax+' usados (quedan '+trtsRestantes+')</span>');
+    }
+  }
+
+  // Check dose per pase
+  if(prod.dosisMaxPase > 0 && dosis > 0) {
+    if(dosis > prod.dosisMaxPase) {
+      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Dosis/pase: '+dosis+' supera el máximo de '+prod.dosisMaxPase+' '+unidad+'</span>');
+    } else {
+      msgs.push('<span style="color:#7acc4a">&#x2705; Dosis/pase: '+dosis+'/'+prod.dosisMaxPase+' '+unidad+' (OK)</span>');
+    }
+  }
+
+  // Check total dose in campaign
+  if(prod.dosisMaxTotal > 0 && dosis > 0) {
+    var dosisAcum = uso.dosisTotalHa + dosis;
+    if(dosisAcum > prod.dosisMaxTotal) {
+      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Dosis total campaña: '+(uso.dosisTotalHa).toFixed(2)+' ya aplicados + '+dosis+' = '+dosisAcum.toFixed(2)+' (máx. '+prod.dosisMaxTotal+') &#x26A0;</span>');
+    } else {
+      var restante = prod.dosisMaxTotal - dosisAcum;
+      msgs.push('<span style="color:'+(restante < prod.dosisMaxTotal*0.2 ? '#e67e22':'#7acc4a')+'">&#x2705; Total campaña: '+dosisAcum.toFixed(2)+'/'+prod.dosisMaxTotal+' (quedan '+restante.toFixed(2)+')</span>');
+    }
+  }
+
+  limBadge.innerHTML = msgs.length
+    ? '<div style="margin-top:4px;padding:5px 8px;background:rgba(0,0,0,.25);border-radius:5px;font-size:11px;line-height:1.7">'+msgs.join('<br>')+'</div>'
+    : '';
 }
 
 function saveTratamiento() {
@@ -3864,6 +3959,34 @@ function saveTratamiento() {
     if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
+
+  // ── Comprueba límites legales de cada producto ──
+  var warnings = [];
+  var campanaV   = document.getElementById('trt-campana').value;
+  var recintoIds2 = Array.prototype.slice.call(document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')).map(function(c){ return c.value; });
+  productos.forEach(function(pRow) {
+    var prod = (DB.productos||[]).find(function(p){ return p.id===pRow.productoId; });
+    if(!prod) return;
+    var uso = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds2, editingId.tratamiento||null);
+    var nombre = prod.nombre;
+    if(prod.dosisMaxPase > 0 && pRow.dosis > prod.dosisMaxPase) {
+      warnings.push('⛔ ' + nombre + ': la dosis por pase (' + pRow.dosis + ' ' + pRow.unidad + ') supera el máximo permitido (' + prod.dosisMaxPase + ').');
+    }
+    if(prod.dosisMaxTotal > 0) {
+      var totalAcum = uso.dosisTotalHa + pRow.dosis;
+      if(totalAcum > prod.dosisMaxTotal) {
+        warnings.push('⛔ ' + nombre + ': dosis total acumulada en campaña (' + totalAcum.toFixed(2) + ') superaría el máximo (' + prod.dosisMaxTotal + ').');
+      }
+    }
+    if(prod.nTrtsMax > 0 && uso.nTrts >= prod.nTrtsMax) {
+      warnings.push('⛔ ' + nombre + ': ya se han registrado ' + uso.nTrts + ' tratamientos en esta campaña (máximo ' + prod.nTrtsMax + ').');
+    }
+  });
+
+  if(warnings.length) {
+    var msg = '⚠️ Advertencia de límites legales:\n\n' + warnings.join('\n') + '\n\n¿Desea guardar igualmente?';
+    if(!confirm(msg)) return;
+  }
 
   var data = {
     fecha:      fecha,
@@ -4417,6 +4540,9 @@ function openProductoModal(id=null) {
   document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
   var ucEl = document.getElementById('prod-unidad-compra');
   if(ucEl) ucEl.value = p ? (p.unidadCompra||p.unidadCoste||'') : '';
+  var dmpEl = document.getElementById('prod-dosis-max-pase');   if(dmpEl) dmpEl.value = p ? (p.dosisMaxPase||'')  : '';
+  var dmtEl = document.getElementById('prod-dosis-max-total');  if(dmtEl) dmtEl.value = p ? (p.dosisMaxTotal||'') : '';
+  var ntrEl = document.getElementById('prod-ntrts-max');        if(ntrEl) ntrEl.value = p ? (p.nTrtsMax||'')     : '';
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
@@ -4901,8 +5027,11 @@ function saveProducto() {
     titular:     document.getElementById('prod-titular').value.trim(),
     formulacion: document.getElementById('prod-formulacion').value,
     dosis:       document.getElementById('prod-dosis').value.trim(),
-    plazo:       document.getElementById('prod-plazo').value.trim(),
+    plazo:        document.getElementById('prod-plazo').value.trim(),
     unidadCompra: (document.getElementById('prod-unidad-compra')||{value:''}).value || '',
+    dosisMaxPase:  parseFloat((document.getElementById('prod-dosis-max-pase')||{value:''}).value)  || 0,
+    dosisMaxTotal: parseFloat((document.getElementById('prod-dosis-max-total')||{value:''}).value) || 0,
+    nTrtsMax:      parseInt((document.getElementById('prod-ntrts-max')||{value:''}).value)         || 0,
     formatos:    formatos,
     coste:       legacyCoste,
     unidadCoste: legacyUnidad,
@@ -9871,8 +10000,11 @@ function renderCompras() {
           var esDev = parseFloat(item.cantidad)<0;
           return '<tr style="'+(esDev?'background:rgba(192,57,43,.07)':'')+'">'
             +'<td>'+icon+' <b style="'+(esDev?'color:#e74c3c':'')+'">'+nm+'</b>'+(esDev?' <span style="font-size:10px;background:#e74c3c;color:#fff;padding:1px 6px;border-radius:8px">devoluci\u00f3n</span>':'')+'</td>'
-            +'<td style="white-space:nowrap;text-align:right"><b style="'+(esDev?'color:#e74c3c':'')+'">'+item.cantidad+' '+item.unidad+'</b></td>'
-            +'<td style="text-align:right">'+(item.precio?parseFloat(item.precio).toFixed(2)+' \u20ac':'&mdash;')+'</td>'
+            +'<td style="white-space:nowrap;text-align:right"><b style="'+(esDev?'color:#e74c3c':'')+'">'+item.cantidad+' '+item.unidad+'</b>'
+            +(item.precioUnitario && item.tipo==='abono' ? '<br><span style="font-size:10px;color:var(--text3)">'+parseFloat(item.precioUnitario).toFixed(2)+' \u20ac/t</span>' : '')
+            +(item.precioUnitario && item.tipo==='producto' ? '<br><span style="font-size:10px;color:var(--text3)">'+parseFloat(item.precioUnitario).toFixed(2)+' \u20ac/u</span>' : '')
+            +'</td>'
+            +'<td style="text-align:right;font-weight:700;color:#7acc4a">'+(item.precio?parseFloat(item.precio).toFixed(2)+' \u20ac':'&mdash;')+'</td>'
             +'</tr>';
         }).join('');
 
@@ -10009,18 +10141,26 @@ function addCompraRow(data) {
 
   top.appendChild(tipoSel); top.appendChild(wrap); top.appendChild(removeBtn);
 
-  // Row 2: cant, unidad, precio
+  // Row 2: cant, unidad, precio unitario, importe total
   var fields = document.createElement('div');
-  fields.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px;gap:8px;align-items:end';
+  fields.className = 'compra-row-fields';
+  fields.style.cssText = 'display:grid;grid-template-columns:1fr 80px 110px 110px;gap:8px;align-items:end';
+
+  var precioLabel = tipo === 'abono' ? 'Precio (&#x20AC;/t)' : 'Precio unit. (&#x20AC;/u)';
+  var precioUnit  = tipo === 'abono' ? data&&data.precioUnitario||'' : (data&&data.precioUnitario||'');
+  // Legacy: if no precioUnitario, leave empty — importe is stored in data.precio
   fields.innerHTML = '<div style="display:flex;flex-direction:column;gap:3px">'
     +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Cantidad</label>'
-    +'<input type="number" step="0.01" class="compra-row-cant" placeholder="cant. (neg.=devolución)" value="'+(data&&data.cantidad||'')+'" style="width:100%"></div>'
+    +'<input type="number" step="0.01" class="compra-row-cant" placeholder="cant. (neg.=devolución)" value="'+(data&&data.cantidad||'')+'" style="width:100%" oninput="calcCompraImporte(this)"></div>'
     +'<div style="display:flex;flex-direction:column;gap:3px">'
     +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Unidad</label>'
-    +'<select class="compra-row-unidad" style="width:100%">'+unidades+'</select></div>'
+    +'<select class="compra-row-unidad" style="width:100%" onchange="calcCompraImporte(this)">'+unidades+'</select></div>'
     +'<div style="display:flex;flex-direction:column;gap:3px">'
-    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Precio total (&#x20AC;)</label>'
-    +'<input type="number" step="0.01" class="compra-row-precio" placeholder="&#x20AC;" value="'+(data&&data.precio||'')+'" style="width:100%"></div>';
+    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase" class="compra-precio-label">'+precioLabel+'</label>'
+    +'<input type="number" step="0.01" class="compra-row-precio-unit" placeholder="&#x20AC;" value="'+(precioUnit||'')+'" style="width:100%" oninput="calcCompraImporte(this)"></div>'
+    +'<div style="display:flex;flex-direction:column;gap:3px">'
+    +'<label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Importe total (&#x20AC;)</label>'
+    +'<input type="number" step="0.01" class="compra-row-precio" placeholder="&#x20AC; total" value="'+(data&&data.precio||'')+'" style="width:100%;background:rgba(74,140,42,.08);border-color:var(--primary)" oninput="calcCompraImporte(this)"></div>';
 
   inner.appendChild(top); inner.appendChild(fields);
   row._compraList = list;
@@ -10084,6 +10224,38 @@ function compraComboSelect(item) {
   onCompraItemChange(inp);
 }
 
+// Recalculates the total amount when cant, unidad or precio-unit changes.
+// For abonos the unit price is €/t so we convert to the purchase unit.
+// For fitosanitarios the unit price is €/unit (L, kg, etc.) directly.
+function calcCompraImporte(el) {
+  var row = el.closest('.product-row'); if(!row) return;
+  var tipo    = (row.querySelector('.compra-row-tipo')||{value:'producto'}).value;
+  var cant    = parseFloat((row.querySelector('.compra-row-cant')||{value:''}).value) || 0;
+  var unidad  = (row.querySelector('.compra-row-unidad')||{value:''}).value;
+  var precUn  = parseFloat((row.querySelector('.compra-row-precio-unit')||{value:''}).value) || 0;
+  var importeInp = row.querySelector('.compra-row-precio'); if(!importeInp) return;
+
+  // If the user is editing the importe field directly, don't override it
+  if(el.classList.contains('compra-row-precio')) return;
+
+  if(!cant || !precUn) { importeInp.value = ''; return; }
+
+  var importe = 0;
+  if(tipo === 'abono') {
+    // Price is always €/t. Convert quantity to tonnes.
+    var cantT = cant;
+    if     (unidad === 'kg')  cantT = cant / 1000;
+    else if(unidad === 'g')   cantT = cant / 1000000;
+    else if(unidad === 'saco') cantT = cant * 0.05; // assume 50 kg saco by default
+    // unidad === 't' or anything else → cantT = cant
+    importe = precUn * cantT;
+  } else {
+    // Fitosanitarios: €/unit (L or kg as purchased)
+    importe = precUn * Math.abs(cant);
+  }
+  importeInp.value = importe.toFixed(2);
+}
+
 function refreshCompraRowItems(tipoSel) {
   var row  = tipoSel.closest('.product-row'); if(!row) return;
   var tipo = tipoSel.value;
@@ -10093,6 +10265,12 @@ function refreshCompraRowItems(tipoSel) {
   inp.dataset.itemId = '';
   inp.dataset.tipo   = tipo;
   inp.placeholder = '\uD83D\uDD0D Buscar '+(tipo==='abono'?'abono':'producto')+'...';
+  // Update price label
+  var lbl = row.querySelector('.compra-precio-label');
+  if(lbl) lbl.innerHTML = tipo==='abono' ? 'Precio (&#x20AC;/t)' : 'Precio unit. (&#x20AC;/u)';
+  // Clear price fields
+  var pu = row.querySelector('.compra-row-precio-unit'); if(pu) pu.value = '';
+  var pi = row.querySelector('.compra-row-precio');      if(pi) pi.value = '';
 }
 
 function onCompraItemChange(inp) {
@@ -10156,7 +10334,8 @@ function saveCompra() {
     var cant   = parseFloat((row.querySelector('.compra-row-cant')||{}).value)||0;
     var unidad = (row.querySelector('.compra-row-unidad')||{}).value;
     var precio = parseFloat((row.querySelector('.compra-row-precio')||{}).value)||0;
-    if(itemId && cant !== 0) items.push({tipo:tipo, itemId:itemId, cantidad:cant, unidad:unidad, precio:precio});
+    var precioUnitario = parseFloat((row.querySelector('.compra-row-precio-unit')||{}).value)||0;
+    if(itemId && cant !== 0) items.push({tipo:tipo, itemId:itemId, cantidad:cant, unidad:unidad, precio:precio, precioUnitario:precioUnitario});
   });
   if(!items.length) { alert('Añade al menos un producto'); return; }
 
