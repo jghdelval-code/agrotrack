@@ -2573,6 +2573,35 @@ var gDrive = {
       }).catch(function(e){ if(callback) callback(null, 'Error de red'); });
   },
 
+  // ── Upload an image (JPEG) to Drive with correct MIME type ───────────────
+  uploadImage: function(arrayBuffer, fileName, callback) {
+    var self = this;
+    if(!self.token) { if(callback) callback(null, 'No conectado a Google Drive'); return; }
+    var mimeType = 'image/jpeg';
+    var meta = JSON.stringify({ name: fileName, mimeType: mimeType });
+    var bytes = new Uint8Array(arrayBuffer);
+    var binaryStr = '';
+    // Use chunked btoa to avoid call-stack limits on large images
+    var chunkSize = 8192;
+    var base64 = '';
+    for(var i=0; i<bytes.length; i+=chunkSize) {
+      base64 += btoa(String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize)));
+    }
+    var boundary = '-------agrohumada_foto_boundary';
+    var multipart = '--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+meta+
+                    '\r\n--'+boundary+'\r\nContent-Type: '+mimeType+'\r\nContent-Transfer-Encoding: base64\r\n\r\n'+base64+
+                    '\r\n--'+boundary+'--';
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer '+self.token, 'Content-Type': 'multipart/related; boundary='+boundary },
+      body: multipart
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.error){ if(callback) callback(null, d.error.message||'Error de Drive'); return; }
+        if(callback) callback(d.id, null);
+      }).catch(function(e){ if(callback) callback(null, 'Error de red'); });
+  },
+
   // ── Delete a Drive file by id (best-effort, used when removing a ficha) ──
   deleteFile: function(fileId) {
     var self = this;
@@ -7483,8 +7512,8 @@ function procesarFoto(input) {
       status.textContent = '&#x23F3; Subiendo a Drive...';
       var fecha = new Date().toISOString().slice(0,10);
       var r = DB.recintos.find(function(x){return x.id===_fotoRecintoId;});
-      var fname = 'AgroTrack_Foto_'+(r?r.nombreFinca||r.numPoligono:'parcela')+'_'+fecha+'_'+Date.now()+'.jpg';
-      gDrive.uploadFichaPdf(blob, fname, function(fileId, err) {
+      var fname = 'AgroHumada_Foto_'+(r?r.nombreFinca||r.numPoligono:'parcela')+'_'+fecha+'_'+Date.now()+'.jpg';
+      gDrive.uploadImage(blob, fname, function(fileId, err) {
         if(err) {
           status.textContent = '&#x274C; Error al subir: '+err;
           return;
@@ -7520,10 +7549,12 @@ function comprimirImagen(file, maxW, callback) {
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
+      // toBlob gives us a real JPEG Blob — read it as ArrayBuffer directly
       canvas.toBlob(function(blob) {
-        var dr = new FileReader();
-        dr.onload = function(ev){ callback(ev.target.result, canvas.toDataURL('image/jpeg',0.82)); };
-        dr.readAsArrayBuffer(blob);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        var fr = new FileReader();
+        fr.onload = function(ev){ callback(ev.target.result, dataUrl); };
+        fr.readAsArrayBuffer(blob);
       }, 'image/jpeg', 0.82);
     };
     img.src = e.target.result;
