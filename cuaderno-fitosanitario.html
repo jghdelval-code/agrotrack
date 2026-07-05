@@ -7514,10 +7514,10 @@ function procesarFoto(input) {
   // Get GPS location at the time of the upload (best effort)
   function doUpload(lat, lng) {
     status.textContent = '&#x23F3; Comprimiendo...';
-    comprimirImagen(file, 1600, function(blob, dataUrl) {
+    comprimirImagen(file, 1600, function(blob, thumbUrl) {
       if(!gDrive.token) {
-        // Offline: store as base64 locally (no Drive)
-        guardarFotoLocal(file.name, dataUrl, lat, lng);
+        // Offline: store thumbnail locally
+        guardarFotoLocal(file.name, thumbUrl, lat, lng);
         status.textContent = '&#x26A0;&#xFE0F; Guardada localmente (sin Drive)';
         renderFotosGaleria();
         renderParcelas && renderParcelas();
@@ -7532,7 +7532,7 @@ function procesarFoto(input) {
           status.textContent = '&#x274C; Error al subir: '+err;
           return;
         }
-        guardarFotoDrive(fname, fileId, lat, lng);
+        guardarFotoDrive(fname, fileId, lat, lng, thumbUrl);
         status.textContent = '&#x2705; Foto guardada en Drive';
         input.value = '';
         renderFotosGaleria();
@@ -7557,22 +7557,31 @@ function comprimirImagen(file, maxW, callback) {
   reader.onload = function(e) {
     var img = new Image();
     img.onload = function() {
+      // Full-size canvas (max 1600px) — for Drive upload
       var w = img.width, h = img.height;
       if(w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      // Pass the Blob directly — two-step Drive upload accepts it without conversion
+
+      // Thumbnail canvas (max 300px) — stored locally for gallery preview
+      var tw = w, th = h;
+      if(tw > 300) { th = Math.round(th * 300 / tw); tw = 300; }
+      var thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = tw; thumbCanvas.height = th;
+      thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+      var thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.7);
+
       canvas.toBlob(function(blob) {
         if(!blob) {
-          // Fallback for browsers where toBlob fails: convert dataUrl → Blob manually
+          // Fallback: convert dataUrl to Blob
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           var byteStr = atob(dataUrl.split(',')[1]);
           var arr = new Uint8Array(byteStr.length);
           for(var i=0; i<byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
           blob = new Blob([arr], {type:'image/jpeg'});
         }
-        callback(blob, dataUrl);
+        callback(blob, thumbUrl);
       }, 'image/jpeg', 0.82);
     };
     img.onerror = function() { alert('No se pudo leer la imagen'); };
@@ -7591,12 +7600,14 @@ function guardarFotoLocal(nombre, dataUrl, lat, lng) {
   save();
 }
 
-function guardarFotoDrive(nombre, driveFileId, lat, lng) {
+function guardarFotoDrive(nombre, driveFileId, lat, lng, thumbUrl) {
   if(!DB.fotos) DB.fotos = [];
   DB.fotos.push({
     id: uid(), recintoId: _fotoRecintoId,
     fecha: new Date().toISOString(), nombre: nombre,
-    lat: lat, lng: lng, tipo: 'drive', driveFileId: driveFileId
+    lat: lat, lng: lng, tipo: 'drive',
+    driveFileId: driveFileId,
+    thumbUrl: thumbUrl || ''   // small local preview, ~300px wide JPEG
   });
   save();
 }
@@ -7623,11 +7634,12 @@ function renderFotosGaleria() {
       var fechaStr = d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
       var recName = (DB.recintos.find(function(x){return x.id===f.recintoId;})||{}).nombreFinca||'';
       var coordStr = (f.lat&&f.lng) ? '&#x1F4CD; '+f.lat.toFixed(5)+', '+f.lng.toFixed(5) : '';
-      var img = f.tipo==='local'
-        ? '<img src="'+f.dataUrl+'" style="width:100%;height:110px;object-fit:cover;border-radius:6px 6px 0 0;display:block">'
-        : '<div onclick="verFotoDrive(\''+f.driveFileId+'\')" style="cursor:pointer;width:100%;height:110px;background:rgba(74,140,42,.08);display:flex;align-items:center;justify-content:center;border-radius:6px 6px 0 0;flex-direction:column;gap:6px">'
+      var previewSrc = f.thumbUrl || f.dataUrl || '';
+      var img = previewSrc
+        ? '<img src="'+previewSrc+'" style="width:100%;height:110px;object-fit:cover;border-radius:6px 6px 0 0;display:block" onclick="'+( f.driveFileId ? "verFotoDrive('"+f.driveFileId+"')" : '' )+'" style="cursor:pointer">'
+        : '<div style="width:100%;height:110px;background:rgba(74,140,42,.08);display:flex;align-items:center;justify-content:center;border-radius:6px 6px 0 0;flex-direction:column;gap:6px">'
           +'<span style="font-size:32px">&#x1F5BC;&#xFE0F;</span>'
-          +'<span style="font-size:11px;color:var(--primary);font-weight:700">Ver en Drive</span>'
+          +'<span style="font-size:11px;color:var(--text3)">Sin vista previa</span>'
           +'</div>';
       return '<div style="background:var(--card);border:1px solid var(--border2);border-radius:8px;overflow:hidden">'
         + img
