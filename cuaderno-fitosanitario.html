@@ -2105,6 +2105,7 @@ var DB = JSON.parse(localStorage.getItem('agrotrack_data') || 'null') || JSON.pa
 if(!DB.abonos)   DB.abonos   = [];
 if(!DB.abonados) DB.abonados = [];
 if(!DB.compras)  DB.compras  = [];
+if(!DB.fotos)    DB.fotos    = [];
 // Migration: fix compras saved with ES6 shorthand bug (clienteId saved as undefined key)
 (function() {
   var fixed = false;
@@ -2178,7 +2179,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 //   - records that exist on both sides: the "winning" side's copy is used
 //   - explicit deletions (tombstones in _deletedIds) always win over a
 //     record still present on the other side, so deletes still propagate
-var SYNC_ENTITY_KEYS = ['clientes','recintos','tratamientos','productos','abonos','abonados','compras'];
+var SYNC_ENTITY_KEYS = ['clientes','recintos','tratamientos','productos','abonos','abonados','compras','fotos'];
 
 function mergeDB(remote, local, preferLocalOnConflict) {
   remote = remote || {};
@@ -2221,9 +2222,10 @@ function mergeDB(remote, local, preferLocalOnConflict) {
 }
 
 function refreshUIAfterSync() {
-  if(!DB.abonos)   DB.abonos   = [];
+  if(!DB.abonos)   DB.abonados = [];
   if(!DB.abonados) DB.abonados = [];
   if(!DB.compras)  DB.compras  = [];
+  if(!DB.fotos)    DB.fotos    = [];
   var camps = getAllCampanas();
   if(camps.length) currentCampana = camps[camps.length-1];
   refreshCampanaSelector();
@@ -7656,8 +7658,17 @@ function verFotoEnMapa(lat, lng) {
 }
 
 function eliminarFotoRegistro(fotoId) {
-  confirmDialog('¿Eliminar esta foto?\n(El archivo en Drive NO se borrará automáticamente)', function() {
-    DB.fotos = (DB.fotos||[]).filter(function(f){ return f.id!==fotoId; });
+  var foto = (DB.fotos||[]).find(function(f){ return f.id === fotoId; });
+  if(!foto) return;
+  confirmDialog('¿Eliminar esta foto?', function() {
+    // Remove from local array
+    DB.fotos = (DB.fotos||[]).filter(function(f){ return f.id !== fotoId; });
+    // Mark as deleted so mergeDB never restores it from Drive JSON
+    markDeleted('fotos', fotoId);
+    // Also delete the image file from Drive if possible
+    if(foto.driveFileId && gDrive.token) {
+      gDrive.deleteFile(foto.driveFileId);
+    }
     save();
     renderFotosGaleria();
     renderParcelas && renderParcelas();
