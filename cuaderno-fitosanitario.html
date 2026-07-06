@@ -1155,27 +1155,16 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
           <span style="font-size:10px;color:var(--text3);margin-top:3px;display:block">Se selecciona automáticamente al añadirlo en una compra</span>
         </div>
-        <!-- ── Límites legales de aplicación ── -->
+        <!-- ── Usos autorizados por cultivo ── -->
         <div class="form-group span-2">
-          <label style="color:#e67e22;font-weight:700">&#x26A0;&#xFE0F; Límites legales de aplicación (MAPA)</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
-            <div>
-              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Dosis máx. por pase (L o kg/ha)</label>
-              <input type="number" step="0.01" min="0" id="prod-dosis-max-pase" placeholder="ej: 2.5"
-                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Dosis máx. total/campaña (L o kg/ha)</label>
-              <input type="number" step="0.01" min="0" id="prod-dosis-max-total" placeholder="ej: 7.5"
-                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--text3);margin-bottom:3px;display:block">Nº máx. tratamientos/campaña</label>
-              <input type="number" step="1" min="0" id="prod-ntrts-max" placeholder="ej: 3"
-                style="width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:13px">
-            </div>
+          <label style="color:#e67e22;font-weight:700">&#x1F33F; Usos autorizados y l&iacute;mites por cultivo</label>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:8px">
+            Según etiqueta o ficha del MAPA. Se usa para alertar al registrar tratamientos si se supera algún límite.
           </div>
-          <div style="font-size:10px;color:var(--text3);margin-top:4px">Datos de la etiqueta o ficha del MAPA. Se usan para avisar si se supera el límite al registrar tratamientos.</div>
+          <div id="usos-lista" style="margin-bottom:8px"></div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addUsoRow()" style="width:100%;justify-content:center">
+            &#x2795; Añadir cultivo / uso
+          </button>
         </div>
         <div class="form-group span-2">
           <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
@@ -3824,28 +3813,51 @@ function getTrtTotalHa() {
   return total;
 }
 
-// ── Accumulated usage of a product in a campaign for a set of recintos ──────
-// Returns {nTrts, dosisTotal} — nTrts = number of treatments where the product
-// was applied (per recinto, weighted by ha), dosisTotal = sum of doses × ha
-// across all treatments in the same campaign (same client + campaign).
-// excludeTrtId: omit the treatment being edited (edit mode).
+// Returns {nTrts, dosisTotalHa, uso} where uso is the best-matching per-crop
+// limits object (or null if none configured). Falls back to global limits.
 function calcUsoProducto(prodId, clienteId, campana, recintoIds, excludeTrtId) {
-  var nTrts = 0;          // number of pases already applied
-  var dosisTotalHa = 0;   // cumulative dose already applied (L or kg / ha)
+  var nTrts = 0;
+  var dosisTotalHa = 0;
   (DB.tratamientos||[]).forEach(function(t) {
     if(t.id === excludeTrtId) return;
     if(t.clienteId !== clienteId) return;
     if(t.campana   !== campana)   return;
-    // Find if this treatment applied our product
     var pRow = (t.productos||[]).find(function(p){ return p.productoId === prodId; });
     if(!pRow) return;
-    // Check overlap with our target recintos
     var overlap = (t.recintoIds||[]).filter(function(rid){ return recintoIds.indexOf(rid) >= 0; });
     if(!overlap.length) return;
     nTrts++;
     dosisTotalHa += (parseFloat(pRow.dosis)||0);
   });
-  return { nTrts: nTrts, dosisTotalHa: dosisTotalHa };
+
+  // Find the best matching uso for the selected recintos
+  var prod = (DB.productos||[]).find(function(p){ return p.id === prodId; });
+  var uso = null;
+  if(prod && prod.usos && prod.usos.length) {
+    // Gather unique crops from the selected recintos
+    var crops = [];
+    recintoIds.forEach(function(rid) {
+      var r = DB.recintos.find(function(x){ return x.id===rid; });
+      if(r && r.especieVariedad) {
+        var cv = r.especieVariedad.split('/')[0].trim().toUpperCase();
+        if(crops.indexOf(cv)<0) crops.push(cv);
+      }
+    });
+    // Find first uso that matches any crop (exact or partial)
+    uso = prod.usos.find(function(u) {
+      var uc = (u.cultivo||'').toUpperCase();
+      return crops.some(function(cv){ return uc && (cv===uc || cv.indexOf(uc)>=0 || uc.indexOf(cv)>=0); });
+    });
+    // Fallback: if only one uso defined, use it regardless of crop
+    if(!uso && prod.usos.length === 1) uso = prod.usos[0];
+  }
+  // If no per-crop uso, build one from legacy global limits
+  if(!uso && prod) {
+    if(prod.dosisMaxPase||prod.dosisMaxTotal||prod.nTrtsMax) {
+      uso = { cultivo:'', dosisMaxPase: prod.dosisMaxPase||0, dosisMaxTotal: prod.dosisMaxTotal||0, nTrtsMax: prod.nTrtsMax||0, plazo: prod.plazo||'' };
+    }
+  }
+  return { nTrts: nTrts, dosisTotalHa: dosisTotalHa, uso: uso };
 }
 
 function calcProdRowPVP(input) {
@@ -3941,44 +3953,36 @@ function calcProdRowPVP(input) {
   var clienteId  = (document.getElementById('trt-cliente')||{}).value||'';
   var campanaV   = (document.getElementById('trt-campana')||{}).value||currentCampana||'';
   var recintoIds = Array.prototype.slice.call(document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')).map(function(c){ return c.value; });
-  var uso        = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds, editingId.tratamiento||null);
-
+  var calc       = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds, editingId.tratamiento||null);
+  var uso        = calc.uso;
   var msgs = [];
 
-  // Check nº of treatments
-  if(prod.nTrtsMax > 0) {
-    var trtsRestantes = prod.nTrtsMax - uso.nTrts;
-    if(trtsRestantes <= 0) {
-      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Tratamientos: ya se han dado '+uso.nTrts+'/'+prod.nTrtsMax+' permitidos esta campaña</span>');
-    } else if(trtsRestantes === 1) {
-      msgs.push('<span style="color:#e67e22;font-weight:700">&#x26A0; Tratamientos: este sería el último permitido ('+prod.nTrtsMax+' máx.)</span>');
-    } else {
-      msgs.push('<span style="color:#7acc4a">&#x2705; Tratamientos: '+uso.nTrts+'/'+prod.nTrtsMax+' usados (quedan '+trtsRestantes+')</span>');
-    }
-  }
+  if(uso) {
+    if(uso.cultivo) msgs.push('<span style="color:var(--text3);font-size:10px">&#x1F33F; Límites para: <b style=\'color:var(--white)\'>'+uso.cultivo+'</b></span>');
 
-  // Check dose per pase
-  if(prod.dosisMaxPase > 0 && dosis > 0) {
-    if(dosis > prod.dosisMaxPase) {
-      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Dosis/pase: '+dosis+' supera el máximo de '+prod.dosisMaxPase+' '+unidad+'</span>');
-    } else {
-      msgs.push('<span style="color:#7acc4a">&#x2705; Dosis/pase: '+dosis+'/'+prod.dosisMaxPase+' '+unidad+' (OK)</span>');
+    if(uso.nTrtsMax > 0) {
+      var trtsR = uso.nTrtsMax - calc.nTrts;
+      if(trtsR <= 0)       msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Tratamientos: '+calc.nTrts+'/'+uso.nTrtsMax+' ya aplicados</span>');
+      else if(trtsR === 1) msgs.push('<span style="color:#e67e22;font-weight:700">&#x26A0; Último tratamiento permitido (máx. '+uso.nTrtsMax+')</span>');
+      else                 msgs.push('<span style="color:#7acc4a">&#x2705; Tratamientos: '+calc.nTrts+'/'+uso.nTrtsMax+' (quedan '+trtsR+')</span>');
     }
-  }
-
-  // Check total dose in campaign
-  if(prod.dosisMaxTotal > 0 && dosis > 0) {
-    var dosisAcum = uso.dosisTotalHa + dosis;
-    if(dosisAcum > prod.dosisMaxTotal) {
-      msgs.push('<span style="color:#e74c3c;font-weight:700">&#x274C; Dosis total campaña: '+(uso.dosisTotalHa).toFixed(2)+' ya aplicados + '+dosis+' = '+dosisAcum.toFixed(2)+' (máx. '+prod.dosisMaxTotal+') &#x26A0;</span>');
-    } else {
-      var restante = prod.dosisMaxTotal - dosisAcum;
-      msgs.push('<span style="color:'+(restante < prod.dosisMaxTotal*0.2 ? '#e67e22':'#7acc4a')+'">&#x2705; Total campaña: '+dosisAcum.toFixed(2)+'/'+prod.dosisMaxTotal+' (quedan '+restante.toFixed(2)+')</span>');
+    if(uso.dosisMaxPase > 0 && dosis > 0) {
+      msgs.push(dosis > uso.dosisMaxPase
+        ? '<span style="color:#e74c3c;font-weight:700">&#x274C; Dosis/pase: '+dosis+' supera máx. '+uso.dosisMaxPase+' '+unidad+'</span>'
+        : '<span style="color:#7acc4a">&#x2705; Dosis/pase: '+dosis+'/'+uso.dosisMaxPase+' '+unidad+'</span>');
     }
+    if(uso.dosisMaxTotal > 0 && dosis > 0) {
+      var acum = calc.dosisTotalHa + dosis;
+      var rest = uso.dosisMaxTotal - acum;
+      msgs.push(acum > uso.dosisMaxTotal
+        ? '<span style="color:#e74c3c;font-weight:700">&#x274C; Total campaña: '+acum.toFixed(2)+' supera máx. '+uso.dosisMaxTotal+'</span>'
+        : '<span style="color:'+(rest<uso.dosisMaxTotal*0.2?'#e67e22':'#7acc4a')+'">&#x2705; Total campaña: '+acum.toFixed(2)+'/'+uso.dosisMaxTotal+' (quedan '+rest.toFixed(2)+')</span>');
+    }
+    if(uso.plazo) msgs.push('<span style="color:var(--text3)">&#x23F3; Plazo seg.: '+uso.plazo+' días</span>');
   }
 
   limBadge.innerHTML = msgs.length
-    ? '<div style="margin-top:4px;padding:5px 8px;background:rgba(0,0,0,.25);border-radius:5px;font-size:11px;line-height:1.7">'+msgs.join('<br>')+'</div>'
+    ? '<div style="margin-top:4px;padding:5px 8px;background:rgba(0,0,0,.25);border-radius:5px;font-size:11px;line-height:1.8">'+msgs.join('<br>')+'</div>'
     : '';
 }
 
@@ -4006,25 +4010,21 @@ function saveTratamiento() {
 
   // ── Comprueba límites legales de cada producto ──
   var warnings = [];
-  var campanaV   = document.getElementById('trt-campana').value;
+  var campanaV    = document.getElementById('trt-campana').value;
   var recintoIds2 = Array.prototype.slice.call(document.querySelectorAll('#recintos-picker input[type=checkbox]:checked')).map(function(c){ return c.value; });
   productos.forEach(function(pRow) {
     var prod = (DB.productos||[]).find(function(p){ return p.id===pRow.productoId; });
     if(!prod) return;
-    var uso = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds2, editingId.tratamiento||null);
-    var nombre = prod.nombre;
-    if(prod.dosisMaxPase > 0 && pRow.dosis > prod.dosisMaxPase) {
-      warnings.push('⛔ ' + nombre + ': la dosis por pase (' + pRow.dosis + ' ' + pRow.unidad + ') supera el máximo permitido (' + prod.dosisMaxPase + ').');
-    }
-    if(prod.dosisMaxTotal > 0) {
-      var totalAcum = uso.dosisTotalHa + pRow.dosis;
-      if(totalAcum > prod.dosisMaxTotal) {
-        warnings.push('⛔ ' + nombre + ': dosis total acumulada en campaña (' + totalAcum.toFixed(2) + ') superaría el máximo (' + prod.dosisMaxTotal + ').');
-      }
-    }
-    if(prod.nTrtsMax > 0 && uso.nTrts >= prod.nTrtsMax) {
-      warnings.push('⛔ ' + nombre + ': ya se han registrado ' + uso.nTrts + ' tratamientos en esta campaña (máximo ' + prod.nTrtsMax + ').');
-    }
+    var calc = calcUsoProducto(prod.id, clienteId, campanaV, recintoIds2, editingId.tratamiento||null);
+    var uso  = calc.uso;
+    if(!uso) return;
+    var nombre = prod.nombre + (uso.cultivo?' ('+uso.cultivo+')':'');
+    if(uso.dosisMaxPase > 0 && pRow.dosis > uso.dosisMaxPase)
+      warnings.push('⛔ '+nombre+': dosis por pase ('+pRow.dosis+' '+pRow.unidad+') supera el máximo ('+uso.dosisMaxPase+').');
+    if(uso.dosisMaxTotal > 0 && (calc.dosisTotalHa + pRow.dosis) > uso.dosisMaxTotal)
+      warnings.push('⛔ '+nombre+': dosis total acumulada en campaña ('+(calc.dosisTotalHa+pRow.dosis).toFixed(2)+') superaría el máximo ('+uso.dosisMaxTotal+').');
+    if(uso.nTrtsMax > 0 && calc.nTrts >= uso.nTrtsMax)
+      warnings.push('⛔ '+nombre+': ya se han dado '+calc.nTrts+' tratamientos (máximo '+uso.nTrtsMax+').');
   });
 
   if(warnings.length) {
@@ -4504,6 +4504,90 @@ function quitarCancelado() {
   if(cancWrap) cancWrap.style.display = 'none';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// USOS AUTORIZADOS POR CULTIVO — gestión dentro del modal de producto
+// _editingUsos es el array local mientras el usuario edita el producto
+// ─────────────────────────────────────────────────────────────────────────────
+var _editingUsos = [];
+
+function renderUsosTable() {
+  var cont = document.getElementById('usos-lista'); if(!cont) return;
+  if(!_editingUsos.length) {
+    cont.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin usos registrados.</div>';
+    return;
+  }
+  cont.innerHTML = _editingUsos.map(function(u, idx) {
+    return '<div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      + '<span style="font-size:15px">&#x1F33F;</span>'
+      + '<strong style="color:var(--white);font-size:13px;flex:1">'+(u.cultivo||'<em style="color:var(--text3)">Sin cultivo</em>')+'</strong>'
+      + '<button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="removeUso('+idx+')">&#x1F5D1;</button>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      + usoField('Cultivo', 'text',   u.cultivo||'',    'uso-cultivo-'+idx,    'ej: TRIGO')
+      + usoField('Dosis máx./pase (L o kg/ha)', 'number', u.dosisMaxPase||'', 'uso-dmpase-'+idx, 'ej: 2.5')
+      + usoField('Dosis máx. total campaña (L o kg/ha)', 'number', u.dosisMaxTotal||'', 'uso-dmtotal-'+idx, 'ej: 7.5')
+      + usoField('Nº máx. tratamientos/campaña', 'number', u.nTrtsMax||'', 'uso-ntrts-'+idx, 'ej: 3')
+      + usoField('Plazo de seguridad (días)', 'text', u.plazo||'', 'uso-plazo-'+idx, 'ej: 21 / NP')
+      + usoField('Observaciones', 'text', u.obs||'', 'uso-obs-'+idx, 'Modo de empleo, restricciones...')
+      + '</div>'
+      + '<div style="text-align:right;margin-top:6px">'
+      + '<button type="button" class="btn btn-primary btn-sm" onclick="saveUso('+idx+')">&#x2705; Guardar uso</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function usoField(label, type, val, id, ph) {
+  return '<div>'
+    + '<label style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">'+label+'</label>'
+    + '<input type="'+type+'" id="'+id+'" value="'+(val||'')+'" placeholder="'+ph+'"'
+    + ' style="width:100%;background:var(--card);border:1px solid var(--border2);border-radius:5px;color:var(--white);padding:5px 8px;font-size:12px">'
+    + '</div>';
+}
+
+function addUsoRow() {
+  _editingUsos.push({ cultivo:'', dosisMaxPase:0, dosisMaxTotal:0, nTrtsMax:0, plazo:'', obs:'' });
+  renderUsosTable();
+  // Scroll to bottom of modal and focus the new row's cultivo field
+  setTimeout(function(){
+    var cont = document.getElementById('usos-lista');
+    if(cont) cont.scrollIntoView({behavior:'smooth', block:'end'});
+    var lastInput = document.getElementById('uso-cultivo-'+(_editingUsos.length-1));
+    if(lastInput) lastInput.focus();
+  }, 80);
+}
+
+function saveUso(idx) {
+  var u = _editingUsos[idx];
+  if(!u) return;
+  u.cultivo      = (document.getElementById('uso-cultivo-'+idx)||{value:''}).value.trim().toUpperCase();
+  u.dosisMaxPase = parseFloat((document.getElementById('uso-dmpase-'+idx)||{value:''}).value) || 0;
+  u.dosisMaxTotal= parseFloat((document.getElementById('uso-dmtotal-'+idx)||{value:''}).value) || 0;
+  u.nTrtsMax     = parseInt((document.getElementById('uso-ntrts-'+idx)||{value:''}).value) || 0;
+  u.plazo        = (document.getElementById('uso-plazo-'+idx)||{value:''}).value.trim();
+  u.obs          = (document.getElementById('uso-obs-'+idx)||{value:''}).value.trim();
+  renderUsosTable();
+}
+
+function removeUso(idx) {
+  _editingUsos.splice(idx, 1);
+  renderUsosTable();
+}
+
+function getUsosFromModal() {
+  // Flush any unsaved edits first
+  _editingUsos.forEach(function(u, idx) {
+    u.cultivo      = (document.getElementById('uso-cultivo-'+idx)||{value:u.cultivo}).value.trim().toUpperCase();
+    u.dosisMaxPase = parseFloat((document.getElementById('uso-dmpase-'+idx)||{value:'0'}).value) || 0;
+    u.dosisMaxTotal= parseFloat((document.getElementById('uso-dmtotal-'+idx)||{value:'0'}).value) || 0;
+    u.nTrtsMax     = parseInt((document.getElementById('uso-ntrts-'+idx)||{value:'0'}).value) || 0;
+    u.plazo        = (document.getElementById('uso-plazo-'+idx)||{value:''}).value.trim();
+    u.obs          = (document.getElementById('uso-obs-'+idx)||{value:''}).value.trim();
+  });
+  return _editingUsos.filter(function(u){ return u.cultivo; }); // drop blank rows
+}
+
 function uploadFichaPdf(inputEl) {
   var file = inputEl.files && inputEl.files[0];
   if(!file) return;
@@ -4587,6 +4671,9 @@ function openProductoModal(id=null) {
   var dmpEl = document.getElementById('prod-dosis-max-pase');   if(dmpEl) dmpEl.value = p ? (p.dosisMaxPase||'')  : '';
   var dmtEl = document.getElementById('prod-dosis-max-total');  if(dmtEl) dmtEl.value = p ? (p.dosisMaxTotal||'') : '';
   var ntrEl = document.getElementById('prod-ntrts-max');        if(ntrEl) ntrEl.value = p ? (p.nTrtsMax||'')     : '';
+  // Load per-crop usos
+  _editingUsos = JSON.parse(JSON.stringify(p ? (p.usos||[]) : []));
+  renderUsosTable();
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
@@ -5076,6 +5163,7 @@ function saveProducto() {
     dosisMaxPase:  parseFloat((document.getElementById('prod-dosis-max-pase')||{value:''}).value)  || 0,
     dosisMaxTotal: parseFloat((document.getElementById('prod-dosis-max-total')||{value:''}).value) || 0,
     nTrtsMax:      parseInt((document.getElementById('prod-ntrts-max')||{value:''}).value)         || 0,
+    usos:          getUsosFromModal(),
     formatos:    formatos,
     coste:       legacyCoste,
     unidadCoste: legacyUnidad,
