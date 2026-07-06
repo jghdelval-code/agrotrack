@@ -1634,7 +1634,8 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-body" style="padding:14px 18px">
       <div id="hist-parcela-info" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
       <div id="hist-parcela-stats" style="display:flex;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border2)"></div>
-      <div id="hist-parcela-body" style="max-height:50vh;overflow-y:auto"></div>
+      <div id="hist-parcela-body" style="max-height:40vh;overflow-y:auto"></div>
+      <div id="hist-parcela-fotos"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-historial-parcela')">Cerrar</button>
@@ -5874,13 +5875,54 @@ function verHistorialParcela(recintoId) {
 
   var labores = gatherLabores([r]);
   labores.sort(function(a,b){ return b.fecha.localeCompare(a.fecha); });
-  var nTrt = labores.filter(function(l){ return l.tipo==='tratamiento'; }).length;
-  var nAbo = labores.filter(function(l){ return l.tipo==='abonado'; }).length;
+  var nTrt   = labores.filter(function(l){ return l.tipo==='tratamiento'; }).length;
+  var nAbo   = labores.filter(function(l){ return l.tipo==='abonado'; }).length;
+  var fotos  = (DB.fotos||[]).filter(function(f){ return f.recintoId === r.id; })
+                              .sort(function(a,b){ return b.fecha.localeCompare(a.fecha); });
+
   document.getElementById('hist-parcela-stats').innerHTML =
     '<span class="tag tag-green">&#x1F48A; '+nTrt+' tratamiento'+(nTrt!==1?'s':'')+'</span>' +
-    '<span class="tag tag-blue">&#x1F9EA; '+nAbo+' abonado'+(nAbo!==1?'s':'')+'</span>';
+    '<span class="tag tag-blue">&#x1F9EA; '+nAbo+' abonado'+(nAbo!==1?'s':'')+'</span>' +
+    '<span class="tag tag-gray">&#x1F4F7; '+fotos.length+' foto'+(fotos.length!==1?'s':'')+'</span>';
 
   document.getElementById('hist-parcela-body').innerHTML = renderLaboresHtml(labores);
+
+  // ── Foto section at the bottom of the modal ──
+  var fotoSecEl = document.getElementById('hist-parcela-fotos');
+  if(fotoSecEl) {
+    var fotoHtml = '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border2)">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      + '<span style="font-weight:700;font-size:13px;color:var(--white)">&#x1F4F7; Fotos de la parcela</span>'
+      + '<button type="button" class="btn btn-primary btn-sm" style="font-size:12px" '
+      + 'onclick="closeModal(\'modal-historial-parcela\');setTimeout(function(){abrirFotosModal(\''+r.id+'\',\''+encodeURIComponent(r.nombreFinca||sigpacRef)+'\');},200)">&#x1F4F7; Hacer / subir foto</button>'
+      + '</div>';
+
+    if(!fotos.length) {
+      fotoHtml += '<div style="color:var(--text3);font-size:12px;padding:8px 0">Sin fotos. Pulsa el botón para hacer la primera.</div>';
+    } else {
+      fotoHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px">'
+        + fotos.map(function(f) {
+            var previewSrc = f.thumbUrl || f.dataUrl || '';
+            var d = new Date(f.fecha);
+            var fechaStr = d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'2-digit'});
+            var thumb = previewSrc
+              ? '<img src="'+previewSrc+'" style="width:100%;height:75px;object-fit:cover;border-radius:6px 6px 0 0;display:block;cursor:pointer" '
+                + (f.driveFileId ? 'onclick="verFotoDrive(\''+f.driveFileId+'\')" ' : '') + '>'
+              : '<div style="width:100%;height:75px;background:rgba(74,140,42,.08);display:flex;align-items:center;justify-content:center;border-radius:6px 6px 0 0;font-size:24px">&#x1F5BC;&#xFE0F;</div>';
+            return '<div style="background:var(--card);border:1px solid var(--border2);border-radius:8px;overflow:hidden">'
+              + thumb
+              + '<div style="padding:4px 6px;display:flex;align-items:center;justify-content:space-between;gap:4px">'
+              + '<span style="font-size:10px;color:var(--text3)">'+fechaStr+'</span>'
+              + '<button type="button" class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" '
+              + 'onclick="eliminarFotoRegistro(\''+f.id+'\');verHistorialParcela(\''+r.id+'\')">&#x1F5D1;</button>'
+              + '</div></div>';
+          }).join('')
+        + '</div>';
+    }
+    fotoHtml += '</div>';
+    fotoSecEl.innerHTML = fotoHtml;
+  }
+
   openModal('modal-historial-parcela');
 }
 
@@ -5907,6 +5949,8 @@ function buildParcelaListForCrop(recs, cv) {
     var regBadge = reg.indexOf('secano')>=0 ? '<span class="reg-pill reg-pill-sec">&#x1F33E; Secano</span>'
                  : reg.indexOf('regad')>=0  ? '<span class="reg-pill reg-pill-reg">&#x1F4A7; Regad&iacute;o</span>'
                  : '';
+    var fotosCnt = (DB.fotos||[]).filter(function(f){ return f.recintoId === r.id; }).length;
+    var fotoBadge = fotosCnt > 0 ? '<span style="background:var(--primary);color:#fff;font-size:9px;padding:0 4px;border-radius:6px;font-weight:700;margin-left:2px">'+fotosCnt+'</span>' : '';
     return '<div style="padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">'
       + '<div style="font-weight:700;color:var(--primary);word-break:break-word;line-height:1.3;cursor:pointer;text-decoration:underline;text-decoration-color:transparent" '
       + 'onclick="event.stopPropagation();verHistorialParcela(\''+r.id+'\')" '
@@ -5918,6 +5962,8 @@ function buildParcelaListForCrop(recs, cv) {
       + '<span style="font-weight:700;color:#7acc4a;margin-left:auto">'+ha.toFixed(2)+' ha</span>'
       + '<button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px;flex-shrink:0" '
       + 'onclick="event.stopPropagation();verParcelaEnMapa(\''+r.id+'\')" title="Ver en el mapa">&#x1F4CD;</button>'
+      + '<button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px;font-size:11px;flex-shrink:0" '
+      + 'onclick="event.stopPropagation();abrirFotosModal(\''+r.id+'\',\''+label.replace(/'/g,'')+'\')" title="Ver / subir fotos">&#x1F4F7;'+fotoBadge+'</button>'
       + '</div></div>';
   }).join('');
   return rows;
