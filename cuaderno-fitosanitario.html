@@ -4512,6 +4512,7 @@ var _editingUsos = [];
 
 function renderUsosTable() {
   var cont = document.getElementById('usos-lista'); if(!cont) return;
+  if(!Array.isArray(_editingUsos)) _editingUsos = [];
   if(!_editingUsos.length) {
     cont.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin usos registrados.</div>';
     return;
@@ -4520,21 +4521,17 @@ function renderUsosTable() {
     return '<div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
       + '<span style="font-size:15px">&#x1F33F;</span>'
-      + '<strong style="color:var(--white);font-size:13px;flex:1">'+(u.cultivo||'<em style="color:var(--text3)">Sin cultivo</em>')+'</strong>'
+      + '<strong style="color:var(--white);font-size:13px;flex:1">'+(u.cultivo||'<em style="color:var(--text3)">Rellena el cultivo</em>')+'</strong>'
       + '<button type="button" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="removeUso('+idx+')">&#x1F5D1;</button>'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-      + usoField('Cultivo', 'text',   u.cultivo||'',    'uso-cultivo-'+idx,    'ej: TRIGO')
+      + usoField('Cultivo *', 'text', u.cultivo||'', 'uso-cultivo-'+idx, 'ej: TRIGO')
       + usoField('Dosis máx./pase (L o kg/ha)', 'number', u.dosisMaxPase||'', 'uso-dmpase-'+idx, 'ej: 2.5')
-      + usoField('Dosis máx. total campaña (L o kg/ha)', 'number', u.dosisMaxTotal||'', 'uso-dmtotal-'+idx, 'ej: 7.5')
+      + usoField('Dosis máx. total campaña', 'number', u.dosisMaxTotal||'', 'uso-dmtotal-'+idx, 'ej: 7.5')
       + usoField('Nº máx. tratamientos/campaña', 'number', u.nTrtsMax||'', 'uso-ntrts-'+idx, 'ej: 3')
       + usoField('Plazo de seguridad (días)', 'text', u.plazo||'', 'uso-plazo-'+idx, 'ej: 21 / NP')
-      + usoField('Observaciones', 'text', u.obs||'', 'uso-obs-'+idx, 'Modo de empleo, restricciones...')
-      + '</div>'
-      + '<div style="text-align:right;margin-top:6px">'
-      + '<button type="button" class="btn btn-primary btn-sm" onclick="saveUso('+idx+')">&#x2705; Guardar uso</button>'
-      + '</div>'
-      + '</div>';
+      + usoField('Observaciones', 'text', u.obs||'', 'uso-obs-'+idx, 'Restricciones, modo de empleo...')
+      + '</div></div>';
   }).join('');
 }
 
@@ -4549,25 +4546,10 @@ function usoField(label, type, val, id, ph) {
 function addUsoRow() {
   _editingUsos.push({ cultivo:'', dosisMaxPase:0, dosisMaxTotal:0, nTrtsMax:0, plazo:'', obs:'' });
   renderUsosTable();
-  // Scroll to bottom of modal and focus the new row's cultivo field
   setTimeout(function(){
-    var cont = document.getElementById('usos-lista');
-    if(cont) cont.scrollIntoView({behavior:'smooth', block:'end'});
     var lastInput = document.getElementById('uso-cultivo-'+(_editingUsos.length-1));
-    if(lastInput) lastInput.focus();
+    if(lastInput) { lastInput.scrollIntoView({behavior:'smooth', block:'center'}); lastInput.focus(); }
   }, 80);
-}
-
-function saveUso(idx) {
-  var u = _editingUsos[idx];
-  if(!u) return;
-  u.cultivo      = (document.getElementById('uso-cultivo-'+idx)||{value:''}).value.trim().toUpperCase();
-  u.dosisMaxPase = parseFloat((document.getElementById('uso-dmpase-'+idx)||{value:''}).value) || 0;
-  u.dosisMaxTotal= parseFloat((document.getElementById('uso-dmtotal-'+idx)||{value:''}).value) || 0;
-  u.nTrtsMax     = parseInt((document.getElementById('uso-ntrts-'+idx)||{value:''}).value) || 0;
-  u.plazo        = (document.getElementById('uso-plazo-'+idx)||{value:''}).value.trim();
-  u.obs          = (document.getElementById('uso-obs-'+idx)||{value:''}).value.trim();
-  renderUsosTable();
 }
 
 function removeUso(idx) {
@@ -4576,6 +4558,7 @@ function removeUso(idx) {
 }
 
 function getUsosFromModal() {
+  if(!Array.isArray(_editingUsos)) _editingUsos = [];
   // Flush any unsaved edits first
   _editingUsos.forEach(function(u, idx) {
     u.cultivo      = (document.getElementById('uso-cultivo-'+idx)||{value:u.cultivo}).value.trim().toUpperCase();
@@ -4669,7 +4652,10 @@ function openProductoModal(id=null) {
   var ucEl = document.getElementById('prod-unidad-compra');
   if(ucEl) ucEl.value = p ? (p.unidadCompra||p.unidadCoste||'') : '';
   // Load per-crop usos
-  _editingUsos = JSON.parse(JSON.stringify(p ? (p.usos||[]) : []));
+  // p.usos can be a legacy text string (free-text field from old versions) or
+  // the new array format. Always normalise to array before editing.
+  var rawUsos = p ? p.usos : [];
+  _editingUsos = Array.isArray(rawUsos) ? JSON.parse(JSON.stringify(rawUsos)) : [];
   renderUsosTable();
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
