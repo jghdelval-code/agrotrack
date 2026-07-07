@@ -1162,9 +1162,14 @@ textarea { resize: vertical; min-height: 72px; }
             Según etiqueta o ficha del MAPA. Se usa para alertar al registrar tratamientos si se supera algún límite.
           </div>
           <div id="usos-lista" style="margin-bottom:8px"></div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="addUsoRow()" style="width:100%;justify-content:center">
-            &#x2795; Añadir cultivo / uso
-          </button>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addUsoRow()" style="flex:1;justify-content:center">
+              &#x2795; Añadir cultivo / uso
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-importar-mapa" onclick="importarUsosMapa()" style="flex:1;justify-content:center;display:none">
+              &#x1F4E5; Importar usos del MAPA
+            </button>
+          </div>
         </div>
         <div class="form-group span-2">
           <label>Formatos y precios <span style="font-weight:400;color:var(--text3);font-size:11px">— un formato por tamaño de envase</span></label>
@@ -4383,29 +4388,60 @@ function buildProductCard(p) {
       +'</div>';
   }
 
-  // Usos detalle toggle (only if has data)
+  // Usos detalle toggle — combines MAPA catalog uses (usosDetalle) with the
+  // user's own configured uses + limits (p.usos array).
   var udHtml='';
-  if(p.usosDetalle&&Object.keys(p.usosDetalle).length){
-    var cvList=Object.keys(p.usosDetalle).sort();
+  var userUsos = Array.isArray(p.usos) ? p.usos.filter(function(u){ return u && u.cultivo; }) : [];
+  var hasMapaUsos = p.usosDetalle && Object.keys(p.usosDetalle).length;
+  if(hasMapaUsos || userUsos.length){
     var togId='ud_'+p.id;
-    var rows=cvList.map(function(cv){
-      var usos=p.usosDetalle[cv];
-      var color=getCropColor(cv);
-      var usoRows=(usos||[]).slice(0,6).map(function(u){
-        return '<tr><td style="padding:2px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+(u.agente||u.a||'')+'</td>'
-          +'<td style="padding:2px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.dosis||u.d||'')+'</td>'
-          +'<td style="padding:2px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.plazo||u.pl||'')+'</td></tr>';
+    var innerBlocks = '';
+
+    // ── User-defined uses with legal limits (shown first, highlighted) ──
+    if(userUsos.length) {
+      innerBlocks += '<div style="margin-bottom:8px">'
+        + '<div style="font-size:10px;font-weight:700;color:#e67e22;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">&#x2699;&#xFE0F; Mis usos y límites</div>'
+        + userUsos.map(function(u) {
+            var color = getCropColor(u.cultivo);
+            var chips = [];
+            if(u.dosisMaxPase)  chips.push('<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(74,140,42,.15);color:#7acc4a">Máx/pase: '+u.dosisMaxPase+'</span>');
+            if(u.dosisMaxTotal) chips.push('<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(74,140,42,.15);color:#7acc4a">Máx total: '+u.dosisMaxTotal+'</span>');
+            if(u.nTrtsMax)      chips.push('<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(41,128,185,.15);color:#5dade2">Máx trats: '+u.nTrtsMax+'</span>');
+            if(u.plazo)         chips.push('<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(0,0,0,.25);color:var(--text3)">Plazo: '+u.plazo+'</span>');
+            return '<div style="margin-bottom:5px;background:var(--card);border:1px solid var(--border2);border-radius:6px;overflow:hidden">'
+              + '<div style="padding:3px 8px;background:'+color+'22;border-left:3px solid '+color+';font-size:11px;font-weight:700;color:var(--white)">'+u.cultivo+'</div>'
+              + '<div style="padding:6px 8px;display:flex;flex-wrap:wrap;gap:4px">'+(chips.length?chips.join(''):'<span style="font-size:10px;color:var(--text3)">Sin límites definidos</span>')+'</div>'
+              + (u.obs?'<div style="padding:0 8px 6px;font-size:10px;color:var(--text3)">'+u.obs+'</div>':'')
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }
+
+    // ── MAPA catalog uses ──
+    if(hasMapaUsos) {
+      var cvList=Object.keys(p.usosDetalle).sort();
+      if(userUsos.length) innerBlocks += '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin:8px 0 4px">&#x1F4CB; Usos del registro MAPA</div>';
+      innerBlocks += cvList.map(function(cv){
+        var usos=p.usosDetalle[cv];
+        var color=getCropColor(cv);
+        var usoRows=(usos||[]).slice(0,6).map(function(u){
+          return '<tr><td style="padding:2px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)">'+(u.agente||u.a||'')+'</td>'
+            +'<td style="padding:2px 8px;font-size:11px;font-weight:700;color:var(--primary);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.dosis||u.d||'')+'</td>'
+            +'<td style="padding:2px 8px;font-size:11px;color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">'+(u.plazo||u.pl||'')+'</td></tr>';
+        }).join('');
+        return '<div style="margin-bottom:5px">'
+          +'<div style="padding:2px 8px;background:'+color+'22;border-left:3px solid '+color+';font-size:11px;font-weight:700;color:var(--white)">'+cv+'</div>'
+          +'<table style="width:100%;border-collapse:collapse"><thead><tr>'
+          +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Agente/Plaga</th>'
+          +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Dosis</th>'
+          +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Plazo</th>'
+          +'</tr></thead><tbody>'+usoRows+'</tbody></table></div>';
       }).join('');
-      return '<div style="margin-bottom:5px">'
-        +'<div style="padding:2px 8px;background:'+color+'22;border-left:3px solid '+color+';font-size:11px;font-weight:700;color:var(--white)">'+cv+'</div>'
-        +'<table style="width:100%;border-collapse:collapse"><thead><tr>'
-        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Agente/Plaga</th>'
-        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Dosis</th>'
-        +'<th style="padding:2px 8px;font-size:10px;color:var(--text3);text-align:left">Plazo</th>'
-        +'</tr></thead><tbody>'+usoRows+'</tbody></table></div>';
-    }).join('');
-    udHtml='<div id="'+togId+'" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px;max-height:260px;overflow-y:auto">'+rows+'</div>'
-      +'<button type="button" class="toggle-usos-btn" data-togid="'+togId+'" data-cnt="'+cvList.length+'" onclick="var el=document.getElementById(this.dataset.togid);if(el){var op=el.style.display!==\'none\';el.style.display=op?\'none\':\'block\';this.textContent=op?\'\uD83D\uDD0D Ver usos ('+cvList.length+' cultivos)\':\'▴ Ocultar\';}" style="margin-top:4px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos ('+cvList.length+' cultivos)</button>';
+    }
+
+    var totalCultivos = userUsos.length + (hasMapaUsos ? Object.keys(p.usosDetalle).length : 0);
+    udHtml='<div id="'+togId+'" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px;max-height:300px;overflow-y:auto">'+innerBlocks+'</div>'
+      +'<button type="button" class="toggle-usos-btn" data-togid="'+togId+'" onclick="var el=document.getElementById(this.dataset.togid);if(el){var op=el.style.display!==\'none\';el.style.display=op?\'none\':\'block\';this.textContent=op?\'\uD83D\uDD0D Ver usos ('+totalCultivos+' cultivos)\':\'▴ Ocultar\';}" style="margin-top:4px;font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0;font-weight:600">&#x1F50D; Ver usos ('+totalCultivos+' cultivos)</button>';
   }
 
   var mapaBtn=isMapa&&!p.enCatalogo
@@ -4509,6 +4545,50 @@ function quitarCancelado() {
 // _editingUsos es el array local mientras el usuario edita el producto
 // ─────────────────────────────────────────────────────────────────────────────
 var _editingUsos = [];
+var _editingProdUsosDetalle = null;
+
+// Import the MAPA catalog uses into the editable "Mis usos" list so the user
+// can adjust them their way. Pre-fills cultivo + a suggested max dose parsed
+// from the MAPA dose text, and the plazo. Doesn't overwrite existing rows.
+function importarUsosMapa() {
+  if(!_editingProdUsosDetalle) return;
+  if(!Array.isArray(_editingUsos)) _editingUsos = [];
+
+  var existentes = _editingUsos.map(function(u){ return (u.cultivo||'').toUpperCase(); });
+  var añadidos = 0;
+
+  Object.keys(_editingProdUsosDetalle).sort().forEach(function(cv) {
+    var cvUp = cv.toUpperCase();
+    if(existentes.indexOf(cvUp) >= 0) return; // don't duplicate
+
+    var usos = _editingProdUsosDetalle[cv] || [];
+    // Try to parse a numeric max dose from the first use's dose text (e.g. "0,3-0,5 L/ha")
+    var dosisMax = 0, plazo = '';
+    usos.forEach(function(u) {
+      var dtxt = String(u.dosis||u.d||'').replace(',', '.');
+      var nums = dtxt.match(/[\d.]+/g);
+      if(nums) { nums.forEach(function(n){ var v=parseFloat(n); if(v>dosisMax) dosisMax=v; }); }
+      if(!plazo && (u.plazo||u.pl)) plazo = (u.plazo||u.pl);
+    });
+
+    _editingUsos.push({
+      cultivo: cvUp,
+      dosisMaxPase: dosisMax || 0,
+      dosisMaxTotal: 0,
+      nTrtsMax: 0,
+      plazo: plazo || '',
+      obs: ''
+    });
+    añadidos++;
+  });
+
+  renderUsosTable();
+  if(añadidos) {
+    alert('Se han importado ' + añadidos + ' uso(s) del MAPA.\n\nRevisa y ajusta las dosis máximas, nº de tratamientos y plazos según la etiqueta del producto. La dosis sugerida es la máxima detectada en el texto del MAPA.');
+  } else {
+    alert('Todos los cultivos del MAPA ya están en tu lista de usos.');
+  }
+}
 
 function renderUsosTable() {
   var cont = document.getElementById('usos-lista'); if(!cont) return;
@@ -4657,6 +4737,10 @@ function openProductoModal(id=null) {
   var rawUsos = p ? p.usos : [];
   _editingUsos = Array.isArray(rawUsos) ? JSON.parse(JSON.stringify(rawUsos)) : [];
   renderUsosTable();
+  // Show "import MAPA uses" button only if this product has MAPA catalog data
+  _editingProdUsosDetalle = (p && p.usosDetalle && Object.keys(p.usosDetalle).length) ? p.usosDetalle : null;
+  var impBtn = document.getElementById('btn-importar-mapa');
+  if(impBtn) impBtn.style.display = _editingProdUsosDetalle ? '' : 'none';
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
