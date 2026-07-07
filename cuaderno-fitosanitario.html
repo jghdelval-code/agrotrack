@@ -3681,7 +3681,7 @@ function prodComboSelect(item) {
       confirmDialog('"' + prodNC.nombre + '" no est\u00e1 en tu cat\u00e1logo.\n\u00bFA\u00f1adirlo a Mi Cat\u00e1logo para que aparezca directamente en tratamientos?', function() {
         prodNC.enCatalogo = true;
         save();
-      });
+      }, null, { okLabel: '\u2705 A\u00f1adir', cancelLabel: 'Ahora no', okClass: 'btn-primary' });
     }
   }
 
@@ -5261,7 +5261,11 @@ function saveProducto() {
 }
 
 // ── Custom confirm dialog (replaces window.confirm which iOS blocks when iframe is active) ──
-function confirmDialog(msg, onOk, onCancel) {
+function confirmDialog(msg, onOk, onCancel, opts) {
+  opts = opts || {};
+  var okLabel     = opts.okLabel     || 'Eliminar';
+  var cancelLabel = opts.cancelLabel || 'Cancelar';
+  var okClass     = opts.okClass     || 'btn-danger';   // pass 'btn-primary' for non-destructive
   var overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px';
   var box = document.createElement('div');
@@ -5269,8 +5273,8 @@ function confirmDialog(msg, onOk, onCancel) {
   var lines = msg.split('\n');
   var html = lines.map(function(l,i){ return i===0?'<div style="font-weight:700;font-size:15px;color:var(--white);margin-bottom:8px">'+l+'</div>':'<div style="font-size:13px;color:var(--text2);margin-bottom:4px">'+l+'</div>'; }).join('');
   html += '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'
-    + '<button id="_cd_cancel" class="btn btn-secondary" style="min-width:80px">Cancelar</button>'
-    + '<button id="_cd_ok" class="btn btn-danger" style="min-width:80px">Eliminar</button>'
+    + '<button id="_cd_cancel" class="btn btn-secondary" style="min-width:80px">'+cancelLabel+'</button>'
+    + '<button id="_cd_ok" class="btn '+okClass+'" style="min-width:80px">'+okLabel+'</button>'
     + '</div>';
   box.innerHTML = html;
   overlay.appendChild(box);
