@@ -4668,14 +4668,10 @@ function openProductoModal(id=null) {
   document.getElementById('prod-plazo').value = p ? p.plazo||'' : '';
   var ucEl = document.getElementById('prod-unidad-compra');
   if(ucEl) ucEl.value = p ? (p.unidadCompra||p.unidadCoste||'') : '';
-  var dmpEl = document.getElementById('prod-dosis-max-pase');   if(dmpEl) dmpEl.value = p ? (p.dosisMaxPase||'')  : '';
-  var dmtEl = document.getElementById('prod-dosis-max-total');  if(dmtEl) dmtEl.value = p ? (p.dosisMaxTotal||'') : '';
-  var ntrEl = document.getElementById('prod-ntrts-max');        if(ntrEl) ntrEl.value = p ? (p.nTrtsMax||'')     : '';
   // Load per-crop usos
   _editingUsos = JSON.parse(JSON.stringify(p ? (p.usos||[]) : []));
   renderUsosTable();
   var _fmts = (p && p.formatos && p.formatos.length) ? p.formatos : (p && p.coste ? [{nombre:'Estándar',cantidad:1,unidad:p.unidadCoste||'L',precio:p.coste}] : []); renderFormatoRows(_fmts);
-  document.getElementById('prod-usos').value = p ? p.usos||'' : '';
   document.getElementById('prod-obs').value = p ? p.obs||'' : '';
   document.getElementById('prod-cultivo-input').value = '';
   renderCultivoTags(p ? p.cultivosAutorizados||[] : []);
@@ -5160,14 +5156,10 @@ function saveProducto() {
     dosis:       document.getElementById('prod-dosis').value.trim(),
     plazo:        document.getElementById('prod-plazo').value.trim(),
     unidadCompra: (document.getElementById('prod-unidad-compra')||{value:''}).value || '',
-    dosisMaxPase:  parseFloat((document.getElementById('prod-dosis-max-pase')||{value:''}).value)  || 0,
-    dosisMaxTotal: parseFloat((document.getElementById('prod-dosis-max-total')||{value:''}).value) || 0,
-    nTrtsMax:      parseInt((document.getElementById('prod-ntrts-max')||{value:''}).value)         || 0,
     usos:          getUsosFromModal(),
     formatos:    formatos,
     coste:       legacyCoste,
     unidadCoste: legacyUnidad,
-    usos:        document.getElementById('prod-usos').value.trim(),
     obs:         document.getElementById('prod-obs').value.trim(),
     cultivosAutorizados: getCultivoTagsValues(),
     enCatalogo:  enCatalogo
