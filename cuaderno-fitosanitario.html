@@ -4032,11 +4032,6 @@ function saveTratamiento() {
       warnings.push('⛔ '+nombre+': ya se han dado '+calc.nTrts+' tratamientos (máximo '+uso.nTrtsMax+').');
   });
 
-  if(warnings.length) {
-    var msg = '⚠️ Advertencia de límites legales:\n\n' + warnings.join('\n') + '\n\n¿Desea guardar igualmente?';
-    if(!confirm(msg)) return;
-  }
-
   var data = {
     fecha:      fecha,
     campana:    document.getElementById('trt-campana').value,
@@ -4052,15 +4047,26 @@ function saveTratamiento() {
     obs:           document.getElementById('trt-obs').value
   };
 
-  if(editingId.tratamiento) {
-    var i = DB.tratamientos.findIndex(function(t){return t.id===editingId.tratamiento;});
-    if(i>=0) DB.tratamientos[i] = Object.assign({}, DB.tratamientos[i], data);
-  } else {
-    DB.tratamientos.push({id:uid(),...data});
+  function doSaveTratamiento() {
+    if(editingId.tratamiento) {
+      var i = DB.tratamientos.findIndex(function(t){return t.id===editingId.tratamiento;});
+      if(i>=0) DB.tratamientos[i] = Object.assign({}, DB.tratamientos[i], data);
+    } else {
+      DB.tratamientos.push(Object.assign({id:uid()}, data));
+    }
+    save();
+    closeModal('modal-tratamiento');
+    renderTratamientos();
   }
-  save();
-  closeModal('modal-tratamiento');
-  renderTratamientos();
+
+  // If there are legal-limit warnings, confirm via the custom dialog
+  // (native confirm() is blocked by iOS Safari in standalone/PWA mode).
+  if(warnings.length) {
+    var msg = '⚠️ Límites legales\n' + warnings.join('\n') + '\n¿Guardar igualmente?';
+    confirmDialog(msg, doSaveTratamiento, null, { okLabel: 'Guardar igual', cancelLabel: 'Revisar', okClass: 'btn-primary' });
+  } else {
+    doSaveTratamiento();
+  }
 }
 
 function markDeleted(key, id) {
