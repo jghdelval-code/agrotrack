@@ -3595,6 +3595,7 @@ function refreshProductRows() {
       dosis:        parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0,
       unidad:       (row.querySelector('.prod-row-unidad')||{}).value,
       justificacion:(row.querySelector('.prod-row-just')||{}).value||'',
+      problema:     (row.querySelector('.prod-row-problema')||{}).value||'',
       margen:       parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0
     };
   });
@@ -3666,11 +3667,20 @@ function addProductRow(data) {
     +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4CA; Stock</span><span class="prod-row-stock">&mdash;</span></div>'
     +'<div class="prod-row-badge"><span class="prod-row-badge-label">&#x1F4B6; PVP/ha</span><span class="prod-row-pvp">'+(data&&data.pvpHa?data.pvpHa.toFixed(2)+'&euro;/ha':'&mdash;')+'</span></div>';
   var limiteDiv=document.createElement('div'); limiteDiv.className='prod-row-limite';
+  // Per-product problema + justificación — each product can target a different
+  // pest and have its own justification (both feed the cuaderno's 3.1/3.1bis rows)
+  var pjWrap=document.createElement('div');
+  pjWrap.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px';
+  var probInp=document.createElement('input'); probInp.type='text';
+  probInp.placeholder='\uD83D\uDC1B Problema fitosanitario / plaga'; probInp.className='prod-row-problema';
+  probInp.style.cssText='width:100%';
+  if(data&&data.problema) probInp.value=data.problema;
   var justInp=document.createElement('input'); justInp.type='text';
-  justInp.placeholder='Justificación / plaga objetivo'; justInp.className='prod-row-just';
-  justInp.style.cssText='width:100%;margin-top:5px';
+  justInp.placeholder='\u2696\uFE0F Justificaci\u00f3n de la actuaci\u00f3n'; justInp.className='prod-row-just';
+  justInp.style.cssText='width:100%';
   if(data&&data.justificacion) justInp.value=data.justificacion;
-  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(infoRow); inner.appendChild(limiteDiv); inner.appendChild(justInp);
+  pjWrap.appendChild(probInp); pjWrap.appendChild(justInp);
+  inner.appendChild(top); inner.appendChild(fields); inner.appendChild(infoRow); inner.appendChild(limiteDiv); inner.appendChild(pjWrap);
   row._prodList=allProds;
   row.appendChild(inner);
   document.getElementById('trt-products-rows').appendChild(row);
@@ -4045,10 +4055,11 @@ function saveTratamiento() {
     var dosis = parseFloat((row.querySelector('.prod-row-dosis')||{}).value)||0;
     var unidad = (row.querySelector('.prod-row-unidad')||{}).value;
     var just   = (row.querySelector('.prod-row-just')||{}).value||'';
+    var prob   = (row.querySelector('.prod-row-problema')||{}).value||'';
     var margen = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
     var pvpEl  = row.querySelector('.prod-row-pvp');
     var pvpHa  = pvpEl ? (parseFloat(pvpEl.textContent)||0) : 0;
-    if(pid) productos.push({productoId:pid, dosis:dosis, unidad:unidad, volCaldo:200, justificacion:just, margen:margen, pvpHa:pvpHa});
+    if(pid) productos.push({productoId:pid, dosis:dosis, unidad:unidad, volCaldo:200, justificacion:just, problema:prob, margen:margen, pvpHa:pvpHa});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
 
@@ -6599,9 +6610,14 @@ function exportarCuaderno() {
   sectionRow(ws5,3,13,'3.1  REGISTRO DE ACTUACIONES FITOSANITARIAS (SIN ASESOR GIP)');
   headerRow(ws5,4,['Id.\nParcela','Especie','Variedad','Fechas','Sup.tratada\n(ha)','Problema\nFitosanitario','Aplicador','Equipo','Nombre\nComercial','N\u00ba\nRegistro','Dosis\n(kg,l/ha)','Eficacia','Observaciones']);
   var r5=5;
+  // Un recinto va a la hoja 3.1bis (asesor) si su sistema GIP implica asesoramiento:
+  // Asistida de un asesor, Producción Integrada, ATRIA o Agricultura Ecológica.
+  function esGipAsesor(r) {
+    var g = (r.gip||'').toUpperCase();
+    return g.indexOf('(AS)')>=0 || g.indexOf('ASISTIDA')>=0 || g.indexOf('(PI)')>=0 || g.indexOf('ATRIA')>=0 || g.indexOf('(AE)')>=0;
+  }
   trts.forEach(function(t){
-    var tR=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&!r.sistemaGip;});
-    if(!tR.length)tR=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0;});
+    var tR=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&!esGipAsesor(r);});
     if(!tR.length)return;
     var ords=tR.map(function(r){return r.numOrden||'?';}).join(', ');
     var ev=(tR[0].especieVariedad||'').split('/');
@@ -6609,7 +6625,7 @@ function exportarCuaderno() {
     var dates=formatDate(t.fechaInicio||t.fecha)+(t.fechaFin?' - '+formatDate(t.fechaFin):'');
     (t.productos||[]).forEach(function(p){
       var prod=(DB.productos||[]).find(function(x){return x.id===p.productoId;});
-      dataRow(ws5,r5,[ords,ev[0].trim(),(ev.slice(1).join('/')).trim(),dates,ha.toFixed(2),t.problema||'',t.aplicador||'',t.maquinaria||'',prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),t.eficacia||'',t.obs||''],13);
+      dataRow(ws5,r5,[ords,ev[0].trim(),(ev.slice(1).join('/')).trim(),dates,ha.toFixed(2),p.problema||t.problema||'',t.aplicador||'',t.maquinaria||'',prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),t.eficacia||'',t.obs||''],13);
       r5++;
     });
   });
@@ -6630,13 +6646,13 @@ function exportarCuaderno() {
   headerRow(ws6,5,['Especie','Variedad','Id.\nParcela','Sup.\nCultivada\n(ha)','Sup.\nTratada\n(ha)','Plaga /\nProblema','Justificaci\u00f3n\nactuaci\u00f3n','Alternativas\nno qu\u00edmicas','Nombre\nComercial','N\u00ba\nRegistro','Dosis\n(kg,l/ha)','Aplicador','Equipo','Eficacia','Observaciones']);
   var r6=6;
   trts.forEach(function(t){
-    var tR=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&r.sistemaGip;});
+    var tR=recs.filter(function(r){return (t.recintoIds||[]).indexOf(r.id)>=0&&esGipAsesor(r);});
     if(!tR.length)return;
     tR.forEach(function(r){
       var ev=(r.especieVariedad||'').split('/');
       (t.productos||[]).forEach(function(p){
         var prod=(DB.productos||[]).find(function(x){return x.id===p.productoId;});
-        dataRow(ws6,r6,[ev[0].trim(),(ev.slice(1).join('/')).trim(),r.numOrden||'',parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',t.problema||'',t.justificacion||'',t.altNoQuim||'',prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),t.aplicador||'',t.maquinaria||'',t.eficacia||'',t.obs||''],15);
+        dataRow(ws6,r6,[ev[0].trim(),(ev.slice(1).join('/')).trim(),r.numOrden||'',parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',parseFloat(r.supCultivada)||parseFloat(r.supSigpac)||'',p.problema||t.problema||'',p.justificacion||t.justificacion||'',t.altNoQuim||'',prod?prod.nombre:'',prod?prod.numRegistro:'',p.dosis+(p.unidad?' '+p.unidad:''),t.aplicador||'',t.maquinaria||'',t.eficacia||'',t.obs||''],15);
         r6++;
       });
     });
