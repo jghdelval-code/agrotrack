@@ -388,13 +388,50 @@ textarea { resize: vertical; min-height: 72px; }
   .modal-body { padding: 16px; }
   .modal-header { padding: 14px 16px 12px; }
   .modal-footer { padding: 12px 16px; position: sticky; bottom: 0; background: var(--card); z-index: 2; }
-  .btn { min-height: 38px; }
+  .btn { min-height: 40px; }
   input, select, textarea { font-size: 16px !important; }
   .recinto-check { padding: 10px 12px; min-height: 44px; }
   .parcela-recinto-row { padding: 10px 8px; min-height: 44px; }
   .product-card { flex-direction: column; gap: 10px; }
   .product-card-actions { flex-direction: row; justify-content: flex-end; }
-  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-sm { padding: 6px 11px; font-size: 13px; }
+
+  /* ── LEGIBILIDAD: texto un punto más grande en móvil ── */
+  body { font-size: 15px; }
+  h2 { font-size: 19px !important; }
+  h3 { font-size: 17px !important; }
+  label { font-size: 13px !important; }
+  .tag { font-size: 12px !important; }
+  .cliente-card-name { font-size: 17px !important; }
+  .cliente-card-meta { font-size: 13px !important; }
+  .cultivo-row { font-size: 13px !important; }
+  .cultivo-row-ha { font-size: 12px !important; }
+  .parcela-title-name { font-size: 18px !important; }
+  .parcela-recinto-row { font-size: 13px !important; }
+  .prod-row-badge-label { font-size: 11px !important; }
+  .servicio-btn .servicio-label { font-size: 16px !important; }
+  .reg-pill { font-size: 11px !important; }
+  .mnav-btn { font-size: 11px !important; }
+  .stat-card .val { font-size: 22px !important; }
+  .stat-card .lbl { font-size: 12px !important; }
+
+  /* ── ANTI-DESBORDAMIENTO: nada se sale de pantalla ── */
+  html, body { max-width: 100vw; overflow-x: hidden !important; }
+  main, .content, .tab-panel { max-width: 100vw; overflow-x: hidden; }
+  .cliente-card, .parcela-card, .product-card, .trt-card { max-width: 100%; overflow-x: hidden; }
+  .cliente-card-header { flex-wrap: wrap; }
+  .cliente-card-header > div { min-width: 0; }
+  .section-header { flex-wrap: wrap; gap: 8px; }
+  .section-header .actions { flex-wrap: wrap; width: 100%; }
+  .section-header .actions > * { flex: 1 1 auto; min-width: 0; }
+  .filter-select, .search-input { max-width: 100%; min-width: 0; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  code, .tag, .reg-pill { word-break: break-word; white-space: normal; }
+  .cliente-summary-block { padding: 12px 12px !important; min-width: 0; }
+  .cultivo-row-name { overflow: hidden; text-overflow: ellipsis; }
+  img, svg { max-width: 100%; }
+  .modal { width: 100vw; box-sizing: border-box; }
+  .form-group input, .form-group select, .form-group textarea { max-width: 100%; box-sizing: border-box; }
 
   /* KEY FIX: allow body and main to scroll on mobile */
   body { height: auto !important; min-height: 100vh; overflow: auto !important; padding-bottom: 66px; }
@@ -408,12 +445,12 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* ── Tables ─────────────────────────────────────── */
 @media (max-width: 700px) {
-  table { font-size: 12px; }
-  thead th { padding: 8px 6px; font-size: 10px; }
+  table { font-size: 13px; }
+  thead th { padding: 8px 6px; font-size: 11px; }
   td { padding: 7px 6px; }
   .col-hide-mobile { display: none !important; }
   .td-actions { white-space: nowrap; }
-  .td-actions .btn { padding: 4px 8px; font-size: 12px; }
+  .td-actions .btn { padding: 4px 8px; font-size: 13px; }
 }
 
 /* ── Parcela cards ─────────────────────────────── */
