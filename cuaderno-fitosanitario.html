@@ -4601,6 +4601,7 @@ var _editingProdUsosDetalle = null;
 function importarUsosMapa() {
   if(!_editingProdUsosDetalle) return;
   if(!Array.isArray(_editingUsos)) _editingUsos = [];
+  syncUsosFromDom();   // preserve any values already typed by the user
 
   var existentes = _editingUsos.map(function(u){ return (u.cultivo||'').toUpperCase(); });
   var añadidos = 0;
@@ -4671,7 +4672,24 @@ function usoField(label, type, val, id, ph) {
     + '</div>';
 }
 
+// Reads current DOM input values back into _editingUsos — must be called
+// before any re-render (addUsoRow, removeUso, importarUsosMapa), otherwise
+// the values the user typed but hasn't saved yet would be wiped.
+function syncUsosFromDom() {
+  if(!Array.isArray(_editingUsos)) { _editingUsos = []; return; }
+  _editingUsos.forEach(function(u, idx) {
+    var el;
+    el = document.getElementById('uso-cultivo-'+idx);  if(el) u.cultivo      = el.value.trim().toUpperCase();
+    el = document.getElementById('uso-dmpase-'+idx);   if(el) u.dosisMaxPase = parseFloat(el.value) || 0;
+    el = document.getElementById('uso-dmtotal-'+idx);  if(el) u.dosisMaxTotal= parseFloat(el.value) || 0;
+    el = document.getElementById('uso-ntrts-'+idx);    if(el) u.nTrtsMax     = parseInt(el.value) || 0;
+    el = document.getElementById('uso-plazo-'+idx);    if(el) u.plazo        = el.value.trim();
+    el = document.getElementById('uso-obs-'+idx);      if(el) u.obs          = el.value.trim();
+  });
+}
+
 function addUsoRow() {
+  syncUsosFromDom();   // preserve whatever the user has typed so far
   _editingUsos.push({ cultivo:'', dosisMaxPase:0, dosisMaxTotal:0, nTrtsMax:0, plazo:'', obs:'' });
   renderUsosTable();
   setTimeout(function(){
@@ -4681,21 +4699,14 @@ function addUsoRow() {
 }
 
 function removeUso(idx) {
+  syncUsosFromDom();   // preserve typed values in the OTHER rows
   _editingUsos.splice(idx, 1);
   renderUsosTable();
 }
 
 function getUsosFromModal() {
+  syncUsosFromDom();
   if(!Array.isArray(_editingUsos)) _editingUsos = [];
-  // Flush any unsaved edits first
-  _editingUsos.forEach(function(u, idx) {
-    u.cultivo      = (document.getElementById('uso-cultivo-'+idx)||{value:u.cultivo}).value.trim().toUpperCase();
-    u.dosisMaxPase = parseFloat((document.getElementById('uso-dmpase-'+idx)||{value:'0'}).value) || 0;
-    u.dosisMaxTotal= parseFloat((document.getElementById('uso-dmtotal-'+idx)||{value:'0'}).value) || 0;
-    u.nTrtsMax     = parseInt((document.getElementById('uso-ntrts-'+idx)||{value:'0'}).value) || 0;
-    u.plazo        = (document.getElementById('uso-plazo-'+idx)||{value:''}).value.trim();
-    u.obs          = (document.getElementById('uso-obs-'+idx)||{value:''}).value.trim();
-  });
   return _editingUsos.filter(function(u){ return u.cultivo; }); // drop blank rows
 }
 
