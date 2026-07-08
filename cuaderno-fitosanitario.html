@@ -3838,23 +3838,24 @@ function calcUsoProducto(prodId, clienteId, campana, recintoIds, excludeTrtId) {
   // Find the best matching uso for the selected recintos
   var prod = (DB.productos||[]).find(function(p){ return p.id === prodId; });
   var uso = null;
-  if(prod && prod.usos && prod.usos.length) {
+  var prodUsos = (prod && Array.isArray(prod.usos)) ? prod.usos : [];
+  if(prodUsos.length) {
     // Gather unique crops from the selected recintos
     var crops = [];
     recintoIds.forEach(function(rid) {
       var r = DB.recintos.find(function(x){ return x.id===rid; });
       if(r && r.especieVariedad) {
-        var cv = r.especieVariedad.split('/')[0].trim().toUpperCase();
+        var cv = String(r.especieVariedad).split('/')[0].trim().toUpperCase();
         if(crops.indexOf(cv)<0) crops.push(cv);
       }
     });
     // Find first uso that matches any crop (exact or partial)
-    uso = prod.usos.find(function(u) {
+    uso = prodUsos.find(function(u) {
       var uc = (u.cultivo||'').toUpperCase();
       return crops.some(function(cv){ return uc && (cv===uc || cv.indexOf(uc)>=0 || uc.indexOf(cv)>=0); });
     });
     // Fallback: if only one uso defined, use it regardless of crop
-    if(!uso && prod.usos.length === 1) uso = prod.usos[0];
+    if(!uso && prodUsos.length === 1) uso = prodUsos[0];
   }
   // If no per-crop uso, build one from legacy global limits
   if(!uso && prod) {
@@ -3992,6 +3993,7 @@ function calcProdRowPVP(input) {
 }
 
 function saveTratamiento() {
+ try {
   var fecha = document.getElementById('trt-fecha').value;
   var clienteId = document.getElementById('trt-cliente').value;
   if(!fecha) { alert('Indica la fecha del tratamiento'); return; }
@@ -4009,7 +4011,7 @@ function saveTratamiento() {
     var margen = parseFloat((row.querySelector('.prod-row-margen')||{}).value)||0;
     var pvpEl  = row.querySelector('.prod-row-pvp');
     var pvpHa  = pvpEl ? (parseFloat(pvpEl.textContent)||0) : 0;
-    if(pid) productos.push({productoId:pid, dosis, unidad, volCaldo:200, justificacion:just, margen, pvpHa});
+    if(pid) productos.push({productoId:pid, dosis:dosis, unidad:unidad, volCaldo:200, justificacion:just, margen:margen, pvpHa:pvpHa});
   });
   if(!productos.length) { alert('Añade al menos un producto'); return; }
 
@@ -4067,6 +4069,9 @@ function saveTratamiento() {
   } else {
     doSaveTratamiento();
   }
+ } catch(err) {
+  alert('Error al guardar el tratamiento:\n' + (err && err.message ? err.message : err) + '\n\nSi el problema persiste, avisa de este mensaje.');
+ }
 }
 
 function markDeleted(key, id) {
